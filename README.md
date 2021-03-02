@@ -18,6 +18,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 (All instructions by March 7, pretrained networks by March 20)
 
 ## Bibtex
+If you find this code or paper useful in your research, please consider citing us:
 ```
 @article{hudson2021gansformer,
   title={Generative Adversarial Transformers},

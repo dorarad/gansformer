@@ -3,7 +3,7 @@
   <b>Drew A. Hudson* & C. Lawrence Zitnick</b></span>
 </p>
 
-*I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the bipartite transformer, especially when explored within the language representation area, as well as for the kind financial support that allowed this work to happen!
+<span style="color: #000298"><i> *I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the bipartite transformer, especially when explored within the language representation area, as well as for the kind financial support that allowed this work to happen! </i></span>
 
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/image1.png" style="float:left" width="340px">

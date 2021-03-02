@@ -1206,7 +1206,7 @@ def G_synthesis(
                 kwargs = EasyDict()
                 to_pos = grid_poses[res] if img2ltnt else None
                 kwargs.update({"num_heads": num_heads, "ltnt_gate": ltnt_gate, "img_gate": img_gate, 
-                    "to_pos": to_pos, "pos_type": pos_type and img2ltnt TODO, 
+                    "to_pos": to_pos, "pos_type": pos_type and img2ltnt, 
                     "attention_dropout": attention_dropout, "col_dp": attention_dropout})
 
                 if use_pos:

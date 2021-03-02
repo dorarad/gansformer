@@ -41,4 +41,4 @@ The GANsformer consists of two networks:
      
 * Discriminator: Receives and image and has to predict whether it is real or fake – originating from the dataset or the generator. The model perform multiple layers of convolution and downsampling on the image, reducing the representation's resolution gradually until making final prediction. Optionally, attention can be incorporated into the discriminator as well where it has multiple (k) aggregator variables, that use attention to adaptively collect information from the image while being processed. We observe small improvements in model performance when attention is used in the discriminator, although note that most of the gain in using attention based on our observations arises from the generator.
 
-**More documentation and instructions coming soon!**
+### More documentation and instructions will be coming soon!

@@ -15,7 +15,7 @@ The model iteratively propagates information from a set of latent variables to t
 In contrast to the classic transformer architecture, it utilizes multiplicative integration that allows flexible region-based modulation, and can thus be seen as a generalization of the successful StyleGAN network. 
 
 **Instructions for model training and data prepreation as well as pretrained models will be available soon!**
-(All instructions by March 7, pretrained networks by March 20)
+(Final code cleanups by March 3, all instructions by March 7, pretrained networks by March 20)
 
 ## Bibtex
 ```

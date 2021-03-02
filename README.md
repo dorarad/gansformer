@@ -6,8 +6,8 @@
 *I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the bipartite transformer, especially when explored within the language representation area, as well as for the kind financial support that allowed this work to happen!
 
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/image1.png" style="float:left" width="220px">
-  <img src="https://cs.stanford.edu/people/dorarad/image2.png" style="float:right" width="430px">
+  <img src="https://cs.stanford.edu/people/dorarad/image1.png" style="float:left" width="320px">
+  <img src="https://cs.stanford.edu/people/dorarad/image2.png" style="float:right" width="625px">
 </div>
 
 This is an extension of the *GANsformer* model, a novel and efficient type of transformer, explored for the task of image generation. The network employs a _bipartite structure_ that enables long-range interactions across the image, while maintaining computation of linearly efficiency, that can readily scale to high-resolution synthesis. 

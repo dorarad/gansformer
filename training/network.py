@@ -1,4 +1,4 @@
-﻿# Network architectures for the GANSformer model, as well as multiple baselines such as
+# Network architectures for the GANSformer model, as well as multiple baselines such as
 # vanilla GAN, StyleGAN2, k-GAN and SAGAN, all implemented as extensions of the same 
 # model skeleton for most precise comparability under same settings.
 # See readme for architecture overview.
@@ -456,6 +456,10 @@ def transpose_for_scores(x, batch_size, num_heads, seq_len, head_size):
     x = tf.reshape(x, [batch_size, seq_len, num_heads, head_size]) 
     x = tf.transpose(x, [0, 2, 1, 3])
     return x
+
+####################################################################################################################################################
+# Note that the code from this point until the end of the file is not cleaned up yet! Cot will get cleaned-up by March 3 end-of-day. Stay Tuned!
+####################################################################################################################################################
 
 # comment about direction from to
 def transformer(from_tensor, to_tensor, dim, from_len = None, to_len = None, att_mask = None, ltnt_gate = False, 

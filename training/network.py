@@ -1,3 +1,7 @@
+####################################################################################################################################################
+# Note that the code from line 468 until the end of the file is not cleaned up yet! Code will get cleaned-up by March 3 end-of-day. Stay Tuned!
+####################################################################################################################################################
+
 # Network architectures for the GANSformer model, as well as multiple baselines such as
 # vanilla GAN, StyleGAN2, k-GAN and SAGAN, all implemented as extensions of the same 
 # model skeleton for most precise comparability under same settings.

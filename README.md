@@ -18,7 +18,7 @@ This is an implementation of the [GANsformer](https://arxiv.org/pdf/2103.01209.p
 The model iteratively propagates information from a set of latent variables to the evolving visual features and vice versa, to support the refinement of each in light of the other and encourage the emergence of compositional representations of objects and scenes. 
 In contrast to the classic transformer architecture, it utilizes multiplicative integration that allows flexible region-based modulation, and can thus be seen as a generalization of the successful StyleGAN network. 
 
-**Instructions for model training and data prepreation as well as pretrained models will be available soon. **  
+**Instructions for model training and data prepreation as well as pretrained models will be available soon.**  
 **Note that the code is still going through some refactoring and clean-up. Will be ready for running by end of March 3. Stay Tuned!**  
 (Code clean-up by March 3, all instructions by March 7, pretrained networks by March 20)
 

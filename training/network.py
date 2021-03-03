@@ -458,7 +458,7 @@ def transpose_for_scores(x, batch_size, num_heads, seq_len, head_size):
     return x
 
 ####################################################################################################################################################
-# Note that the code from this point until the end of the file is not cleaned up yet! Cot will get cleaned-up by March 3 end-of-day. Stay Tuned!
+# Note that the code from this point until the end of the file is not cleaned up yet! Code will get cleaned-up by March 3 end-of-day. Stay Tuned!
 ####################################################################################################################################################
 
 # comment about direction from to

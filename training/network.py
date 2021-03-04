@@ -1,5 +1,5 @@
 ####################################################################################################################################################
-# Note that the code from line 468 until the end of the file is not cleaned up yet! Code will get cleaned-up by March 3 end-of-day. Stay Tuned!
+# Note that the code from line 468 until the end of the file is not cleaned up yet! Code will get cleaned-up by March 4. Stay Tuned!
 ####################################################################################################################################################
 
 # Network architectures for the GANSformer model, as well as multiple baselines such as
@@ -462,7 +462,7 @@ def transpose_for_scores(x, batch_size, num_heads, seq_len, head_size):
     return x
 
 ####################################################################################################################################################
-# Note that the code from this point until the end of the file is not cleaned up yet! Code will get cleaned-up by March 3 end-of-day. Stay Tuned!
+# Note that the code from this point until the end of the file is not cleaned up yet! Code will get cleaned-up by March 4. Stay Tuned!
 ####################################################################################################################################################
 
 # comment about direction from to

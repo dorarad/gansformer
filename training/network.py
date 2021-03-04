@@ -17,31 +17,26 @@ from dnnlib import EasyDict
 from training import misc
 import math
 
-# Tensor basic operations
+# Shape operations
 # ----------------------------------------------------------------------------
 
-# Returns a list of the shape of tensor, preferring static dimensions when available
-def get_shape(tensor):
-    shape = tensor.shape.as_list()
-    non_static_indexes = [index for (index, dim) in enumerate(shape) if dim is None]
-
-    if not non_static_indexes:
-        return shape
-
-    dyn_shape = tf.shape(tensor)
-    for index in non_static_indexes:
-        shape[index] = dyn_shape[index]
+# Return the shape of tensor as a list, preferring static dimensions when available
+def get_shape(x):
+    shape, dyn_shape = x.shape.as_list(), tf.shape(x)
+    for index, dim in enumerate(shape):
+        if dim is None:
+            shape[index] = dyn_shape[index]
     return shape
 
-# Given a tensor [batch_size, ...] computes the size of each element in the batch
+# Given a tensor with elements [batch_size, ...] compute the size of each element in the batch
 def element_dim(x):
-    return np.prod(get_shape(tensor)[1:])
+    return np.prod(get_shape(x)[1:])
 
-# Flattens all dimensions of tensor except last one
+# Flatten all dimensions of a tensor except the last one
 def to_2d(x):
-    if len(get_shape(x)) == 2:
-        return x
     shape = get_shape(x)
+    if len(shape) == 2:
+        return x
     return tf.reshape(x, [np.prod(shape[:-1]), shape[-1]])
 
 # Linear layer
@@ -99,16 +94,20 @@ def norm(x, norm_type, parametric = True):
         x = tf.contrib.layers.layer_norm(inputs = x, begin_norm_axis = -1, begin_params_axis = -1)
     return x
 
-# Normalization to be used in attention layers. Does not scale back features with scale and bias 
+# Normalization operation used in attention layers. Does not scale back features x (the image) 
+# with parametrized gain and bias, since these will be controlled by the additive/multiplicative 
+# integration of as part of the transformer layer (where the latent y will modulate the image features x)
+# after x gets normalized, by controlling their scale and bias (similar to the FiLM and StyleGAN approaches).
+# 
 # Arguments:
-# - x: [batch_size * x_len, channels]
-# - x_len: number of elements in the x set (e.g. number of positions WH)
-# - integration: type of integration: additive, multiplicative or both
-# - norm: normalization type: instance or layer-wise
+# - x: [batch_size * num, channels]
+# - num: number of elements in the x set (e.g. number of positions WH)
+# - integration: type of integration -- additive, multiplicative or both
+# - norm: normalization type -- instance or layer-wise
 # Returns: normalized x tensor
-def att_norm(x, x_len, integration, norm):
+def att_norm(x, num, integration, norm):
     shape = get_shape(x)
-    x = tf.reshape(x, [-1, x_len] + get_shape(x)[1:])
+    x = tf.reshape(x, [-1, num] + get_shape(x)[1:])
     x = tf.cast(x, tf.float32)
 
     # instance axis if norm == "instance" and channel axis if norm == "layer"
@@ -119,11 +118,12 @@ def att_norm(x, x_len, integration, norm):
     if integration in ["mul", "both"]:
         x *= tf.rsqrt(tf.reduce_mean(tf.square(x), axis = norm_axis, keepdims = True) + 1e-8)
     
-    # return x to original shape
+    # return x to its original shape
     x = tf.reshape(x, shape)
     return x
 
-# Minibatch standard deviation layer
+# Minibatch standard deviation layer (used in the Discriminator, see StyleGAN model and prior
+# work about GANs for further details).
 def minibatch_stddev_layer(x, group_size = 4, num_new_features = 1, sdims = 2):
     # Minibatch must be divisible by (or smaller than) group_size
     group_size = tf.minimum(group_size, get_shape(x)[0])    
@@ -150,7 +150,7 @@ def minibatch_stddev_layer(x, group_size = 4, num_new_features = 1, sdims = 2):
 # Dropout and masking
 # ----------------------------------------------------------------------------
 
-# Create a random mask of chosen shape and with probability rate to be dropped
+# Create a random mask of a chosen shape and with probability 'dropout' to be dropped (=0)
 def random_dp_binary(shape, dropout):
     if dropout == 0:
         return tf.ones(shape, dtype = tf.int32)
@@ -164,28 +164,29 @@ def dropout(x, dp, noise_shape = None):
         return x
     return tf.nn.dropout(x, keep_prob = 1.0 - dp, noise_shape = noise_shape)
 
-# Set a mask on logits (-Inf where mask is 0)
+# Set a mask for logits (set -Inf where mask is 0)
 def logits_mask(x, mask):
     return x + tf.cast(1 - tf.cast(mask, tf.int32), tf.float32) * -10000.0
 
 # Positional encoding
 # ----------------------------------------------------------------------------
 
-# 2d linear embeddings [s, s, dim] in a [-rng, rng] range where s is the grid size and dim 
-# the embedding dimension. Each embedding consists of 'num' units, with each unit measuring 
+# 2d linear embeddings [size, size, dim] in a [-rng, rng] range where size = grid size and 
+# dim = the embedding dimension. Each embedding consists of 'num' parts, with each part measuring 
 # positional similarity along another direction, uniformly spanning the 2d space.
 def get_linear_embeddings(size, dim, num, rng = 1.0):
     pi = tf.constant(math.pi)
     theta = tf.range(0, pi, pi / num)
     dirs = tf.stack([tf.cos(theta), tf.sin(theta)], axis = -1)
-    embs = tf.get_variable(name = "emb", shape = [num, int(dim / num)], initializer = tf.random_uniform_initializer())
+    embs = tf.get_variable(name = "emb", shape = [num, int(dim / num)], 
+        initializer = tf.random_uniform_initializer())
     
     c = tf.linspace(-rng, rng, size)
     x = tf.tile(tf.expand_dims(c, axis = 0), [size, 1])
     y = tf.tile(tf.expand_dims(c, axis = 1), [1, size])
     xy = tf.stack([x,y], axis = -1)
     
-    lens = tf.reduce_sum(tf.expand_dims(xy, axis = 2) * dirs, axis = -1, keepdims = True) #  
+    lens = tf.reduce_sum(tf.expand_dims(xy, axis = 2) * dirs, axis = -1, keepdims = True)  
     emb = tf.reshape(lens * embs, [size, size, dim])
     return emb
 
@@ -206,9 +207,9 @@ def get_sinusoidal_embeddings(size, dim, num = 2):
         peCosY = tf.tile(tf.expand_dims(peCos, axis = 1), [1, size, 1]) 
 
         emb = tf.concat([peSinX, peCosX, peSinY, peCosY], axis = -1)
-    # Extension to 'num' spatial directions. Each embedding consists of 'num' units, with each  
-    # unit measuring positional similarity along another direction, uniformly spanning the 2d space.
-    # Each such unit has a sinus and cosine components.
+    # Extension to 'num' spatial directions. Each embedding consists of 'num' parts, with each  
+    # part measuring positional similarity along another direction, uniformly spanning the 2d space.
+    # Each such part has a sinus and cosine components.
     else:
         pi = tf.constant(math.pi)
         theta = tf.range(0, pi, pi / num)
@@ -228,20 +229,22 @@ def get_sinusoidal_embeddings(size, dim, num = 2):
 
     return emb
 
-# 2d positional embeddings of dimension 'dim' in a range of resolution from 2x2 up to 'max_res x max_res'
+# 2d positional embeddings of dimension 'dim' in a range of resolutions from 2x2 up to 'max_res x max_res'
 # 
 # pos_type: supports several types of embedding schemes:
 # - sinus: (see "Attention is all you need")
 # - linear: where each position gets a value of [-1, 1] * trainable_vector, in each spatial
 #   direction based on its location.
-# - trainable: where embedding of position [w,h] is [emb_w, emb_h] (independently in each spatial direction)
-# - trainable2d: whereembedding of position [w,h] is emb_{w,h} (a different embedding for each position)
+# - trainable: where an embedding of position [w,h] is [emb_w, emb_h] (independent parts in 
+#   each spatial direction)
+# - trainable2d: where an embedding of position [w,h] is emb_{w,h} (a different embedding for 
+#   each position)
 # 
-# dir_num: Each embedding consists of 'dir_num' units, with each unit measuring positional similarity 
+# dir_num: Each embedding consists of 'dir_num' parts, with each path measuring positional similarity 
 # along another direction, uniformly spanning the 2d space.
 # 
-# shared: True for using same embeddings for all directions
-# init: uniform or normal for trainable embeddings initialization
+# shared: True for using same embeddings for all directions / parts
+# init: uniform or normal distribution for trainable embeddings initialization
 def get_positional_embeddings(max_res, dim, pos_type = "sinus", dir_num = 2, shared = False, init = "uniform"):
     embs = []
     initializer = tf.random_uniform_initializer() if init == "uniform" else tf.initializers.random_normal()
@@ -281,9 +284,9 @@ def get_relative_embeddings(l, dim, embs):
 # Non-Linear networks
 # ----------------------------------------------------------------------------
 
-# Non-linear layer with resnet connection. Accepts features 'x' of dimension 'dim', 
-# and uses nonlinearty 'act'. Optionally performs attention from x to y 
-# (meaning information flows y -> x)
+# Non-linear layer with a resnet connection. Accept features 'x' of dimension 'dim', 
+# and use nonlinearty 'act'. Optionally perform attention from x to y 
+# (meaning information flows y -> x).
 def nnlayer(x, dim, act, lrmul, y = None, ff = True, name = "", **kwargs):
     _x = x
 
@@ -301,11 +304,11 @@ def nnlayer(x, dim, act, lrmul, y = None, ff = True, name = "", **kwargs):
     return x
 
 # Multi-layer network with 'layers_num' layers, dimension 'dim', and nonlinearity 'act'.
-# Optionally uses resnet connections and self-attention.
-# If x dimensions are not [batch_size, x_dim], then first pools x, according to pooling:
+# Optionally use resnet connections and self-attention.
+# If x dimensions are not [batch_size, dim], then first pool x, according to a pooling scheme:
 # - mean: mean pooling
-# - cnct: concatenate all spatial features together to one vector and maps them to dimension 'dim'
-# - 2d: turns a tensor [..., dim] into [-1, dim] so to make a large batch with all elements of last axis.
+# - cnct: concatenate all spatial features together to one vector and compress them to dimension 'dim'
+# - 2d: turn a tensor [..., dim] into [-1, dim] so to create one large batch with all the elements from the last axis.
 def mlp(x, resnet, layers_num, dim, act, lrmul, pooling = "mean", attention = False, norm_type = None, **kwargs): 
     shape = get_shape(x)
     
@@ -359,9 +362,17 @@ def conv2d_layer(x, dim, kernel, up = False, down = False, resample_kernel = Non
     return x
 
 # Modulated convolution layer
-def modulated_conv2d_layer(x, y, dim, kernel, up = False, down = False, demodulate = True, modulate = True, 
-    resample_kernel = None, gain = 1, use_wscale = True, lrmul = 1, fused_modconv = True, noconv = False,
-        weight_var = "weight", mod_weight_var = "mod_weight", mod_bias_var = "mod_bias"):
+def modulated_conv2d_layer(x, y, dim, kernel, # Convolution parameters
+    up = False,             # Whether to upsample features after convolution
+    down = False,           # Whether to downsample features before convolution
+    resample_kernel = None, # resample_kernel for up/downsampling
+    modulate = True,        # Whether y should modulate x (control its gain/bias) 
+    demodulate = True,      # Whether to normalize/scale back x gain/bias
+    fused_modconv = True,   # Whether to fuse the convlution and modulate operations together (see StyleGAN2)
+    noconv = False,         # Whether to skip convlution itself (so to perform only modulation)
+    gain = 1, use_wscale = True, lrmul = 1, # Parameters for creating the convolution weight 
+    weight_var = "weight", mod_weight_var = "mod_weight", mod_bias_var = "mod_bias"):
+
     assert not (up and down)
     assert kernel >= 1 and kernel % 2 == 1
 
@@ -416,7 +427,9 @@ def modulated_conv2d_layer(x, y, dim, kernel, up = False, down = False, demodula
 
     return x
 
-# Local attention block, potentially replacing convolution (Not used by default in GANsformer)
+# Local attention block, potentially replacing convolution (not used by default in GANsformer)
+# Grid is positional embeddings that match the size of a convolution receptive window
+# X shape is [NCHW]
 def att2d_layer(x, dim, kernel, grid, up = False, down = False, resample_kernel = None, num_heads = 4):
     if num_heads == "max":
         num_heads = dim
@@ -429,23 +442,25 @@ def att2d_layer(x, dim, kernel, grid, up = False, down = False, resample_kernel 
     # Transpose channel axis to last one
     shape = get_shape(x)
     depth = shape[1]
-    x = tf.transpose(x, [0, 2, 3, 1])
+    x = tf.transpose(x, [0, 2, 3, 1]) # [N, H, W, C]
+    shape_t = get_shape(x)
 
     # extract local patches for each image position
-    x_patches = tf.reshape(tf.image.extract_patches(x, sizes = [1, kernel, kernel, 1], 
-        strides = [1, 1, 1, 1], rates = [1, 1, 1, 1], padding = "SAME"), [-1, kernel * kernel, depth])
-    x_flat = tf.reshape(x, [-1, 1, depth])
+    x_patches = tf.image.extract_patches(x, sizes = [1, kernel, kernel, 1], 
+        strides = [1, 1, 1, 1], rates = [1, 1, 1, 1], padding = "SAME") # [N, H, W, k*k, C]
+    x_patches = tf.reshape(x_patches, [-1, kernel * kernel, depth]) # [N * H * W, k*k, C]
+    x_flat = tf.reshape(x, [-1, 1, depth]) # [N * H * W, 1, C]
 
     kwargs = {
         "num_heads": num_heads, 
         "integration": "add", 
-        "from_pos": tf.zeros([1, depth]), 
+        "from_pos": tf.zeros([1, depth]),
         "to_pos": grid
     }
 
     # Perform local attention between each image position and its local neighborhood
-    x_flat = transformer(from_tensor = x_flat, to_tensor = x_patches, dim = dim, name = "att2d", **kwargs)[0]
-    x = tf.reshape(tf.transpose(x_flat, [0, 2, 1]), shape)
+    x_flat = transformer(from_tensor = x_flat, to_tensor = x_patches, dim = dim, name = "att2d", **kwargs)[0] # [N * H * W, 1, C]
+    x = tf.transpose(tf.reshape(x, shape_t), [0, 3, 1, 2]) # [N, C, H, W]
 
     if up:
         x = upsample_2d(x, k = resample_kernel)
@@ -456,9 +471,9 @@ def att2d_layer(x, dim, kernel, grid, up = False, down = False, resample_kernel 
 # ----------------------------------------------------------------------------
 
 # A helper function for the transformer
-def transpose_for_scores(x, batch_size, num_heads, seq_len, head_size):  
-    x = tf.reshape(x, [batch_size, seq_len, num_heads, head_size]) 
-    x = tf.transpose(x, [0, 2, 1, 3])
+def transpose_for_scores(x, batch_size, num_heads, elem_num, head_size):  
+    x = tf.reshape(x, [batch_size, elem_num, num_heads, head_size]) # [B, N, H, S]
+    x = tf.transpose(x, [0, 2, 1, 3]) # [B, H, N, S]
     return x
 
 ####################################################################################################################################################
@@ -696,189 +711,179 @@ def transformer(from_tensor, to_tensor, dim, from_len = None, to_len = None, att
 
     return out, (attention_probs, attention_scores), (None, from_asgn, to_asgn)
 
-# 
-def merge_images(x, dlatents, weights, res, component_mask, k, merge_type, merge_after, is_visualization = False,
-        merge_channelwise = False, name = ""):
-    _x, _dlatents = x, dlatents
-    maps_out = None
+# Merge multiple images together through a weighted sum to create one image (Used by k-GAN only)
+# Also merge their the latent vectors that have used to create the images respectively
+# Arguments:
+# - x: the image features, [batch_size * k, C, H, W]
+# - k: the number of images to merge together  
+# - type: the type of the merge (sum, softmax, max, leaves)
+# - same: whether to merge all images equally along all WH positions
+# Returns the merged images [batch_size, C, H, W] and latents [batch_size, k, layers_num, dim]
+def merge_images(x, dlatents, k, type, same = False):
     batch_size =  tf.cast(get_shape(x)[0] / k, tf.int32)
-    x = tf.reshape(x, [batch_size, k] + list(x.shape[-3:]))
+    x = tf.reshape(x, [batch_size, k] + list(x.shape[-3:])) # [B, k, C, H, W]
 
-    with tf.variable_scope("weights%s" % (res)):
-        if merge_type == "auto":
-            weights = conv2d_layer(_x, dim = 1, kernel = 1)
-            weights = tf.reshape(weights, [batch_size, k] + list(weights.shape[-3:]))
-            if merge_channelwise:
-                weights = tf.reduce_sum(weights, axis = [-2, -1], keepdims = True)
-        component_mask = tf.reshape(component_mask, [batch_size, k] + [1 for _ in range(len(get_shape(weights)) - 2)])
-        if merge_type == "softmax":
-            weights = logits_mask(weights, component_mask)
-        else:
-            weights *= component_mask
+    # Compute scores w to be used in a following weighted sum of the images x
+    scores = conv2d_layer(x, dim = 1, kernel = 1)
+    scores = tf.reshape(scores, [batch_size, k] + list(scores.shape[-3:])) # [B, k, 1, H, W]
+    if same:
+        scores = tf.reduce_sum(scores, axis = [-2, -1], keepdims = True) # [B, k, 1, 1, 1]
 
-        if merge_type in ["softmax", "auto"]:
-            pre_weights = weights
-            weights = tf.nn.softmax(weights, axis = 1)
-            if merge_type == "auto" and not merge_after:
-                maps_out = weights 
-        elif merge_type == "max":
-            weights = tf.one_hot(tf.math.argmax(weights, axis = 1), k, axis = 1)
-        elif merge_type == "leaves":
-            weight_list = tf.split(weights, k, axis = 1)
-            alphas = tf.ones_like(weight_list[0]) 
-            for d, weight in enumerate(weight_list[1:]):
-                max_weight = tf.math.reduce_max(weights[:,:d + 1], )
-                new_alphas = tf.sigmoid(weight - max_weight) 
-                alphas = tf.concat([alphas * (1 - new_alphas), new_alphas], axis = 1)
-            weights = alphas
+    # Compute soft probabilities for weighted sum
+    if type == "softmax":
+        scores = tf.nn.softmax(scores, axis = 1) # [B, k, 1, H, W]
+    # Take only image of highest score
+    elif type == "max":
+        scores = tf.one_hot(tf.math.argmax(scores, axis = 1), k, axis = 1) # [B, k, 1, H, W]
+    # Merge the images recursively using a falling-leaves scheme (see k-GAN paper for details)
+    elif type == "leaves":
+        score_list = tf.split(scores, k, axis = 1) # [[B, 1, H, W],...]
+        alphas = tf.ones_like(score_list[0]) # [B, 1, H, W]
+        for d, weight in enumerate(score_list[1:]): # Process the k images iteratively
+            max_weight = tf.math.reduce_max(scores[:,:d + 1], ) # Compute image currently most "in-front"
+            new_alphas = tf.sigmoid(weight - max_weight) # Compute alpha values based on "distance" to the new image
+            alphas = tf.concat([alphas * (1 - new_alphas), new_alphas], axis = 1) # Compute recursive alpha values
+        scores = alphas
+    else: # sum
+        scores = tf.ones_like(scores) # [B, k, 1, H, W]
 
-    x = tf.reduce_sum(x * weights, axis = 1)
+    # Compute a weighted sum of the images
+    x = tf.reduce_sum(x * scores, axis = 1) # [B, C, H, W]
 
-    if dlatents is not None and len(get_shape(_dlatents)) == 4:
-        weights = tf.reduce_mean(tf.reduce_mean(weights, axis = 2), axis = [-2, -1], keepdims = True)
-        dlatents = tf.tile(tf.reduce_sum(dlatents * weights, axis = 1, keepdims = True), [1, k, 1, 1])
-
-    if is_visualization:
-        x = tf.concat([x, _x], axis = 0)
-        if dlatents is not None:
-            if len(get_shape(_dlatents)) == 4:
-                _dlatentsn = tf.reshape(tf.transpose(tf.tile(_dlatents[:, :, np.newaxis], [1, 1, k, 1, 1]), [0, 2, 1, 3, 4]), [get_shape(dlatents)[0] * k] + get_shape(dlatents)[1:])
-            else:
-                _dlatentsn = tf.reshape(tf.tile(_dlatents[:, np.newaxis], [1, k, 1, 1]), [get_shape(dlatents)[0] * k] + get_shape(dlatents)[1:])
-            dlatents = tf.concat([dlatents, _dlatentsn], axis = 0) 
+    if dlatents is not None:
+        scores = tf.reduce_mean(tf.reduce_mean(scores, axis = 2), axis = [-2, -1], keepdims = True) # [B, k, 1, 1]
+        dlatents = tf.tile(tf.reduce_sum(dlatents * scores, axis = 1, keepdims = True), [1, k, 1, 1]) # [B, k, L, D]
     
-    return x, dlatents, maps_out
+    return x
 
 # Generator, composed of two sub-networks: mapping and synthesis, as defined below
 # ----------------------------------------------------------------------------
 
+# Most of this function is similar to the original StyleGAN2 version
 def G_GANsformer(
-    latents_in,                                         # First input: Latent vectors (Z) [minibatch, latent_size].
-    labels_in,                                          # Second input: Conditioning labels [minibatch, label_size].
-    truncation_psi          = 0.65,                     # Style strength multiplier for the truncation trick. None = disable.
-    truncation_cutoff       = None,                     # Number of layers for which to apply the truncation trick. None = disable.
-    truncation_psi_val      = None,                     # Value for truncation_psi to use during validation
-    truncation_cutoff_val   = None,                     # Value for truncation_cutoff to use during validation
-    dlatent_avg_beta        = 0.995,                    # Decay for tracking the moving average of W during training. None = disable.
-    style_mixing       = 0.9,                           # Probability of mixing styles during training. None = disable.
-    component_mixing         = 0.0,                     # Probability of mixing styles during training. None = disable.
-    is_training             = False,                    # Network is under training? Enables and disables specific features.
-    is_validation           = False,                    # Network is under validation? Chooses which value to use for truncation_psi.
-    return_dlatents         = False,                    # Return dlatents in addition to the images?
-    return_comps            = False,
-    take_dlatents           = False,
-    is_template_graph       = False,                    # True = template graph constructed by the Network class, False = actual evaluation.
-    obj_vis                 = None,
-    component_dropout       = 0.0,
-    components              = EasyDict(),               # Container for sub-networks. Retained between calls.
-    mapping_func            = "G_mapping",              # Build func name for the mapping network.
-    synthesis_func          = "G_synthesis",            # Build func name for the synthesis network.
-    skip_layers             = False,
-    const_dim               = 0,
-    **kwargs): # Arguments for sub-networks (mapping and synthesis)
+    latents_in,                               # First input: Latent vectors (z) [batch_size, latent_size]
+    labels_in,                                # Second input (optional): Conditioning labels [batch_size, label_size]
+    truncation_psi          = 0.65,           # Style strength multiplier for the truncation trick. None = disable
+    truncation_cutoff       = None,           # Number of layers for which to apply the truncation trick. None = disable
+    truncation_psi_val      = None,           # Value for truncation_psi to use during validation
+    truncation_cutoff_val   = None,           # Value for truncation_cutoff to use during validation
+    dlatent_avg_beta        = 0.995,          # Decay for tracking the moving average of W during training. None = disable
+    style_mixing            = 0.9,            # Probability of mixing styles during training. None = disable
+    component_mixing        = 0.0,            # Probability of mixing components during training. None = disable
+    is_training             = False,          # Network is under training? Enables and disables specific features
+    is_validation           = False,          # Network is under validation? Chooses which value to use for truncation_psi
+    return_dlatents         = False,          # Return dlatents in addition to the images?
+    take_dlatents           = False,          # Use latents_in as dlatents (skip mapping network)
+    is_template_graph       = False,          # True = template graph constructed by the Network class, False = actual evaluation
+    component_dropout       = 0.0,            # Dropout over the k latent components 0 = disable
+    components              = EasyDict(),     # Container for sub-networks. Retained between calls
+    mapping_func            = "G_mapping",    # Function name of the mapping network
+    synthesis_func          = "G_synthesis",  # Function name of the synthesis network
+    **kwargs):                                # Arguments for sub-networks (mapping and synthesis)
 
     # Validate arguments
     assert not is_training or not is_validation
     assert isinstance(components, EasyDict)
+    
+    # Set options for training/validation
+    # Set truncation_psi values if validations
     if is_validation:
         truncation_psi = truncation_psi_val
         truncation_cutoff = truncation_cutoff_val
+    # Turn off truncation cutoff for training
     if is_training or (truncation_psi is not None and not tflib.is_tf_expression(truncation_psi) and truncation_psi == 1):
         truncation_psi = None
     if is_training:
         truncation_cutoff = None
+    # Turn off update of w latent mean when not training
     if not is_training or (dlatent_avg_beta is not None and not tflib.is_tf_expression(dlatent_avg_beta) and dlatent_avg_beta == 1):
         dlatent_avg_beta = None
+    # Turn off style and component mixing when not training
     if not is_training or (style_mixing is not None and not tflib.is_tf_expression(style_mixing) and style_mixing <= 0):
         style_mixing = None
     if not is_training or (component_mixing is not None and not tflib.is_tf_expression(component_mixing) and component_mixing <= 0):
         component_mixing = None
-
+    # Turn off dropout when not training
     if not is_training:
-        kwargs["attention_dropout"] = 0.0 # None
+        kwargs["attention_dropout"] = 0.0
 
-    k = component_num = kwargs["component_num"] # components.synthesis.input_shape[1]
-    dlatent_size = kwargs["dlatent_size"] # components.synthesis.input_shape[3]
+    # Useful variables 
+    batch_size = get_shape(latents_in)[0]
+    k = kwargs["component_num"] 
+    latent_size = kwargs["latent_size"]
+    dlatent_size = kwargs["dlatent_size"]
 
-    batch_size = get_shape(maps_in)[0]
+    latents_num = k + int(kwargs.get("attention", False)) # k attention region-based latents + 1 global latent (StyleGAN like)
 
     resolution = kwargs["resolution"]
     resolution_log2 = int(np.log2(kwargs["resolution"]))
-    ltnt_pos = get_embeddings(component_num, dlatent_size, name = "ltnt_emb")
 
-    map_mask = syn_mask = tf.ones([batch_size, component_num], dtype = tf.int32)
-    component_mask = random_dp_binary([batch_size, component_num], component_dropout)
-    if obj_vis is not None:
-        indx = tf.one_hot(obj_vis, component_num, dtype = tf.int32) 
+    # Initialize trainable positional embeddings for k latent components
+    ltnt_pos = get_embeddings(k, dlatent_size, name = "ltnt_emb")
+    # Initialize component dropout mask (disabled by default)
+    component_mask = random_dp_binary([batch_size, k], component_dropout)
 
-        component_mask = tf.tile(indx[np.newaxis], [batch_size, 1])
-    map_mask = syn_mask = component_mask 
-
-    # Setup components
-    g_kwargs = kwargs.copy()
-    if gen_mod != "non" or gen_cond:
-        g_kwargs["img_gate"] = False     
-
+    # Setup sub-networks
+    # Set synthesis network
     if "synthesis" not in components:
-        components.synthesis = tflib.Network("G_synthesis", func_name = globals()[synthesis_func], **g_kwargs) # ltnt_pos = ltnt_pos, grid_poses = grid_poses, 
-
+        components.synthesis = tflib.Network("G_synthesis", func_name = globals()[synthesis_func], **kwargs)
     num_layers = components.synthesis.input_shape[2]
-
+    # Set mapping network
     if "mapping" not in components:
         components.mapping = tflib.Network("G_mapping", func_name = globals()[mapping_func], 
             dlatent_broadcast = num_layers, **kwargs)
 
-    if take_dlatents:
-        latents_in.set_shape([None, kwargs["component_num"] + int(kwargs.get("attention", False)), num_layers, kwargs["latent_size"]])
+    if take_dlatents: # If latents_in for dlatents, need latent per synthesis network layer, see StyleGAN for details
+        latents_in.set_shape([None, latents_num, num_layers, latent_size])
     else:
-        latents_in.set_shape([None, kwargs["component_num"] + int(kwargs.get("attention", False)), kwargs["latent_size"]])
+        latents_in.set_shape([None, latents_num, latent_size])
 
     # Setup variables
-    lod_in = tf.get_variable("lod", initializer = np.float32(0), trainable = False)
     dlatent_avg = tf.get_variable("dlatent_avg", shape=[dlatent_size], initializer = tf.initializers.zeros(), trainable = False)
 
     if take_dlatents:
         dlatents = latents_in 
     else:
         # Evaluate mapping network
-        dlatents = components.mapping.get_output_for(latents_in, labels_in, ltnt_pos, map_mask, is_training = is_training, **kwargs)
+        dlatents = components.mapping.get_output_for(latents_in, labels_in, ltnt_pos, component_mask, is_training = is_training, **kwargs)
         dlatents = tf.cast(dlatents, tf.float32)
 
-    # Update moving average of W
-    if dlatent_avg_beta is not None and (not kwargs.get("ltnt2ltnt")):
+    # Update moving average of W latent space
+    if dlatent_avg_beta is not None:
         with tf.variable_scope("DlatentAvg"):
             batch_avg = tf.reduce_mean(dlatents[:, :, 0], axis = [0, 1])
             update_op = tf.assign(dlatent_avg, tflib.lerp(batch_avg, dlatent_avg, dlatent_avg_beta))
             with tf.control_dependencies([update_op]):
                 dlatents = tf.identity(dlatents)
 
-    # Perform style mixing regularization.
-    if style_mixing is not None and style_mixing > 0:
+    # Mixing (see StyleGAN): mixes together some of the W latents mapped from one set of 
+    # source latents A, and another set of source latents B. Mixing can be between latents 
+    # that correspond either to different layers or to the different k components used in 
+    # the GANsformer.
+    # Used only during training, and by default only layers are mixes as in StyleGAN.
+    def mixing(latents_in, dlatents, prob, num, idx):
+        if prob is None or prob == 0:
+            return dlatents
+
         with tf.variable_scope("StyleMix"):
             latents2 = tf.random_normal(get_shape(latents_in))
             dlatents2 = components.mapping.get_output_for(latents2, labels_in, ltnt_pos, map_mask, is_training = is_training, **kwargs)
             dlatents2 = tf.cast(dlatents2, tf.float32)
-            layer_idx = np.arange(num_layers)[np.newaxis, np.newaxis, :, np.newaxis]
-            cur_layers = num_layers - tf.cast(lod_in, tf.int32) * 2
             mixing_cutoff = tf.cond(
-                tf.random_uniform([], 0.0, 1.0) < style_mixing,
-                lambda: tf.random_uniform([], 1, cur_layers, dtype = tf.int32),
-                lambda: cur_layers)
-            dlatents = tf.where(tf.broadcast_to(layer_idx < mixing_cutoff, get_shape(dlatents)), dlatents, dlatents2)
+                tf.random_uniform([], 0.0, 1.0) < prob,
+                lambda: tf.random_uniform([], 1, num, dtype = tf.int32),
+                lambda: num)
+            dlatents = tf.where(tf.broadcast_to(idx < mixing_cutoff, get_shape(dlatents)), dlatents, dlatents2)
+        return dlatents
 
-    if component_mixing is not None:
-        with tf.variable_scope("ObjMix"):
-            latents3 = tf.random_normal(get_shape(latents_in))
-            dlatents3 = components.mapping.get_output_for(latents3, labels_in, ltnt_pos, map_mask, is_training = is_training, **kwargs)
-            dlatents3 = tf.cast(dlatents3, tf.float32)
-            obj_idx = np.arange(component_num + int(kwargs.get("attention", False)))[np.newaxis, :, np.newaxis, np.newaxis]
-            mixing_cutoff = tf.cond(
-                tf.random_uniform([], 0.0, 1.0) < component_mixing,
-                lambda: tf.random_uniform([], 1, component_num, dtype = tf.int32),
-                lambda: component_num)
-            dlatents = tf.where(tf.broadcast_to(obj_idx < mixing_cutoff, get_shape(dlatents)), dlatents, dlatents3)
+    # Perform style mixing regularization
+    layer_idx = np.arange(num_layers)[np.newaxis, np.newaxis, :, np.newaxis]
+    dlatents = mixing(latents_in, dlatents, style_mixing, num_layers, layer_idx)
+    # Perform component mixing regularization
+    ltnt_idx = np.arange(latents_num)[np.newaxis, :, np.newaxis, np.newaxis]
+    dlatents = mixing(latents_in, dlatents, component_mixing, k, ltnt_idx)
 
-    # Apply truncation trick
+    # Apply truncation (not in training or evaluation, only when sampling images, see StyleGAN for details)
     if truncation_psi is not None:
         with tf.variable_scope("Truncation"):
             layer_idx = np.arange(num_layers)[np.newaxis, np.newaxis, :, np.newaxis]
@@ -890,30 +895,18 @@ def G_GANsformer(
             dlatents = tflib.lerp(dlatent_avg, dlatents, layer_psi)
 
     # Evaluate synthesis network
-    deps = []
-
-    if "lod" in components.synthesis.vars:
-        deps.append(tf.assign(components.synthesis.vars["lod"], lod_in))
-    with tf.control_dependencies(deps):
-
-        if return_dlatents:
-            dlatents = tf.identity(dlatents, name = "dlatents_out")
-        dlatents_all = dlatents
-
-        images_out, comps_out, maps_out = components.synthesis.get_output_for(dlatents_all, ltnt_pos, syn_mask, segs, None, is_training = is_training, 
-            force_clean_graph = is_template_graph, **g_kwargs) # grid_poses = grid_poses, 
+    images_out, maps_out = components.synthesis.get_output_for(dlatents, ltnt_pos, component_mask, 
+        is_training = is_training, force_clean_graph = is_template_graph, **kwargs) 
 
     # Return requested outputs
     images_out = tf.identity(images_out, name = "images_out")
     maps_out = tf.identity(maps_out, name = "maps_out")
-
     ret = (images_out, maps_out)
-    if return_comps:
-        comps_out = tf.identity(comps_out, name = "comps_out")
-        ret += (comps_out, )
+
     if return_dlatents:
-        dlatents = tf.identity(dlatents, name = "dlatents")
-        ret += (dlatents, )
+        dlatents = tf.identity(dlatents, name = "dlatents_out")
+        ret += (dlatents,)
+
     return ret
 
 # Mapping network
@@ -922,13 +915,13 @@ def G_mapping(
     labels_in,                              # Second input: Conditioning labels [minibatch, label_size].
     ltnt_pos,
     component_mask,
-    component_num                 = 1,            # Latent vector (Z) dimensionality.
+    component_num                 = 1,      # Latent vector (Z) dimensionality.
     latent_size             = 512,          # Latent vector (Z) dimensionality.
     label_size              = 0,            # Label dimensionality, 0 if no labels.
     dlatent_size            = 512,          # Disentangled latent (W) dimensionality.
     dlatent_broadcast       = None,         # Output disentangled latent (W) as [minibatch, dlatent_size] or [minibatch, dlatent_broadcast, dlatent_size].
-    mapping_layersnum          = 8,            # Number of mapping layers.
-    mapping_dim             = None,          # Number of activations in the mapping layers.
+    mapping_layersnum          = 8,         # Number of mapping layers.
+    mapping_dim             = None,         # Number of activations in the mapping layers.
     mapping_lrmul           = 0.01,         # Learning rate multiplier for the mapping layers.
     mapping_nonlinearity    = "lrelu",      # Activation function: "relu", "lrelu", etc.
     normalize_latents       = True,         # Normalize latent vectors (Z) before feeding them to the mapping layers?
@@ -1033,7 +1026,6 @@ def G_synthesis(
     dlatents_in,                        # Input: Disentangled latents (W) [minibatch, num_layers, dlatent_size].
     ltnt_pos,
     component_mask,
-    condition,
     dlatent_size        = 512,          # Disentangled latent (W) dimensionality.
     pos_dim             = None,
     num_channels        = 3,            # Number of output color channels.
@@ -1052,11 +1044,10 @@ def G_synthesis(
     style               = True,
     local_noise           = True,
     new_size            = True,
-    is_visualization    = False,
     component_num             = 1,
     merge             = False,
     merge_type          = None,
-    merge_channelwise       = False, 
+    merge_same       = False, 
     merge_layer     = -1,    
     attention                 = False,
     num_heads           = 1,
@@ -1081,9 +1072,6 @@ def G_synthesis(
     norm          = None,
     fixed_gate          = False,
     tanh                = False,
-    cond_dim            = 0,
-    const_dim           = 0,
-    skip_layers         = False,
     pos_directions_num  = 2,
     local_attention     = False,
     **_kwargs):                         # Ignore unrecognized keyword args
@@ -1099,8 +1087,6 @@ def G_synthesis(
         ret = np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
         if merge and not attention:
             ret = int(max(ret, k) / k)
-        if const_dim > 0:
-            ret = const_dim
         return ret 
 
     assert architecture in ["orig", "skip", "resnet"]
@@ -1122,32 +1108,10 @@ def G_synthesis(
     component_mask.set_shape([None, k]) 
     component_mask = tf.cast(component_mask, dtype)
 
-    condition.set_shape([None, cond_dim, resolution, resolution])
-    condition = tf.cast(condition, dtype)
-
-    conditions = {resolution_log2: condition}
-    for res in range(resolution_log2, 1, -1):
-        conditions[res - 1] = downsample_2d(conditions[res])
-
     ltnt_pos.set_shape([k, dlatent_size])
     ltnt_pos = tf.cast(ltnt_pos, dtype)
 
     grid_poses = get_positional_embeddings(resolution_log2, pos_dim or dlatent_size, pos_type, pos_directions_num, init = pos_init, **_kwargs)
-
-    weight_inputs = [1 for _ in range(resolution_log2 + 1)]
-    if merge or (attention and latent_stem):
-        weight_inputs = []
-        for layer_idx in range(resolution_log2 + 1): 
-            shape = [1, k, nf(layer_idx), 1, 1] 
-            weights = tf.get_variable("component_%d" % layer_idx, shape = shape, 
-                initializer = tf.ones_initializer(), trainable = False)
-            weight_inputs.append(weights)
-
-        shape = [1, k, num_channels, 1, 1]  
-        weights = tf.get_variable("component_%d" % (resolution_log2 + 1), shape = shape, 
-            initializer = tf.ones_initializer(), trainable = False)
-
-        weight_inputs.append(weights)
 
     # Noise inputs
     noise_inputs = []
@@ -1169,7 +1133,6 @@ def G_synthesis(
         att_map_l2n = None
         res = (layer_idx + 5) // 2
         dlatent_global = glob(dlatents, res)[:, layer_idx + int(new_size)] 
-        merge_params = (weight_inputs[res - 1], component_mask, merge_type, integration == "conv", att_map)
 
         if local_attention and res < 7:
             x = att2d_layer(x, dim, kernel, grid = att2d_grid)
@@ -1214,7 +1177,7 @@ def G_synthesis(
                 kwargs = EasyDict()
                 to_pos = grid_poses[res] if img2ltnt else None
                 kwargs.update({"num_heads": num_heads, "ltnt_gate": ltnt_gate, "img_gate": img_gate, 
-                    "to_pos": to_pos, "pos_type": pos_type and img2ltnt, 
+                    "to_pos": to_pos, "pos_type": pos_type and img2ltnt TODO, 
                     "attention_dropout": attention_dropout, "col_dp": attention_dropout})
 
                 if use_pos:
@@ -1250,7 +1213,7 @@ def G_synthesis(
         return apply_bias_act(x, act = act), dlatents_next, att_map_l2n, iterative
 
     # Building blocks for main layers
-    def block(x, res, dlatents, dlatents_next, dim, iterative, att_map, up = True, dis_att = False, skip_layers = False): # res = 3..resolution_log2  = (None, None, None)
+    def block(x, res, dlatents, dlatents_next, dim, iterative, att_map, up = True, dis_att = False): # res = 3..resolution_log2  = (None, None, None)
         t = x
         aa = []
         inds = [res*2-5, res*2-4]
@@ -1259,10 +1222,9 @@ def G_synthesis(
             x, dlatents_next, a1, iterative = layer(x, dlatents, dlatents_next, layer_idx = inds[0], dim = dim, kernel = 3, up = up, iterative = iterative, att_map = att_map, dis_att = dis_att)
             aa.append(a1)
 
-        if not skip_layers:
-            with tf.variable_scope("Conv1"):
-                x, dlatents_next, a2, iterative = layer(x, dlatents, dlatents_next, layer_idx = inds[1], dim = dim, kernel = 3, iterative = iterative, att_map = a1, dis_att = dis_att)
-                aa.append(a2)
+        with tf.variable_scope("Conv1"):
+            x, dlatents_next, a2, iterative = layer(x, dlatents, dlatents_next, layer_idx = inds[1], dim = dim, kernel = 3, iterative = iterative, att_map = a1, dis_att = dis_att)
+            aa.append(a2)
 
         if architecture == "resnet":
             with tf.variable_scope("Skip"):
@@ -1276,8 +1238,6 @@ def G_synthesis(
             return upsample_2d(y, k = resample_kernel)
 
     def torgb(x, y, res, dlatents, att_map):
-        maps_out = None
-        merge_params = (weight_inputs[res - 1], component_mask, merge_type, integration == "conv", att_map)
         ind = res*2-3
         with tf.variable_scope("ToRGB"):
             t = x
@@ -1287,12 +1247,8 @@ def G_synthesis(
                 t = apply_bias_act(t)
 
             if merge and res < l:
-                weights = weight_inputs[-1 if merge_after else (res - 1)]
-                t, dlatents_merged, maps_out = merge_images(t, None if attention else dlatents, weights, res,
-                    component_mask, k, merge_type, merge_after, 
-                    is_visualization and not attention, merge_channelwise = merge_channelwise)
-                if dlatents_merged is not None:
-                    dlatents = dlatents_merged
+                with tf.variable_scope("merge%s" % (res)):
+                    t, dlatents = merge_images(t, dlatents, k, merge_type, merge_same)
 
             if not merge_after:
                 if end_res > 7:
@@ -1309,7 +1265,7 @@ def G_synthesis(
             return t if y is None else y + t
 
     # Early layers
-    y, comps_out, maps_out, dlatents_next = None, None, None, None 
+    y, dlatents_next = None, None
     iterative = (None, None, None)
     att_maps_l2n = []
     last_or_none = lambda a: a[-1][0] if len(a) > 0 and isinstance(a, tuple) else None
@@ -1352,22 +1308,13 @@ def G_synthesis(
         with tf.variable_scope("%dx%d" % (2**res, 2**res)):
             should_merge = merge and sep and res >= l
             x, dlatents_next, amaps, iterative = block(x, res, dlatents_in, dlatents_next, 
-                dim = nf(res-1), iterative = iterative, att_map = last_or_none(att_maps_l2n), 
-                skip_layers = skip_layers)
+                dim = nf(res-1), iterative = iterative, att_map = last_or_none(att_maps_l2n))
             att_maps_l2n += amaps
             
             if should_merge: 
-                x, dlatents_merged, maps_out = merge_images(x, None if attention else dlatents_in, weight_inputs[res - 1], res, # comps_out, 
-                    component_mask, k, merge_type, merge_after, 
-                    is_visualization and not attention)
-                if dlatents_merged is not None:
-                    dlatents_in = dlatents_merged
+                with tf.variable_scope("merge%s" % (res)):
+                    x, dlatents_in = merge_images(x, dlatents_in, k, merge_type, merge_same)
                 sep = False
-                if attention:
-                    amap0 = tf.transpose(tf.reshape(maps_out[0], get_shape(maps_out[0])[:2] + [(2**res) * (2**res)]), [0, 2, 1])[:, np.newaxis]
-                    amap1 = tf.transpose(tf.reshape(maps_out[1], get_shape(maps_out[1])[:2] + [(2**res) * (2**res)]), [0, 2, 1])[:, np.newaxis]
-
-                    att_maps_l2n.append((amap0, amap1))
 
             if architecture == "skip":
                 y = upsample(y)
@@ -1375,9 +1322,6 @@ def G_synthesis(
                 y = torgb(x, y, res, glob(dlatents_in, res), att_map = last_or_none(att_maps_l2n)) # cout, 
 
     images_out = y
-    if merge and is_visualization and not attention:
-        images_out, comps_out = tf.split(images_out, [batch_size, k * batch_size], axis = 0)
-        comps_out = tf.reshape(comps_out, [batch_size, k] + get_shape(comps_out)[1:])
 
     def list2tensor(att_list):
         maps_out = []
@@ -1404,15 +1348,10 @@ def G_synthesis(
 
     assert images_out.dtype == tf.as_dtype(dtype)
 
-    if comps_out is None:
-        comps_out = tf.zeros(1)
-    else:
-        assert comps_out.dtype == tf.as_dtype(dtype)    
-
     if maps_out is None:
         maps_out = tf.zeros(1)
 
-    return images_out, comps_out, maps_out
+    return images_out, maps_out
 
 # Discriminator 
 # ----------------------------------------------------------------------------

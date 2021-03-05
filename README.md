@@ -20,7 +20,12 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 
 **Instructions for model training and data prepreation as well as pretrained models will be available soon.**  
 **Note that the code is still going through some refactoring and clean-up. Will be ready for running in couple days. Stay Tuned!**  
-(Code clean-up in couple days, all instructions by March 7, pretrained networks by March 20)
+- [x] Uploading initial code and readme
+- [x] Image scampling and visualization script
+- [ ] Code clean-up (*in progress*)
+- [ ] Training and data-prepreations intructions (*by March 7*)
+- [ ] Pretrained networks (*by March 20*)
+- [ ] Further visualizations/animations
 
 ## Bibtex
 ```bibtex

@@ -1,5 +1,5 @@
 ####################################################################################################################################################
-# The code is still going through some refactoring and clean-up. Will be ready for running by March 3 end-of-day. Stay Tuned!
+# The code is still going through some refactoring and clean-up. Will be ready in couple days!
 ####################################################################################################################################################
 
 import argparse
@@ -15,8 +15,7 @@ from metrics.metric_defaults import metric_defaults
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 from warnings import simplefilter
-
-simplefilter(action="ignore", category = FutureWarning)
+simplefilter(action = "ignore", category = FutureWarning)
 
 # Conditional set: if property is not None, then assign d[name] := prop 
 # for every d in a set of dictionaries
@@ -30,9 +29,9 @@ def cset(dicts, name, prop):
 # Set network (generator or discriminator): model, loss and optimizer
 def set_net(net, reg_interval):
     ret = EasyDict()
-    ret.args  = EasyDict(func_name = "training.network.{}_GANsformer".format(net[0]))  # network options
-    ret.loss_args = EasyDict(func_name = "training.loss.{}_loss".format(net[0]))       # loss options
-    ret.opt_args  = EasyDict(beta1 = 0.0, beta2 = 0.99, epsilon = 1e-8)                # optimizer options
+    ret.args  = EasyDict(func_name = "training.network.{}_GANsformer".format(net[0])) # network options
+    ret.loss_args = EasyDict(func_name = "training.loss.{}_loss".format(net[0]))      # loss options
+    ret.opt_args  = EasyDict(beta1 = 0.0, beta2 = 0.99, epsilon = 1e-8)               # optimizer options
     ret.reg_interval = reg_interval
     return ret
 
@@ -67,7 +66,6 @@ def run(**args):
         "cityscapes": 0.5, 
         "ffhq": 1.0
     }
-
     args.ratio = ratios.get(args.dataset, args.ratio)
     dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.max_images, ratio = args.ratio,
         num_threads = args.num_threads)
@@ -105,7 +103,7 @@ def run(**args):
     # Visualization
     args.imgs = args.images
     args.ltnts = args.latents
-    vis_types["imgs", "ltnts", "maps", "layer_maps", "interpolations", "noise_var", "style_mix"]
+    vis_types = ["imgs", "ltnts", "maps", "layer_maps", "interpolations", "noise_var", "style_mix"]
     # Set of all the set visualization types option
     vis.vis_types = {arg for arg in vis_types if args[arg]}
 
@@ -165,7 +163,7 @@ def run(**args):
         cset([cG.args, cD.args], field, args[field])  
 
     # k-GAN
-    for arg in ["layer", "type", "channelwise"]:
+    for arg in ["layer", "type", "same"]:
         field = "merge_{}".format(arg)
         cset(cG.args, field, args[field])  
     cset([cG.args, train], "merge", args.merge)
@@ -446,8 +444,8 @@ def main():
     ## k-GAN
     parser.add_argument("--merge",              help = "Generate component-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true") 
     parser.add_argument("--merge-layer",        help = "Merge layer, where images get combined through alpha-composition (default: %(default)s)", default = -1, type = int) 
-    parser.add_argument("--merge-type",         help = "Merge type (default: additive)", default = None, choices = ["additive", "softmax", "max", "leaves"], action = str) 
-    parser.add_argument("--merge-channelwise",  help = "Merge images similarly across all spatial positions (default: %(default)s)", default = None, action = "store_true") 
+    parser.add_argument("--merge-type",         help = "Merge type (default: additive)", default = None, choices = ["sum", "softmax", "max", "leaves"], action = str) 
+    parser.add_argument("--merge-same",         help = "Merge images similarly across all spatial positions (default: %(default)s)", default = None, action = "store_true") 
 
     args = parser.parse_args()
 

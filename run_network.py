@@ -13,7 +13,9 @@ from metrics.metric_defaults import metric_defaults
 
 # Suppress warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 from warnings import simplefilter
+
 simplefilter(action="ignore", category = FutureWarning)
 
 # Conditional set: if property is not None, then assign d[name] := prop 
@@ -28,9 +30,9 @@ def cset(dicts, name, prop):
 # Set network (generator or discriminator): model, loss and optimizer
 def set_net(net, reg_interval):
     ret = EasyDict()
-    ret.args  = EasyDict(func_name = "training.network.{}_GANsformer".format(net[0])) # network options
-    ret.loss_args = EasyDict(func_name = "training.loss.{}_loss".format(net[0]))                # loss options
-    ret.opt_args  = EasyDict(beta1 = 0.0, beta2 = 0.99, epsilon = 1e-8)                         # optimizer options
+    ret.args  = EasyDict(func_name = "training.network.{}_GANsformer".format(net[0]))  # network options
+    ret.loss_args = EasyDict(func_name = "training.loss.{}_loss".format(net[0]))       # loss options
+    ret.opt_args  = EasyDict(beta1 = 0.0, beta2 = 0.99, epsilon = 1e-8)                # optimizer options
     ret.reg_interval = reg_interval
     return ret
 
@@ -65,6 +67,7 @@ def run(**args):
         "cityscapes": 0.5, 
         "ffhq": 1.0
     }
+
     args.ratio = ratios.get(args.dataset, args.ratio)
     dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.max_images, ratio = args.ratio,
         num_threads = args.num_threads)
@@ -102,7 +105,7 @@ def run(**args):
     # Visualization
     args.imgs = args.images
     args.ltnts = args.latents
-    vis_types ["imgs", "ltnts", "maps", "layer_maps", "interpolations", "noise_var", "style_mix"]:
+    vis_types["imgs", "ltnts", "maps", "layer_maps", "interpolations", "noise_var", "style_mix"]
     # Set of all the set visualization types option
     vis.vis_types = {arg for arg in vis_types if args[arg]}
 
@@ -125,7 +128,7 @@ def run(**args):
     cset(cG.args, "tanh", args.tanh)
 
     # Latent sizes
-    if args.component_num > 1 
+    if args.component_num > 1:
         if not (args.attention or args.merge):
             print(bcolored("Error: component-num > 1 but the model is not using components.", "red")) 
             print(bcolored("Either add --attention for GANsformer or --merge for k-GAN).", "red"))
@@ -181,7 +184,7 @@ def run(**args):
     # Loss and regularization
     gloss_args = {
         "loss_type": "g_loss",
-        "reg_weight": "g_reg_weight"
+        "reg_weight": "g_reg_weight",
         "pathreg": "pathreg",
     }
     dloss_args = {
@@ -387,7 +390,7 @@ def main():
     parser.add_argument("--minibatch-std-size", help = "Add minibatch standard deviation layer in the discriminator (default: %(default)s)", default = 4, type = int)
 
     ## GANsformer
-    parser.add_argument("--transformer",        help = "Add transformer layers to the generator: top-down latents-to-image (default: False)", default = None, default = None, action = "store_true") 
+    parser.add_argument("--transformer",        help = "Add transformer layers to the generator: top-down latents-to-image (default: False)", default = None, action = "store_true") 
     parser.add_argument("--latent-size",        help = "Latent size, summing the dimension of all components (default: %(default)s)", default = 512, type = int)
     parser.add_argument("--component-num",      help = "Components number. Each component has latent dimension of 'latent-size / component-num'. " + 
                                                        "1 for StyleGAN since it has one global latent vector (default: %(default)s)", default = 1, type = int) 

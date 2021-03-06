@@ -22,7 +22,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 **Note that the code is still going through some refactoring and clean-up. Will be ready for running in couple days. Stay Tuned!**  
 - [x] Uploading initial code and readme
 - [x] Image scampling and visualization script
-- [ ] Code clean-up (*in progress*)
+- [ ] Code clean-up and making it ready for running (*in progress*)
 - [ ] Training and data-prepreations intructions (*by March 7*)
 - [ ] Pretrained networks (*by March 20*)
 - [ ] Further visualizations/animations

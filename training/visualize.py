@@ -60,7 +60,7 @@ def eval(G,
     latents             = None,       # Source latents to generate images from
     labels              = None,       # Source labels to generate images from (0 if no labels are used)
     # Model settings
-    component_num,                    # Number of components the model has
+    components_num,                   # Number of components the model has
     drange_net          = [-1,1],     # Model image output range
     # Visualization settings
     vis_types           = None,       # Visualization types to be created
@@ -130,7 +130,7 @@ def eval(G,
         # Run network over latents and produce images and attention maps
         print("Running network...")
         images, attmaps_all_layers, wlatents_all_layers = G.run(latents, labels, randomize_noise = False, 
-            is_visualization = True, minibatch_size = batch_size, return_dlatents = True)
+            minibatch_size = batch_size, return_dlatents = True) # is_visualization = True
         # For memory efficiency, save full information only for a small amount of images
         attmaps_all_layers = attmaps_all_layers[:rich_num]
         wlatents = wlatents_layers[:,:,0]
@@ -151,7 +151,7 @@ def eval(G,
             if save_maps:
                 soft_maps = attmaps_all_layers[:,:,-1,0]
 
-                pallete = np.expand_dims(get_colors(component_num), axis = [2, 3])
+                pallete = np.expand_dims(get_colors(components_num), axis = [2, 3])
                 maps = (soft_maps == np.amax(soft_maps, axis = 1, keepdims = True)).astype(float)
 
                 soft_maps = np.sum(pallete * np.expand_dims(soft_maps, axis = 2), axis = 1)
@@ -205,7 +205,7 @@ def eval(G,
                 t_ups = []
 
                 if intrp_per_component:
-                    for c in range(component_num):
+                    for c in range(components_num):
                         # copy over all the components except component c that will get interpolated
                         t_up = np.tile(np.copy(t[0])[None], [intrp_density] + [1] * dim)
                         # interpolate component c
@@ -226,8 +226,8 @@ def eval(G,
                 take_wlatents = True)[0]
 
             def save_interpolation(imgs, name):
-                imgs = np.split(imgs, component_num, axis = 0)
-                for c in range(component_num):
+                imgs = np.split(imgs, components_num, axis = 0)
+                for c in range(components_num):
                     filename = "eval/interpolations_%s/%06d/%02d" % (name, i, c)
                     imgs[c] = [misc.to_pil(img, drange = drange_net) for img in imgs[c]]
                     imgs[c][-1].save(dnnlib.make_run_dir_path("{}.png".format(filename)))

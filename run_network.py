@@ -79,9 +79,9 @@ def run(**args):
     # Round to the closest multiply of minibatch size for validity
     args.batch_size -= args.batch_size % args.minibatch_size
     args.minibatch_std_size -= args.minibatch_std_size % args.minibatch_size
-    args.latent_size -= args.latent_size % args.component_num
+    args.latent_size -= args.latent_size % args.components_num
     if args.latent_size == 0:
-        print(bcolored("Error: latent-size is too small. Must best a multiply of component-num.", "red")) 
+        print(bcolored("Error: latent-size is too small. Must best a multiply of components-num.", "red")) 
         exit()
 
     sched_args = {
@@ -122,21 +122,20 @@ def run(**args):
     # Networks architecture
     cset(cG.args, "architecture", args.g_arch)
     cset(cD.args, "architecture", args.d_arch)
-    cset([cG.args, cD.args], "resnet_mlp", args.resnet_mlp)
     cset(cG.args, "tanh", args.tanh)
 
     # Latent sizes
-    if args.component_num > 1:
+    if args.components_num > 1:
         if not (args.attention or args.merge):
-            print(bcolored("Error: component-num > 1 but the model is not using components.", "red")) 
+            print(bcolored("Error: components-num > 1 but the model is not using components.", "red")) 
             print(bcolored("Either add --attention for GANsformer or --merge for k-GAN).", "red"))
             exit()    
-        args.latent_size = int(args.latent_size / args.component_num)
+        args.latent_size = int(args.latent_size / args.components_num)
     cD.args.latent_size = cG.args.latent_size = cG.args.dlatent_size = args.latent_size 
-    cset([cG.args, cD.args, train, vis], "component_num", args.component_num)
+    cset([cG.args, cD.args, vis], "components_num", args.components_num)
 
     # Mapping network
-    for arg in ["layersnum", "lrmul", "dim", "shared"]:
+    for arg in ["layersnum", "lrmul", "dim", "resnet", "shared_dim"]:
         cset(cG.args, arg, args["mapping_{}".formt(arg)])    
 
     # StyleGAN settings
@@ -151,11 +150,10 @@ def run(**args):
 
     args.norm = args.normalize
     for arg in ["norm", "integration", "ltnt_gate", "img_gate", "kmeans", 
-                "kmeans_iters", "asgn_direct", "mapping_ltnt2ltnt"]:
+                "kmeans_iters", "mapping_ltnt2ltnt"]:
         cset(cG.args, arg, args[arg])  
 
-    for arg in ["attention_inputs", "use_pos"]:
-        cset([cG.args, cD.args], arg, args[arg])  
+    cset([cG.args, cD.args], "use_pos", args["use_pos"])  
 
     # Positional encoding
     for arg in ["dim", "init", "directions_num"]:
@@ -357,14 +355,14 @@ def main():
     ## General architecture
     parser.add_argument("--g-arch",             help = "Generator architecture type (default: skip)", default = None, choices = ["orig", "skip", "resnet"], type = str)
     parser.add_argument("--d-arch",             help = "Discriminator architecture type (default: resnet)", default = None, choices = ["orig", "skip", "resnet"], type = str)
-    parser.add_argument("--resnet-mlp",         help = "Use resent connections in MLP layers (default: False)", default = None, action = "store_true")
     parser.add_argument("--tanh",               help = "tanh on generator output (default: False)", default = None, action = "store_true")
 
     # Mapping network
     parser.add_argument("--mapping-layersnum",  help = "Number of mapping layers (default: 8)", default = None, type = int)
     parser.add_argument("--mapping-lrmul",      help = "Mapping network learning rate multiplier (default: 0.01)", default = None, type = float)
     parser.add_argument("--mapping-dim",        help = "Mapping layers dimension (default: latent_size)", default = None, type = int)
-    parser.add_argument("--mapping-shared",     help = "Perform one shared mapping to all latent components concatenated together (default: False)", default = None, type = int)    
+    parser.add_argument("--mapping-resnet",     help = "Use resent connections in mapping layers (default: False)", default = None, action = "store_true")
+    parser.add_argument("--mapping-shared-dim", help = "Perform one shared mapping to all latent components concatenated together using the set dimension (default: disabled)", default = None, type = int)    
 
     # Loss
     parser.add_argument("--pathreg",            help = "Use path regularization in generator training (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool)    
@@ -390,14 +388,14 @@ def main():
     ## GANsformer
     parser.add_argument("--transformer",        help = "Add transformer layers to the generator: top-down latents-to-image (default: False)", default = None, action = "store_true") 
     parser.add_argument("--latent-size",        help = "Latent size, summing the dimension of all components (default: %(default)s)", default = 512, type = int)
-    parser.add_argument("--component-num",      help = "Components number. Each component has latent dimension of 'latent-size / component-num'. " + 
+    parser.add_argument("--components-num",     help = "Components number. Each component has latent dimension of 'latent-size / components-num'. " + 
                                                        "1 for StyleGAN since it has one global latent vector (default: %(default)s)", default = 1, type = int) 
     parser.add_argument("--num-heads",          help = "Number of attention heads (default: %(default)s)", default = 1, type = int) 
     parser.add_argument("--normalize",          help = "Feature normalization type (optional)", default = None, choices = ["batch", "instance", "layer"]) 
     parser.add_argument("--integration",        help = "Feature integration type: additive, multiplicative or both (default: %(default)s)", default = "add", choices = ["add", "mul", "both"], type = str) 
 
     # Generator attention layers
-    # Add transformer
+    # Transformer resolution layers
     parser.add_argument("--g-start-res",        help = "Transformer minimum generator resolution (logarithmic): first layer in which transformer will be applied (default: %(default)s)", default = 0, type = int) 
     parser.add_argument("--g-end-res",          help = "Transformer maximum generator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 7, type = int) 
 
@@ -407,45 +405,43 @@ def main():
     parser.add_argument("--d-end-res",          help = "Transformer maximum discriminator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 7, type = int) 
 
     # Attention 
-    parser.add_argument("--ltnt-gate",          help = "Gate attention from latents, such that components potentially will not send information " + 
+    parser.add_argument("--ltnt-gate",          help = "Gate attention from latents, such that components may not send information " + 
                                                        "when gate value is low (default: False)", default = None, action = "store_true") 
-    parser.add_argument("--img-gate",           help = "Gate attention for images, such that some image positions potentially will not get updated " + 
+    parser.add_argument("--img-gate",           help = "Gate attention for images, such that some image positions may not get updated " + 
                                                        "or receive information when gate value is low (default: False)", default = None, action = "store_true") 
     parser.add_argument("--kmeans",             help = "Track and update image-to-latents assignment centroids, used in the duplex attention (default: False)", default = None, action = "store_true") 
     parser.add_argument("--kmeans-iters",       help = "Number of K-means iterations per transformer layer. Note that centroids are carried from layer to layer (default: %(default)s)", default = 1, type = int) # -per-layer
-    parser.add_argument("--asgn_direct",        help = "TODO (default: False)", default = None, action = "store_true")
-    parser.add_argument("--attention-inputs",   help = "Attention function inputs: content, position or both (default: %(default)s)", default = "both", choices = ["content", "position", "both"], type = str) 
 
     # Attention directions
     # format is A2B: Elements _from_ B attend _to_ elements in A, and B elements get updated accordingly.
     # Note that it means that information propagates in the following direction: A -> B
     parser.add_argument("--mapping-ltnt2ltnt",  help = "Add self-attention over latents in the mapping network (default: False)", default = None, action = "store_true") 
     parser.add_argument("--g-ltnt2ltnt",        help = "Add self-attention over latents in the synthesis network (default: False)", default = None, action = "store_true") 
-    parser.add_argument("--g-img2img",          help = "Add self-attention between images positions in the discriminator (SAGAN) (default: False)", default = 0, type = int) 
-    parser.add_argument("--g-img2ltnt",         help = "Train mode # bottom-up (default: %(default)s)", default = None, action = "store_true")
+    parser.add_argument("--g-img2img",          help = "Add self-attention between images positions in that layer of the generator (SAGAN) (default: disabled)", default = 0, type = int) 
+    parser.add_argument("--g-img2ltnt",         help = "Add image to latents attention (bottom-up) (default: %(default)s)", default = None, action = "store_true")
     # g-ltnt2img: default information flow direction when using --transformer
 
-    parser.add_argument("--d-ltnt2img",         help = "Train mode # top-down (default: %(default)s)", default = None, action = "store_true") 
+    parser.add_argument("--d-ltnt2img",         help = "Add latents to image attention (top-down) (default: %(default)s)", default = None, action = "store_true") 
     parser.add_argument("--d-ltnt2ltnt",        help = "Add self-attention over latents in the discriminator (default: False)", default = None, action = "store_true") 
-    parser.add_argument("--d-img2img",          help = "Add self-attention over images positions in the discriminator (SAGAN) (default: False)", default = None, action = "store_true") 
+    parser.add_argument("--d-img2img",          help = "Add self-attention over images positions in that layer of the discriminator (SAGAN) (default: disabled)", default = 0, type = int) 
     # d-img2ltnt: default information flow direction when using --d-transformer
 
     # Local attention operations (replacing convolution)
-    parser.add_argument("--g-local-attention",  help = "Local attention operations in the generation (default: False)", default = None, action = "store_true") 
-    parser.add_argument("--d-local-attention",  help = "Local attention operations in the discriminator (default: False)", default = None, action = "store_true") 
+    parser.add_argument("--g-local-attention",  help = "Local attention operations in the generation up to this layer (default: disabled)", default = None, type = int) 
+    parser.add_argument("--d-local-attention",  help = "Local attention operations in the discriminator up to this layer (default: disabled)", default = None, type = int) 
 
     # Positional encoding
     parser.add_argument("--use-pos",            help = "Use positional encoding (default: False)", default = None, action = "store_true") 
     parser.add_argument("--pos-dim",            help = "Positional encoding dimension (default: latent-size)", default = None, type = int) 
     parser.add_argument("--pos-type",           help = "Positional encoding type (default: %(default)s)", default = "sinus", choices = ["linear", "sinus", "trainable", "trainable2d"], type = str) 
     parser.add_argument("--pos-init",           help = "Positional encoding initialization distribution (default: %(default)s)", default = "uniform", choices = ["uniform", "normal"], type = str) 
-    parser.add_argument("--pos-directions-num", help = "Positional encoding spatial number of directions (default: %(default)s)", default = 2, type = int) 
+    parser.add_argument("--pos-directions-num", help = "Positional encoding number of spatial directions (default: %(default)s)", default = 2, type = int) 
 
     ## k-GAN
-    parser.add_argument("--merge",              help = "Generate component-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true") 
+    parser.add_argument("--merge",              help = "Generate components-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true") 
     parser.add_argument("--merge-layer",        help = "Merge layer, where images get combined through alpha-composition (default: %(default)s)", default = -1, type = int) 
     parser.add_argument("--merge-type",         help = "Merge type (default: additive)", default = None, choices = ["sum", "softmax", "max", "leaves"], action = str) 
-    parser.add_argument("--merge-same",         help = "Merge images similarly across all spatial positions (default: %(default)s)", default = None, action = "store_true") 
+    parser.add_argument("--merge-same",         help = "Merge images with same alpha weights across all spatial positions (default: %(default)s)", default = None, action = "store_true") 
 
     args = parser.parse_args()
 

@@ -1,4 +1,4 @@
-# Network architectures for the GANSformer model, as well as multiple baselines such as
+﻿# Network architectures for the GANSformer model, as well as multiple baselines such as
 # vanilla GAN, StyleGAN2, k-GAN and SAGAN, all implemented as extensions of the same 
 # model skeleton for most precise comparability under same settings.
 # See readme for architecture overview.
@@ -460,230 +460,278 @@ def att2d_layer(x, dim, kernel, grid, up = False, down = False, resample_kernel 
 
     return x
 
-# Transformer layer
-# ----------------------------------------------------------------------------
+############################################# Transformer #############################################
+# -----------------------------------------------------------------------------------------------------
 
-# A helper function for the transformer
+# Validate transformer input shape for from/to_tensor and reshape to 2d
+def process_input(t, t_pos, t_len, name):
+    shape = get_shape(t)
+
+    # from/to_tensor should be either 2 or 3 dimensions. If it's 3, then t_len should be specified.
+    if len(t) > 3:
+        print("Transformer {}_tensor has {} shape. should be up to 3 dims.".format(name, shape))
+        raise
+    elif len(shape) == 3:
+        batch_size, t_len, _ = shape
+    else:
+        if t_len is None:
+            print("If {}_tensor has two dimensions, must specify {}_len.".format(name, name))
+            raise        
+        # Infer batch size for the 2-dims case
+        batch_size = tf.cast(shape[0] / t_len, tf.int32)
+
+    # Reshape tensors to 2d
+    t = to_2d(t)
+    if t_pos is not None:
+        t_pos = tf.tile(to_2d(t_pos), [batch_size, 1])
+
+    return t, t_pos, shape, t_len, batch_size
+
+# Transpose tensor to scores
 def transpose_for_scores(x, batch_size, num_heads, elem_num, head_size):  
     x = tf.reshape(x, [batch_size, elem_num, num_heads, head_size]) # [B, N, H, S]
     x = tf.transpose(x, [0, 2, 1, 3]) # [B, H, N, S]
     return x
 
-##########################################################################################################################
-# Note that the code of this function is not yet re-factored and cleaned-up. Will be fixed in a few hours, Stay Tuned!
-##########################################################################################################################
+# Compute attention probabilities: perform softmax on att_scores and dropout
+def compute_probs(scores, dp):
+    # Compute attention probabilities
+    probs = tf.nn.softmax(scores) # [B, N, F, T]
+    shape = get_shape(probs)
+    shape[-2] = 1
+    # Dropout over random cells and over random full rows (randomly don't use a 'to' element)
+    probs = dropout(probs, dp / 2)
+    probs = dropout(probs, dp / 2, shape)
+    return probs
 
-# comment about direction from to
-def transformer(from_tensor, to_tensor, dim, att_vars, from_len = None, to_len = None, att_mask = None, to_gate = False, 
-        img_gate = False, num_heads = 1, att_dp = 0.12, from_pos = None, to_pos = None, 
-        inputs = "both", kmeans = False, kmeans_iters = 1, integration = "add", normalize = False, 
-        norm = None, q_act = "linear", v_act = "linear", c_act = "linear", k_act = "linear", name = ""):
-    from_asgn = att_vars["from_asgn"]
-    to_asgn = att_vars["to_asgn"]
+# (Optional, only used when --ltnt-gate, --img-gate)
+#
+# Gate attention values either row-wise (from) or column-wise so that some of the elements
+# in the from/to_tensor will not participate in sending/receiving information, when gate
+# value is low for them.             
+def gate_attention(att_probs, tensor, pos, num_heads, from_len, to_len, name, gate_bias = 0):
+    nc, np = "{}_cont".format(name), "{}_pos".format(name)
+    gate = apply_bias_act(dense_layer(tensor, num_heads, name = nc), name = nc)
+    if pos is not None:
+        gate += apply_bias_act(dense_layer(pos, num_heads, name = np), name = np)
+    gate = tf.sigmoid(gate + gate_bias)
+    gate = tf.transpose(tf.reshape(gate, [batch_size, from_len, to_len, num_heads]), [0, 3, 1, 2])
+    att_probs *= gate
+    return att_probs
+
+# Normalizes the 'tensor' elements, and then integrate the new information from 
+# 'control' with 'tensor', where 'control' controls the bias/gain of 'tensor'. 
+# norm types: batch, instance, layers
+# integration types: add, mul, both
+def integrate(tensor, tensor_len, control, integration, norm):
+    dim = get_shape(tensor)[-1]
+
+    # Normalize tensor
+    if norm is not None: 
+        tensor = att_norm(tensor, tensor_len, integration, norm)
+
+    # Compute gain/bias
+    control_dim = {"add": dim, "mul": dim, "both": 2 * dim}[integration]
+    bias = gain = control = apply_bias_act(dense_layer(control, control_dim, name = "out"), name = "out")
+    if integration == "both": 
+        gain, bias = tf.split(control, 2, axis = -1)
+
+    # Modulate the bias/gain of 'tensor'
+    if integration != "add":
+        tensor *= (gain + 1) 
+    if integration != "mul":
+        tensor += bias
+
+    return tensor    
+
+# (The following 2 functions are optional, and are only used when --kmeans)
+
+#### K-means (as part of Duplex Attention)
+#
+# Basically, given the attention scores between 'from' elements to 'to' elements, compute 
+# the 'to' centroids of the inferred assignments relations, as in the k-means algorithm. 
+#
+# (Intuitively, given that the bed region will get assigned to one latent, and the chair region
+# will get assigned to another latent, we will compute the centroid/mean of that region and use
+# it as a representative of that region/object).
+# ---------------------------------------------------------------------------------------------
+
+# Compute relative weights of different 'from' elements for each 'to' centroid.
+# Namely, compute assignments of 'from' elements to 'to' elements, by normalizing the 
+# attention distribution over the rows, to obtain the weight contribution of each 
+# 'from' element to the 'to' centroid.
+#
+# Returns [batch_size, num_heads, to_len, from_len] for each element in 'to'
+# the relative weights of assigned 'from' elements (their weighted sum is the respective centroid)
+def compute_assignments(att_probs):
+    centroid_assignments = (att_probs / (tf.reduce_sum(att_probs, axis = -2, keepdims = True) + 1e-8))
+    centroid_assignments = tf.transpose(centroid_assignments, [0, 1, 3, 2]) # [B, N, T, F]
+    return centroid_assignments
+
+# Given queries (function of the 'from' elements) and the centroid_assignemnts
+# between 'from' and 'to' elements, compute the centroid/mean queries.
+# 
+# Some of the code here meant to be backward compatible with the pretrained networks 
+# and may improve in further versions of the repository.
+def compute_centroids(_queries, queries, to_from, to_len, from_len, init_parametric = True):
+    from_elements = tf.concat([_queries, queries - _queries], axis = -1)
+    from_elements = transpose_for_scores(from_elements, batch_size, num_heads, from_len, 2 * size_head) # [B, N, F, H]
+
+    # to_from represent centroid_assignments of 'from' elements to 'to' elements 
+    # [batch_size, num_head, to_len, from_len]
+    if to_from is not None:
+        # upsample centroid_assignments from the prior generator layer 
+        # (where image grid dimensions were x2 smaller)        
+        if get_shape(to_from)[-2] < to_len:
+            s = int(math.sqrt(get_shape(to_from)[-2]))
+            to_from = upsample_2d(tf.reshape(to_from, [batch_size * num_heads, s, s, from_len]), factor = 2, data_format = "NHWC")
+            to_from = tf.reshape(to_from, [batch_size, num_heads, to_len, from_len])
+
+        if get_shape(to_from)[-1] < from_len:
+            s = int(math.sqrt(get_shape(to_from)[-1]))
+            to_from = upsample_2d(tf.reshape(to_from, [batch_size * num_heads, to_len, s, s]), factor = 2, data_format = "NCHW")
+            to_from = tf.reshape(to_from, [batch_size, num_heads, to_len, from_len])
+
+        # Given: 
+        # 1. Centroid assignments of 'from' elements to 'to' centroid
+        # 2. 'from' elements (queries)
+        # Compute the 'to' respective centroids
+        to_centroids = tf.matmul(to_from, from_elements)
+
+    # Centroids initialization
+    if to_centroids is None or init_parametric:
+        to_centroids = tf.tile(tf.get_variable("toasgn_init", shape = [1, num_heads, to_len, sh_f], 
+            initializer = tf.initializers.random_normal()), [batch_size, 1, 1, 1]) 
+
+    return from_elements, to_centroids
+
+# ---------------------------------------------------------------------------------------------
+
+# Transformer (multi-head attention) function originated from the Google-BERT repository.  
+# https://github.com/google-research/bert/blob/master/modeling.py#L558
+# 
+# We adopt their from/to notation: 
+# from_tensor: [batch_size, from_len, dim] a list of 'from_len' elements
+# to_tensor: [batch_size, to_len, dim] a list of 'to_len' elements
+# 
+# Each element in 'from_tensor' attends to elements from 'to_tensor',
+# Then we compute a weighted sum over the 'to_tensor' elements, and use it to update
+# the elements at 'from_tensor' (through additive/multiplicative integration). 
+#
+# Overall it means that information flows in the direction to->from, or that the 'to' 
+# modulates the 'from'. For instance, if from=image, and to=latents, then the latents 
+# will control the image features. If from = to then this implements self-attention.
+# 
+# We first project 'from_tensor' into a 'query', and 'to_tensor' into 'key' and 'value'.
+# Then, the query and key tensors are dot-producted and softmaxed to obtain
+# attention distribution over the to_tensor elements. The values are then 
+# interpolated (weighted-summed) using this distribution, to get 'context'.
+# The context is used to modulate the bias/gain of the 'from_tensor' (depends on 'intervention').
+# Notation: B - batch_size, F - from_len, T - to_len, N - num_heads, H - head_size
+def transformer(
+        dim,                                  # The layer dimension
+        from_tensor,        to_tensor,        # The from/to tensors [batch_size, t_len, dim] or [batch_size * t_len, dim]
+        from_len = None,    to_len = None,    # The from/to tensors lengths (must be specified if from/to has 2 dims)
+        from_pos = None,    to_pos = None,    # The positional encodings of the form/to tensors (optional)
+        from_gate = False,  to_gate = False,  # Add sigmoid gate on from/to, so that info may not be sent/received 
+                                              # when gate is low (i.e. the attention probs may not sum to 1)
+        # Additional options
+        num_heads = 1,                        # Number of attention heads
+        att_dp = 0.12,                        # Attention dropout rate
+        att_mask = None,                      # Attention mask to block from/to elements [batch_size, from_len, to_len]
+        integration = "add",                  # Feature integration type: additive, multiplicative or both
+        norm = None,                          # Feature normalization type (optional): instance, batch or layer
+
+        # k-means options (optional, duplex)
+        kmeans = False,                       # Track and update image-to-latents assignment centroids (in duplex)
+        kmeans_iters = 1,                     # Number of K-means iterations per layer
+        att_vars,                             # K-means variables carried over from layer to layer (only when --kmeans)
+        name = ""):                           # Layer variable_scope suffix
+
+    # Validate input shapes and map them to 2d
+    from_tensor, from_pos, from_shape, from_len, batch_size = process_input(from_tensor, from_pos, from_len, "from")
+    to_tensor,   to_pos,   to_shape,   to_len,   _          = process_input(to_tensor, to_pos, to_len, "to")
+    
+    size_head = int(dim / num_heads)
+    to_from = att_vars["centroid_assignments"]
     
     with tf.variable_scope("AttLayer_{}".format(name)):
-        batch_size, from_shape = None, None
-        attention_scores = tf.constant(0.0)
-        size_head = int(dim / num_heads)
+        # Compute queries, keys and values
+        queries = apply_bias_act(dense_layer(from_tensor, dim, name = "query"), name = "query") # [B*F, N*H]
+        keys    = apply_bias_act(dense_layer(to_tensor, dim, name = "key"), name = "key")       # [B*T, N*H]
+        values  = apply_bias_act(dense_layer(to_tensor, dim, name = "value"), name = "value")   # [B*T, N*H]
+        _queries = queries
 
-        outdim = get_shape(from_tensor)[-1]
-        if integration == "both": 
-            outdim *= 2
-
-        if len(get_shape(from_tensor)) > 3 or len(get_shape(to_tensor)) > 3:
-            raise
-        if len(get_shape(from_tensor)) > 2:
-            from_shape = get_shape(from_tensor) 
-            batch_size = from_shape[0]
-            from_len = from_shape[1]
-            from_tensor = to_2d(from_tensor)
-        if len(get_shape(to_tensor)) > 2:
-            to_len = get_shape(to_tensor)[1]
-            to_tensor = to_2d(to_tensor)
-
-        if batch_size is None:
-            batch_size = tf.cast(get_shape(from_tensor)[0] / from_len, tf.int32) 
-
-        value_layer = to_tensor
-        value_layer = apply_bias_act(dense_layer(value_layer, dim, name = "value"), name = "value", act = v_act) # [B*T, N*H]
-        value_layer = transpose_for_scores(value_layer, batch_size, num_heads, to_len, size_head) # [B, N, T, H] int(dim / num_heads)
-
+        # Add positional encodings to queries and keys
         if from_pos is not None:
-            from_pos = tf.tile(to_2d(from_pos), [batch_size, 1])
-
+            queries += apply_bias_act(dense_layer(from_pos, dim, name = "from_pos"), name = "from_pos")
         if to_pos is not None:
-            to_pos = tf.tile(to_2d(to_pos), [batch_size, 1])
+            keys += apply_bias_act(dense_layer(to_pos, dim, name = "to_pos"), name = "to_pos")
 
-        def cond_downsample(mp):
-            if mp is not None and get_shape(mp)[-2] > from_len: # NHWC 
-                s = int(math.sqrt(get_shape(mp)[-2]))
-                new_s = int(math.sqrt(from_len))
-                factor = int(s / new_s)
-                mp = downsample_2d(tf.reshape(mp, [batch_size, s, s, to_len]), factor = factor, data_format = "NHWC")
-                mp = tf.reshape(mp, [batch_size, num_heads, from_len, to_len])
-            return mp
-
-        sh_f = (2 * size_head) if inputs == "both" else size_head  
-
-        if from_pos is not None:
-            fp = apply_bias_act(dense_layer(from_pos, dim, name = "from_pos"), name = "from_pos", act = q_act) # _from_pos
-        if to_pos is not None:
-            tp = apply_bias_act(dense_layer(to_pos, dim, name = "to_pos"), name = "to_pos", act = k_act) # _to_pos
-
-        query_layer = apply_bias_act(dense_layer(from_tensor, dim, name = "query"), name = "query", act = q_act) # [B*F, N*H]
-        key_layer = apply_bias_act(dense_layer(to_tensor, dim, name = "key"), name = "key", act = k_act) # [B*T, N*H]
-
-        to_sign = tf.tile(tf.one_hot(tf.range(to_len), to_len)[np.newaxis, np.newaxis], [batch_size, num_heads, 1, 1])
-        sh_t = to_len
-
-        from_sign = {"both": tf.concat([query_layer, fp], axis = -1), "content": query_layer, "pos": fp}.get(inputs)
-        
-        _from_sign = from_sign = transpose_for_scores(from_sign, batch_size, num_heads, from_len, sh_f) # [B, N, F, H]
-        _to_sign = to_sign = transpose_for_scores(to_sign, batch_size, num_heads, to_len, sh_t) # [B, N, T, H]
-
-        if from_pos is not None:
-            query_layer += fp 
-        if to_pos is not None:
-            key_layer += tp 
-
-        if from_asgn is not None:
-            if get_shape(from_asgn)[-2] < from_len: # NHWC 
-                s = int(math.sqrt(get_shape(from_asgn)[-2]))
-                from_asgn = upsample_2d(tf.reshape(from_asgn, [batch_size * num_heads, s, s, to_len]), factor = 2, data_format = "NHWC")
-                from_asgn = tf.reshape(from_asgn, [batch_size, num_heads, from_len, to_len])
-            if get_shape(from_asgn)[-1] < to_len:
-                s = int(math.sqrt(get_shape(to_len)[-1]))
-                from_asgn = upsample_2d(tf.reshape(from_asgn, [batch_size * num_heads, from_len, s, s]), factor = 2, data_format = "NCHW")
-                from_asgn = tf.reshape(from_asgn, [batch_size, num_heads, from_len, to_len])
-            from_asgn = tf.matmul(from_asgn, to_sign) 
-        if to_asgn is not None:
-            if get_shape(to_asgn)[-2] < to_len:
-                s = int(math.sqrt(get_shape(to_asgn)[-2]))
-                to_asgn = upsample_2d(tf.reshape(to_asgn, [batch_size * num_heads, s, s, from_len]), factor = 2, data_format = "NHWC")
-                to_asgn = tf.reshape(to_asgn, [batch_size, num_heads, to_len, from_len])
-            if get_shape(to_asgn)[-1] < from_len:
-                s = int(math.sqrt(get_shape(to_asgn)[-1]))
-                to_asgn = upsample_2d(tf.reshape(to_asgn, [batch_size * num_heads, to_len, s, s]), factor = 2, data_format = "NCHW")
-                to_asgn = tf.reshape(to_asgn, [batch_size, num_heads, to_len, from_len])
-            to_asgn = tf.matmul(to_asgn, from_sign)
-
-        if not kmeans:
-            if from_asgn is not None:
-                from_asgn_2d = tf.transpose(from_asgn, [0, 2, 1, 3])
-                from_asgn_2d = tf.reshape(from_asgn_2d, [np.prod(get_shape(from_asgn_2d)[:2]), np.prod(get_shape(from_asgn_2d)[2:])])
-                query_layer += apply_bias_act(dense_layer(from_asgn_2d, dim, name = "from_asgn"), name = "from_asgn") # [B*F, N*H]
-            if to_asgn is not None:
-                to_asgn_2d = tf.transpose(to_asgn, [0, 2, 1, 3])
-                to_asgn_2d = tf.reshape(to_asgn_2d, [np.prod(get_shape(to_asgn_2d)[:2]), np.prod(get_shape(to_asgn_2d)[2:])])
-                key_layer += apply_bias_act(dense_layer(to_asgn_2d, dim, name = "to_asgn"), name = "to_asgn") # [B*F, N*H]
-
-        query_layer = transpose_for_scores(query_layer, batch_size, num_heads, from_len, size_head) # [B, N, F, H]
-        key_layer = transpose_for_scores(key_layer, batch_size, num_heads, to_len, size_head) # [B, N, T, H]
-
-        att_scores = tf.matmul(query_layer, key_layer, transpose_b = True) # [B, N, F, T]
+        # Reshape queries, keys and values, and then compute att_scores
+        values = transpose_for_scores(values, batch_size, num_heads, to_len, size_head)     # [B, N, T, H]
+        queries = transpose_for_scores(queries, batch_size, num_heads, from_len, size_head) # [B, N, F, H]
+        keys = transpose_for_scores(keys, batch_size, num_heads, to_len, size_head)         # [B, N, T, H]
+        att_scores = tf.matmul(queries, keys, transpose_b = True)                           # [B, N, F, T]
 
         if kmeans:
-            att_scores = tf.constant(0.0)
-            to_asgn = tf.tile(tf.get_variable("toasgn_init", shape = [1, num_heads, to_len, sh_f], 
-                initializer = tf.initializers.random_normal()), [batch_size, 1, 1, 1]) 
+            from_elements, to_centroids = compute_centroids(_queries, queries, to_from, to_len, from_len)
 
         for i in range(kmeans_iters):
             with tf.variable_scope("iter_{}".format(i)):
                 if kmeans:
                     if i > 0:
-                        if from_asgn is not None:
-                            from_asgn = tf.matmul(from_asgn, _to_sign) 
-                        if to_asgn is not None:
-                            to_asgn = tf.matmul(to_asgn, _from_sign)
+                        # Given: 
+                        # 1. Centroid assignments of 'from' elements to 'to' centroid
+                        # 2. 'from' elements (queries)
+                        # Compute the 'to' respective centroids
+                        to_centroids = tf.matmul(to_from, from_elements)
 
-                    new_scores = tf.constant(0.0)
+                    w = tf.get_variable(name = "st_weights", shape = [num_heads, 1, get_shape(from_elements)[-1]], 
+                        initializer = tf.ones_initializer())
+                    # Compute attention scores based on dot products between 
+                    # 'from' queries and the 'to' centroids.
+                    att_scores = tf.matmul(from_elements * w, to_centroids, transpose_b = True) 
 
-                    if from_asgn is not None:
-                        w = tf.get_variable(name = "sf_weight", shape = [num_heads, 1, get_shape(from_asgn)[-1]], 
-                            initializer = tf.ones_initializer())
-                        new_scores += tf.matmul(from_asgn * w, to_sign, transpose_b = True)
-
-                    if to_asgn is not None:
-                        w = tf.get_variable(name = "st_weights", shape = [num_heads, 1, get_shape(from_sign)[-1]], 
-                            initializer = tf.ones_initializer())
-                        new_scores += tf.matmul(from_sign * w, to_asgn, transpose_b = True) 
-
-                    att_scores = (att_scores + new_scores) if (not kmeans) else new_scores
-
-                attention_scores = tf.multiply(att_scores, 1.0 / math.sqrt(float(size_head)))
-
+                # Scale attention scores given head size (see BERT)
+                att_scores = tf.multiply(att_scores, 1.0 / math.sqrt(float(size_head)))
+                # (optional, not used by default)
+                # Mask attention logits using att_mask (to mask some components)
                 if att_mask is not None:
-                    if len(get_shape(att_mask)) == 2:
-                        value_layer *= tf.cast(att_mask[:, np.newaxis, :, np.newaxis], tf.float32) # tf.expand_dims(, axis = [1, 3])
-                    else:
-                        if len(get_shape(att_mask)) == 3:
-                            att_mask = tf.expand_dims(att_mask, axis = 1) # [B, 1, F, T]
-                        attention_scores = logits_mask(attention_scores, att_mask)
-
-                attention_probs = tf.nn.softmax(attention_scores) # [B, N, F, T]
-                attention_probs = dropout(attention_probs, attention_dropout / 2)
-                attention_probs = dropout(attention_probs, attention_dropout / 2, [get_shape(attention_scores)[0], num_heads, 1, to_len])
-
-                from_asgn = attention_probs
-                to_asgn = from_asgn
-                to_asgn = tf.transpose((to_asgn / (tf.reduce_sum(to_asgn, axis = -2, keepdims = True) + 1e-8)), [0, 1, 3, 2])
-
+                    att_scores = logits_mask(att_scores, tf.expand_dims(att_mask, axis = 1))
+                # Turn attention logits to probabilities (softmax + dropout)
+                att_probs = compute_probs(att_scores, att_dp)
+                # (Used only in the duplex version, and when --kmeans)
+                # Compute relative weights of different 'from' elements for each 'to' centroid
                 if kmeans: 
-                    from_asgn = None
-                else:
-                    from_asgn = to_asgn = None
+                    to_from = compute_assignments(att_probs)
 
-        attention_probs = tf.nn.softmax(attention_scores) # [B, N, F, T]
-        attention_probs = dropout(attention_probs, attention_dropout)
-        attention_probs = dropout(attention_probs, attention_dropout, [get_shape(attention_scores)[0], num_heads, 1, to_len])
-
+        # Turn attention logits to probabilities (softmax + dropout)
+        att_probs = compute_probs(att_scores, att_dp)
+        # Gate attention values for the from/to elements
         if to_gate:
-            exist_mask = apply_bias_act(dense_layer(to_tensor, num_heads, name = "e_cont"), name = "e_cont")
-            if to_pos is not None:
-                exist_mask += apply_bias_act(dense_layer(to_pos, num_heads, name = "e_pos"), name = "e_pos")
-            exist_mask = tf.sigmoid(exist_mask)
-            exist_mask = tf.transpose(tf.reshape(exist_mask, [batch_size, 1, to_len, num_heads]), [0, 3, 1, 2])
-            attention_probs *= exist_mask # tf.expand_dims(exist_mask, axis = 1)
-
-        if img_gate:
-            gate = apply_bias_act(dense_layer(from_tensor, num_heads, name = "n_cont"), name = "n_cont")
-            if from_pos is not None:
-                gate += apply_bias_act(dense_layer(from_pos, num_heads, name = "n_pos"), name = "n_pos") # _from_pos
-
-            gate = tf.sigmoid(gate + 1)
-            gate_att = tf.transpose(tf.reshape(gate, [batch_size, from_len, num_heads, 1]), [0, 2, 1, 3])
-            attention_probs *= gate_att
-
-        context_layer = tf.matmul(attention_probs, value_layer) # [B, N, F, H]
-        context_layer = tf.transpose(context_layer, [0, 2, 1, 3]) # [B, F, N, H]
-        context_layer = tf.reshape(context_layer, [batch_size * from_len, dim]) # [B * F, N*H] # batch_size * from_len
-
-        context_layer = apply_bias_act(dense_layer(context_layer, outdim, name = "out"), act = c_act, name = "out")
-
-        out = from_tensor
-        if norm is not None: 
-            out = att_norm(out, from_len, integration, norm)
-        a_context_layer = m_context_layer = context_layer
-        if integration == "full": 
-            m_context_layer, a_context_layer = tf.split(context_layer, 2, axis = -1)
-        if integration != "add":
-            out *= (m_context_layer + 1) 
-        if integration != "mul":
-            out += a_context_layer
-
-        if from_shape is not None:
-            out = tf.reshape(out, from_shape)
-
-        from_asgn = attention_probs
-        to_asgn = from_asgn
-        to_asgn = tf.transpose((to_asgn / (tf.reduce_sum(to_asgn, axis = -2, keepdims = True) + 1e-8)), [0, 1, 3, 2])
-
+            att_probs = gate_attention(att_probs, to_tensor, to_pos, num_heads, 
+                from_len = 1, to_len = to_len, name = "e")
+        if from_gate:
+            att_probs = gate_attention(att_probs, from_tensor, from_pos, num_heads, 
+                from_len = from_len, to_len = 1, name = "n", gate_bias = 1)
+        # (Used only in the duplex version, and when --kmeans)
+        # Compute relative weights of different 'from' elements for each 'to' centroid
         if kmeans: 
-            from_asgn = None
-        else:
-            from_asgn = to_asgn = None
+            to_from = compute_assignments(att_probs)
 
-    return out, attention_probs, (from_asgn, to_asgn)
+        # Compute weighted-sum of the values using the attention distribution
+        control = tf.matmul(att_probs, values) # [B, N, F, H]
+        control = tf.transpose(control, [0, 2, 1, 3]) # [B, F, N, H]
+        control = tf.reshape(control, [batch_size * from_len, dim]) # [B*F, N*H]
+        # This newly computed information will control the bias/gain of the new from_tensor
+        from_tensor = integrate(from_tensor, from_len, control, integration, norm)
+
+    # Reshape from_tensor to its original shape (if 3 dimensions)
+    if len(from_shape) > 2:
+        from_tensor = tf.reshape(from_tensor, from_shape)
+
+    return from_tensor, att_probs, {"centroid_assignments": to_from}
 
 # (Not used be default)
 # Merge multiple images together through a weighted sum to create one image (Used by k-GAN only)
@@ -731,8 +779,8 @@ def merge_images(x, dlatents, k, type, same = False):
     
     return x
 
-# Generator
-# ----------------------------------------------------------------------------
+############################################## Generator ##############################################
+# -----------------------------------------------------------------------------------------------------
 
 # Generator network, composed of two sub-networks: mapping and synthesis, as defined below
 # This function is mostly similar to the original StyleGAN2 version
@@ -790,7 +838,7 @@ def G_GANsformer(
         kwargs["attention_dropout"] = 0.0
 
     # Useful variables 
-    k = kwargs["component_num"] 
+    k = kwargs["components_num"] 
     latent_size = kwargs["latent_size"]
     dlatent_size = kwargs["dlatent_size"]
 
@@ -884,17 +932,18 @@ def G_GANsformer(
         is_training = is_training, force_clean_graph = is_template_graph, **kwargs) 
 
     # Return requested outputs
-    imgs_out = tf.identity(imgs_out, name = "images_out")
-    maps_out = tf.identity(maps_out, name = "maps_out")
+    imgs_out = tf.identity(imgs_out, name = "images_out") # [batch_size, num_channels, H, W]
+    maps_out = tf.identity(maps_out, name = "maps_out") # [batch_size, k (components_num), layers_num, heads_num, H, W]  
     ret = (imgs_out, maps_out)
 
     if return_dlatents:
         dlatents = tf.identity(dlatents, name = "dlatents_out")
-        ret += (dlatents,)
+        ret += (dlatents,) # [batch_size, dlatent_broadcast, k (components_num), dlatent_dim]
 
     return ret
 
-# Mapping network
+########################################### Mapping network ###########################################
+
 # Mostly similar to the StylGAN version, with new options for the GANsformer such as:
 # self-attention among latents, shared mapping of components, and support for mapping_dim != output_dim
 def G_mapping(
@@ -904,7 +953,7 @@ def G_mapping(
     latent_pos,                             # Third input: Positional embeddings for latents
     component_mask,                         # Fourth input: Component dropout mask (not used by default)
     # Dimensions
-    component_num           = 1,            # Number of latent (z) vector components z_1,...,z_k
+    components_num           = 1,            # Number of latent (z) vector components z_1,...,z_k
     latent_size             = 512,          # Latent (z) dimensionality per component
     dlatent_size            = 512,          # Disentangled latent (w) dimensionality
     label_size              = 0,            # Label dimensionality, 0 if no labels
@@ -930,7 +979,7 @@ def G_mapping(
     
     # Short names
     act = mapping_nonlinearity
-    k = component_num
+    k = components_num
     global_latent = attention # Whether to add a global latent vector to the k attention region-based latents
     latents_num = k + int(global_latent) # k region-based latents + 1 global latent (like StyleGAN)
 
@@ -1024,18 +1073,19 @@ def G_mapping(
         with tf.variable_scope("Broadcast"):
             x = tf.tile(x[:, :, np.newaxis], [1, 1, dlatent_broadcast, 1])
 
-    # Output
-    x = tf.identity(x, name = "dlatents_out")
-    return x
+    # Output  
+    x = tf.identity(x, name = "dlatents_out") 
+    return x # [batch_size, dlatent_broadcast, k (components_num), dlatent_dim]
 
-# Synthesis network
+########################################## Synthesis network ##########################################
+
 # Main differences from the StyleGAN version include the incorporation of transformer layers.
 # This function supports different generator forms:
-# * GANsformer (--attention)
-# * GAN (--latent-stem --style = False)
-# * StyleGAN (--style) 
-# * SAGAN (--img2img)
-# * k-GAN (--merge)
+# - GANsformer (--attention)
+# - GAN (--latent-stem --style = False)
+# - StyleGAN (--style) 
+# - SAGAN (--img2img)
+# - k-GAN (--merge)
 def G_synthesis(
     # Tensor inputs
     dlatents_in,                        # First input: Disentangled latents (W) [batch_size, num_layers, dlatent_size]
@@ -1063,9 +1113,8 @@ def G_synthesis(
     tanh                = False,        # Use tanh on output activations (turns out to be unnecessary and suboptimal)
     # GANsformer settings
     attention           = False,        # Whereas the generator uses attention or not (i.e. GANsformer or StyleGAN)
-    component_num       = 1,            # Number of Latent (z) vector components z_1,...,z_k
+    components_num       = 1,            # Number of Latent (z) vector components z_1,...,z_k
     num_heads           = 1,            # Number of attention heads 
-    attention_inputs    = "both",       # Attention function inputs: content, position or both
     attention_dropout   = 0.12,         # Attention dropout rate
     ltnt_gate           = False,        # Gate attention from latents, such that components may not send information 
                                         # when gate value is low
@@ -1091,14 +1140,14 @@ def G_synthesis(
     pos_init            = "uniform",    # Positional encoding initialization distribution: normal or uniform
     pos_directions_num  = 2,            # Positional encoding number of spatial directions
     # k-GAN options (not used by default)
-    merge               = False,        # Generate component_num images and then merge them
+    merge               = False,        # Generate components_num images and then merge them
     merge_layer         = -1,           # Merge layer, where images get combined through alpha-composition (-1 for last layer)
     merge_type          = "sum",        # Merge type: sum, softmax, max, leaves
     merge_same          = False,        # Merge images with same alpha weights across all spatial positions
     **_kwargs):                         # Ignore unrecognized keyword args
 
     # Set variables
-    k = component_num
+    k = components_num
     act = nonlinearity
     latents_num = k + int(attention)
     resolution_log2 = int(np.log2(resolution))
@@ -1202,7 +1251,6 @@ def G_synthesis(
             # Main Transformer layer: arguments and function call
             kwargs = {
                 "num_heads": num_heads,         # Number of attention heads
-                "inputs": attention_inputs,     # Attention input: position, content, or both
                 "integration": integration,     # Integration mode: additive, multiplicative, or both
                 "norm": norm,                   # Feature normalization type: batch, instance of layer
                 "att_mask": component_mask,     # Attention mask (to disable particular latents)
@@ -1313,7 +1361,7 @@ def G_synthesis(
 
     # Early layers
     imgs_out, dlatents, att_maps = None, None, []
-    att_vars = {"from_asgn": None, "to_asgn": None} # {"assignments": None, "centroids": None}
+    att_vars = {"centroid_assignments": None} 
 
     # x is img_feats: the evolving image features grid, starting from 4x4, and 
     # iteratively processed and upsampled up to the desirable resolution.
@@ -1364,21 +1412,24 @@ def G_synthesis(
                     imgs_out = upsample(imgs_out)
                 imgs_out = torgb(x, imgs_out, res, get_global(dlatents_in))
 
+    # Convert the list of all attention maps from all layers into one tensor
     def list2tensor(att_list):
-        maps_out = []
-        for amap in att_list:
-            if amap is not None:
-                s = int(math.sqrt(get_shape(amap)[2])) 
-                amap = tf.transpose(tf.reshape(amap, [-1, s, s, k]), [0, 3, 1, 2])
-                if s < resolution:
-                    amap = upsample_2d(amap, factor = int(resolution / s))
-                amap = tf.reshape(amap, [-1, num_heads, k, resolution, resolution])
-                maps_out.append(amap)
-
-        if len(maps_out) == 0:
+        if len(att_list) == 0:
             return None
 
-        maps_out = tf.transpose(tf.stack(maps_out, axis = 1), [0, 3, 1, 2, 4, 5]) 
+        maps_out = []
+        for att_map in att_list:
+            # Reshape attention map into spatial 
+            s = int(math.sqrt(get_shape(att_map)[2])) 
+            att_map = tf.transpose(tf.reshape(att_map, [-1, s, s, k]), [0, 3, 1, 2]) # [NCHW]
+            # Upsample attention map to final image resolution
+            # (since attention map of early generator layers have lower resolutions)
+            if s < resolution:
+                att_map = upsample_2d(att_map, factor = int(resolution / s))
+            att_map = tf.reshape(att_map, [-1, num_heads, k, resolution, resolution]) # [NhkHW]
+            maps_out.append(att_map)
+
+        maps_out = tf.transpose(tf.stack(maps_out, axis = 1), [0, 3, 1, 2, 4, 5]) # [NklhHW]
         return maps_out
 
     if attention:
@@ -1388,10 +1439,12 @@ def G_synthesis(
     if maps_out is None:
         maps_out = tf.zeros(1)
 
+    # imgs_out [batch_size, num_channels, H, W]
+    # maps_out [batch_size, k (components_num), layers_num, heads_num, H, W]
     return imgs_out, maps_out
 
-# Discriminator 
-# ----------------------------------------------------------------------------
+############################################ Discriminator ############################################
+# -----------------------------------------------------------------------------------------------------
 
 # Discriminator network, with convolution, downsampling, and optional transformer layers
 def D_GANsformer(
@@ -1415,9 +1468,8 @@ def D_GANsformer(
     resample_kernel     = [1, 3, 3, 1], # Low-pass filter to apply when resampling activations, None = no filtering
     # GANsformer settings
     attention           = False,        # Whereas the discriminator uses attention or not
-    component_num       = 1,            # Number of aggregator variables
+    components_num       = 1,            # Number of aggregator variables
     num_heads           = 1,            # Number of attention heads 
-    attention_inputs    = "both",       # Attention function inputs: content, position or both
     attention_dropout   = 0.12,         # Attention dropout rate
     ltnt_gate           = False,        # Gate attention from latents, such that components may not send information 
                                         # when gate value is low
@@ -1463,7 +1515,7 @@ def D_GANsformer(
     # Positional encodings
     latent_pos = None
     if use_pos: 
-        latent_pos = get_embeddings(component_num, latent_size, name = "ltnt_emb")    
+        latent_pos = get_embeddings(components_num, latent_size, name = "ltnt_emb")    
 
     grid_poses = get_positional_embeddings(resolution_log2, pos_dim, pos_type, pos_directions_num, pos_init)
     if local_attention:
@@ -1493,7 +1545,6 @@ def D_GANsformer(
                 "num_heads": num_heads,  "att_dp": attention_dropout,
                 "from_gate": ltnt_gate,  "to_gate": img_gate, 
                 "from_pos": latent_pos,  "to_pos": grid_poses[res]
-                "inputs": attention_inputs
             }
             aggregators = transformer(from_tensor = aggregators, to_tensor = x, dim = latent_size, name = "n2l", **kwargs)[0]
 
@@ -1551,7 +1602,7 @@ def D_GANsformer(
     x = None
 
     # Initialize aggregator variables, used only when attention is used in the discriminator
-    aggregators = tf.get_variable(name = "aggregators", shape = [component_num, latent_size], 
+    aggregators = tf.get_variable(name = "aggregators", shape = [components_num, latent_size], 
         initializer = tf.random_uniform_initializer())
     aggregators = tf.tile(tf.expand_dims(aggregators, axis = 0), [batch_size, 1, 1]) # [batch_size, k, dim]
 
@@ -1598,13 +1649,13 @@ def D_GANsformer(
 
             o = tf.reshape(o, shape[:-1]) # [batch_size, k]
             x = tf.concat([x, o], axis = -1) # [batch_size, nf(0) + k]
-            
+
     # Output layer with label conditioning from "Which Training Methods for GANs do actually Converge?"
     with tf.variable_scope("Output"):
         x = apply_bias_act(dense_layer(x, dim = max(labels_in.shape[1], 1)))
         if labels_in.shape[1] > 0:
-            x = tf.reduce_sum(x * labels_in, axis = 1, keepdims = True)
+            x = tf.reduce_sum(x * labels_in, axis = 1, keepdims = True) # [batch_size, 1]
 
     # Output
     scores_out = tf.identity(x, name = "scores_out")
-    return scores_out
+    return scores_out # [batch_size, 1]

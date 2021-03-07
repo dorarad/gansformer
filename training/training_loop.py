@@ -172,7 +172,6 @@ def training_loop(
     rich_eval_size          = 10,       # Number of samples for rich evaluation (heavier images)
     printname               = "",       # Experiment name for logging
     # Architecture
-    component_num           = 1,        # Number of generator latent components (1 for StyleGAN)
     attention               = False,    # Introduce transformer layers
     merge                   = False):   # Generate several images and then merge them
 

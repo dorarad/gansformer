@@ -23,7 +23,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 - [x] Uploading initial code and readme
 - [x] Image scampling and visualization script
 - [ ] Code clean-up and making it ready for running (*in progress, close to completion*)
-- [ ] Training and data-prepreations intructions (*by March 7*)
+- [ ] Training and data-prepreations intructions (*by March 8*)
 - [ ] Pretrained networks (*by March 20*)
 - [ ] Further visualizations/animations
 

@@ -105,7 +105,7 @@ class Projector:
             if self._lpips is None:
                 self._lpips = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/vgg16_zhang_perceptual.pkl")
             self._loss = self._lpips.get_output_for(proc_imgs_expr, self._target_imgs_var)
-        self._loss = self._dist = tf.reduce_sum(self._loss)  
+        self._loss = self._dist = tf.reduce_sum(self._loss)
 
         # Noise regularization graph
         self._info("Building noise regularization graph...")
@@ -157,7 +157,7 @@ class Projector:
 
         # Initialize optimization state
         self._info("Initializing optimization state...")
-        tflib.set_vars({self._target_imgs_var: target_imgs, 
+        tflib.set_vars({self._target_imgs_var: target_imgs,
             self._dlatents_var: np.tile(self._dlatent_avg, (self._minibatch_size, 1, 1, 1))})
         tflib.run(self._noise_init_op)
         tflib.run(self._weight_init_op)
@@ -196,7 +196,7 @@ class Projector:
         return self._cur_step
 
     def get_loss(self):
-        return self.loss     
+        return self.loss
 
     def get_dlatents(self):
         return tflib.run(self._dlatents_expr, {self._noise_in: 0})

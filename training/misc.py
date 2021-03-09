@@ -1,5 +1,5 @@
 # Miscellaneous utility functions
-import tensorflow as tf 
+import tensorflow as tf
 import numpy as np
 import PIL.Image
 import pickle
@@ -63,7 +63,7 @@ def save_npy(mat, filename):
 def save_npys(npys, path, offset = 0):
     npys = list(npys)
     for i, npy in tqdm(enumerate(npys), total = len(npys)):
-        save_npy(npy, dnnlib.make_run_dir_path(path % (offset + i)))  
+        save_npy(npy, dnnlib.make_run_dir_path(path % (offset + i)))
 
 # Delete a list of files
 def rm(files):
@@ -85,7 +85,7 @@ def float2uint(imgs):
     imgs = adjust_dynamic_range(imgs, [-1.0, 1.0], [0, 255])
     imgs = tf.cast(tf.clip_by_value(tf.rint(imgs), 0, 255), tf.uint8)
     return imgs
-    
+
 def float2uint_np(imgs):
     imgs = adjust_dynamic_range(imgs, [-1.0, 1.0], [0, 255])
     imgs = np.rint(imgs).clip(0, 255).astype(np.uint8)
@@ -100,7 +100,7 @@ def pad_min_square(img, pad_color = (0, 0, 0)):
     s = max(w, h)
     result = PIL.Image.new(img.mode, (s, s), pad_color)
     offset_x = max(0, (h - w) // 2)
-    offset_y = max(0, (w - h) // 2)    
+    offset_y = max(0, (w - h) // 2)
     result.paste(img, (offset_x, offset_y))
     return result
 
@@ -159,14 +159,14 @@ def hsv_to_rgb(hsv):
 def adjust_dynamic_range(data, drange_in, drange_out, hsv = False):
     if not hsv:
         return adjust_dynamic_range_aux(data, drange_in, drange_out)
-    else:        
+    else:
         data = adjust_dynamic_range_aux(data, drange_in, [0.0, 1.0])
 
         axis = -1
         # print(list(data.shape))
         for i, x in enumerate(list(data.shape)):
-            if x == 3: 
-                axis = i 
+            if x == 3:
+                axis = i
 
         if axis != -1:
             ln = len(list(data.shape))
@@ -245,16 +245,16 @@ def create_img_grid(imgs, grid_size = None):
 def save_img_grid(imgs, filename, drange = [0,1], grid_size = None):
     to_pil(create_img_grid(imgs, grid_size), drange).save(filename)
 
-def setup_snapshot_img_grid(dataset, size = "1080p", layout = "random"): 
+def setup_snapshot_img_grid(dataset, size = "1080p", layout = "random"):
     # dataset: dataset object to iterate over
-    # size: 
+    # size:
     ### "1080p" = to be viewed on 1080p display
     ### "4k/8k" = to be viewed on 4k/8k display
     ### int for a custom number of images
-    # layout: 
+    # layout:
     ### "random" = grid contents are selected randomly
     ### "row_per_class" = each row corresponds to one class label
-    
+
     # Select size
     gw = 1; gh = 1
     if size == "1080p":
@@ -311,7 +311,7 @@ def get_colors(num):
 
 # Convert a list of images to a GIF file
 def save_gif(imgs, filename, duration = 50):
-    imgs[0].save(filename, save_all = True, append_images = imgs[1:], duration = duration, loop = 0) 
+    imgs[0].save(filename, save_all = True, append_images = imgs[1:], duration = duration, loop = 0)
 
 # Save a list of images with ordering and according to a path template
 def save_images_builder(drange, grid = False):

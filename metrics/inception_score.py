@@ -2,7 +2,7 @@
 import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib
-import glob 
+import glob
 import PIL.Image
 
 from metrics import metric_base

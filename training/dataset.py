@@ -108,17 +108,17 @@ class TFRecordDataset:
                     continue
                 # Load dataset
                 dset = tf.data.TFRecordDataset(tfr_file, compression_type = "", buffer_size = buffer_mb<<20, num_parallel_reads = None)
-                
+
                 # If max_imgs is set, take a subset of the data
                 if max_imgs is not None:
                     dset = dset.take(max_imgs)
-                
+
                 # Parse the TF records
-                dset = dset.map(self.parse_tfrecord_tf, num_parallel_calls = num_threads)            
+                dset = dset.map(self.parse_tfrecord_tf, num_parallel_calls = num_threads)
 
                 # Zip images with their labels (0s if no labels)
                 dset = tf.data.Dataset.zip((dset, self._tf_labels_dataset))
-                
+
                 # Shuffle and repeat
                 bytes_per_item = np.prod(tfr_shape) * np.dtype(self.dtype).itemsize
                 if shuffle_mb > 0:
@@ -188,8 +188,8 @@ class TFRecordDataset:
     def parse_tfrecord_np(record):
         ex = tf.train.Example()
         ex.ParseFromString(record)
-        shape = ex.features.feature["shape"].int64_list.value 
-        data = ex.features.feature["data"].bytes_list.value[0] 
+        shape = ex.features.feature["shape"].int64_list.value
+        data = ex.features.feature["data"].bytes_list.value[0]
         return np.fromstring(data, np.uint8).reshape(shape)
 
 # A helper function for constructing a dataset object using the given options

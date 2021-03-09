@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 import dnnlib
 import dnnlib.tflib as tflib
-import glob 
+import glob
 import PIL.Image
 
 from metrics import metric_base
@@ -179,8 +179,8 @@ class PR(metric_base.MetricBase):
             feats = self._gen_feats(Gs, inception, minibatch_size, num_gpus, Gs_kwargs)
 
         # Compute precision and recall
-        state = knn_precision_recall_features(ref_features = ref_features, eval_features = eval_features, 
-            feature_net = feature_net, nhood_sizes = [self.nhood_size], row_batch_size = self.row_batch_size, 
+        state = knn_precision_recall_features(ref_features = ref_features, eval_features = eval_features,
+            feature_net = feature_net, nhood_sizes = [self.nhood_size], row_batch_size = self.row_batch_size,
             col_batch_size = self.row_batch_size, num_gpus = num_gpus)
         self._report_result(state.knn_precision[0], suffix = "_precision")
         self._report_result(state.knn_recall[0], suffix = "_recall")

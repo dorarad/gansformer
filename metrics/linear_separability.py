@@ -111,7 +111,7 @@ class LS(metric_base.MetricBase):
                 labels = self._get_random_labels_tf(self.minibatch_per_gpu)
                 ret = Gs_clone.get_output_for(latents, labels, return_dlatents = True, **Gs_kwargs)
                 imgs, dlatents = ret[0], ret[-1]
-                
+
                 # Downsample to 256x256. The attribute classifiers were built for 256x256
                 if imgs.shape[2] > 256:
                     factor = imgs.shape[2] // 256

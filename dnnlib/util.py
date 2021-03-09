@@ -1,4 +1,4 @@
-﻿# Miscellaneous utility classes and functions: 
+﻿# Miscellaneous utility classes and functions:
 ### EasyDict to access variables as dict.var instead of dict["var"]
 ### Logging and printing to files/screen
 ### Modules management
@@ -44,9 +44,9 @@ class EasyDict(dict):
         del self[name]
 
 class Logger(object):
-    # Redirect stderr to stdout, optionally print stdout to a file, 
+    # Redirect stderr to stdout, optionally print stdout to a file,
     # and optionally force flushing on both stdout and the file
-    def __init__(self, file_name: str = None, file_mode: str = "a", should_flush: bool = True, 
+    def __init__(self, file_name: str = None, file_mode: str = "a", should_flush: bool = True,
             screen = True):
         self.file = None
         self.screen = screen
@@ -141,7 +141,7 @@ _str_to_ctype = {
 }
 
 def get_dtype_and_ctype(type_obj: Any) -> Tuple[np.dtype, Any]:
-    # Given a type name string (or an object having a __name__ attribute), 
+    # Given a type name string (or an object having a __name__ attribute),
     # return matching Numpy and ctypes types that have the same size in bytes
     type_str = None
 

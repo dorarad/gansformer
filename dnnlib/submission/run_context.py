@@ -1,8 +1,8 @@
 # Environment and configuration management for run/training loop.
 # Each model run is considered a submission that could be deployed either locally (default) or remotely.
-# 
-# It has a context directory that tracks information about the experiment configuration, a log file with run 
-# history and timesteps, performance on different metrics over the course of training, 
+#
+# It has a context directory that tracks information about the experiment configuration, a log file with run
+# history and timesteps, performance on different metrics over the course of training,
 # sample output images and other visualizations.
 
 import datetime
@@ -43,8 +43,8 @@ class RunContext(object):
 
         # write out details about the run to a text file
         self.run_txt_data = {
-            "task_name": submit_config.task_name, 
-            "host_name": submit_config.host_name, 
+            "task_name": submit_config.task_name,
+            "host_name": submit_config.host_name,
             "start_time": datetime.datetime.now().isoformat(sep = " ")
         }
         with open(os.path.join(submit_config.run_dir, "run.txt"), "w") as f:

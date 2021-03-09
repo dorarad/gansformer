@@ -1,5 +1,5 @@
 # Helper for managing networks.
-### Tracks their input/output shapes interface 
+### Tracks their input/output shapes interface
 ### Converts inputs/outputs between numpy and tensorflow
 ### Manages variables and graph
 ### Loads/saves the network into pickle
@@ -206,7 +206,7 @@ class Network:
         if len(in_expr) > self.num_inputs:
             in_expr = in_expr[:self.num_inputs]
         if len(in_expr) < self.num_inputs:
-            in_expr = in_expr + (tf.zeros([tf.shape(in_expr[0])[0]]), )          
+            in_expr = in_expr + (tf.zeros([tf.shape(in_expr[0])[0]]), )
         assert len(in_expr) == self.num_inputs
         assert not all(expr is None for expr in in_expr)
 
@@ -334,7 +334,7 @@ class Network:
         uninitialized = [name for name in self.vars.keys() if self.translate(name) not in src_net.vars]
         names_new = []
         mismatch = False
-        
+
         if len(uninitialized) > 0:
             print(bcolored("Uninitialized variables:", "red"))
             for var in uninitialized:
@@ -405,11 +405,11 @@ class Network:
 
         # Support mismatch in number of provided inputs
         if len(in_arrays) > self.num_inputs:
-            in_arrays = in_arrays[:self.num_inputs] 
+            in_arrays = in_arrays[:self.num_inputs]
         if len(in_arrays) < self.num_inputs:
             in_arrays = in_arrays + (None, )
         assert len(in_arrays) == self.num_inputs
-        
+
         assert not all(arr is None for arr in in_arrays)
         assert input_transform is None or util.is_top_level_function(input_transform["func"])
         assert output_transform is None or util.is_top_level_function(output_transform["func"])
@@ -518,7 +518,7 @@ class Network:
             # Scope does not contain ops as immediate children => recurse deeper
             contains_direct_ops = any("/" not in op.name[len(global_prefix):] and op.type not in ["Identity", "Cast", "Transpose"] for op in cur_ops)
 
-            scope_name = scope[len(self.scope) + 1:] 
+            scope_name = scope[len(self.scope) + 1:]
             rec_scope = scope_name in ["G_mapping", "G_synthesis"] or any((op.name[len(global_prefix):].startswith("AttLayer")) for op in cur_ops)
             if (level <= 1 or not contains_direct_ops or rec_scope) and (len(cur_ops) + len(cur_vars)) > 1:
                 visited = set()

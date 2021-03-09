@@ -1,5 +1,5 @@
-# Tool for creating TFRecords datasets. 
-# It supports multi-resolution (saving the images in different resolutions) but isn't 
+# Tool for creating TFRecords datasets.
+# It supports multi-resolution (saving the images in different resolutions) but isn't
 # essential for the model as it needs only one resolution for training.
 import os
 import sys
@@ -11,7 +11,7 @@ import traceback
 import numpy as np
 import tensorflow as tf
 import PIL.Image
-import cv2 
+import cv2
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from tqdm import tqdm
@@ -46,12 +46,12 @@ class TFRecordExporter:
     def close(self):
         if self.verbose:
             print("%-40s\r" % "Flushing data...", end = "", flush = True)
-        
+
         for tfr_writers in self.tfr_writers:
             for tfr_writer in tfr_writers:
                 tfr_writer.close()
         self.tfr_writers = []
-        
+
         if self.verbose:
             print("%-40s\r" % "", end = "", flush = True)
             print("Added %d images." % self.curr_imgnum)
@@ -64,14 +64,14 @@ class TFRecordExporter:
     def add_img(self, img, shards_num = 5):
         if self.verbose and self.curr_imgnum % self.progress_interval == 0:
             print("%d / %d\r" % (self.curr_imgnum, self.expected_imgs), end = "", flush = True)
-        
+
         if not self.initialized:
             self.shape = img.shape
             self.resolution_log2 = int(np.log2(self.shape[1]))
             assert self.shape[0] in [1, 2, 3]
             assert self.shape[1] == self.shape[2]
             assert self.shape[1] == 2**self.resolution_log2
-            
+
             for lod in range(self.resolution_log2 - 1):
                 tfr_writers_lod = []
                 for shard in range(shards_num):
@@ -81,7 +81,7 @@ class TFRecordExporter:
                 self.tfr_writers.append(tfr_writers_lod)
 
         assert img.shape == self.shape
-        
+
         for lod, tfr_writers in enumerate(self.tfr_writers):
             if lod > 0:
                 break
@@ -98,7 +98,7 @@ class TFRecordExporter:
             ex = tf.train.Example(features = tf.train.Features(feature = features))
 
             tfr_writers[self.writer_index].write(ex.SerializeToString())
-        
+
         self.writer_index = (self.writer_index + 1) % shards_num
         self.curr_imgnum += 1
 
@@ -217,7 +217,7 @@ def display(tfrecord_dir):
             print("Press SPACE or ENTER to advance, ESC to exit")
         print("\nidx = %-8d\nlabel = %s" % (i, labels[0].tolist()))
         img = imgs[0].transpose(1, 2, 0)[:, :, ::-1] # CHW => HWC, RGB => BGR
-        cv2.imshow("dataset_tool", ) 
+        cv2.imshow("dataset_tool", )
         idx += 1
         if cv2.waitKey() == 27:
             break
@@ -504,7 +504,7 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
     with open(os.path.join(celeba_dir, "Anno", "list_landmarks_celeba.txt"), "rt") as file:
         landmarks = [[float(value) for value in line.split()[1:]] for line in file.readlines()[2:]]
         landmarks = np.float32(landmarks).reshape(-1, 5, 2)
-    
+
     print("Loading CelebA-HQ deltas from '%s'" % delta_dir)
     import scipy.ndimage
     import hashlib
@@ -529,7 +529,7 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
     # Must use pillow version 3.1.1 for everything to work correctly
     if getattr(PIL, "PILLOW_VERSION", "") != "3.1.1":
         error("create_celebahq requires pillow version 3.1.1") # conda install pillow = 3.1.1
-        
+
     # Must use libjpeg version 8d for everything to work correctly
     img = np.array(PIL.Image.open(os.path.join(celeba_dir, "img_celeba", "000001.jpg")))
     md5 = hashlib.md5()
@@ -598,23 +598,23 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
             img += (np.median(img, axis=(0,1)) - img) * np.clip(mask, 0.0, 1.0)
             img = PIL.Image.fromarray(np.uint8(np.clip(np.round(img), 0, 255)), "RGB")
             quad += pad[0:2]
-            
+
         # Transform
         img = img.transform((4096, 4096), PIL.Image.QUAD, (quad + 0.5).flatten(), PIL.Image.BILINEAR)
         img = img.resize((1024, 1024), PIL.Image.ANTIALIAS)
         img = np.asarray(img).transpose(2, 0, 1)
-        
+
         # Verify MD5
         md5 = hashlib.md5()
         md5.update(img.tobytes())
         assert md5.hexdigest() == fields["proc_md5"][idx]
-        
+
         # Load delta image and original JPG
         with zipfile.ZipFile(os.path.join(delta_dir, "deltas%05d.zip" % (idx - idx % 1000)), "r") as zip:
             delta_bytes = zip.read("delta%05d.dat" % idx)
         with open(orig_path, "rb") as file:
             orig_bytes = file.read()
-        
+
         # Decrypt delta image, using original JPG data as decryption key
         algorithm = cryptography.hazmat.primitives.hashes.SHA256()
         backend = cryptography.hazmat.backends.default_backend()
@@ -622,10 +622,10 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
         kdf = cryptography.hazmat.primitives.kdf.pbkdf2.PBKDF2HMAC(algorithm = algorithm, length = 32, salt = salt, iterations = 100000, backend = backend)
         key = base64.urlsafe_b64encode(kdf.derive(orig_bytes))
         delta = np.frombuffer(bz2.decompress(cryptography.fernet.Fernet(key).decrypt(delta_bytes)), dtype = np.uint8).reshape(3, 1024, 1024)
-        
+
         # Apply delta image
         img = img + delta
-        
+
         # Verify MD5
         md5 = hashlib.md5()
         md5.update(img.tobytes())
@@ -661,7 +661,7 @@ def pad_min_square(img):
     s = max(w, h)
     result = PIL.Image.new(img.mode, (s, s))
     offset_x = max(0, (h - w) // 2)
-    offset_y = max(0, (w - h) // 2)    
+    offset_y = max(0, (w - h) // 2)
     result.paste(img, (offset_x, offset_y))
     return result
 
@@ -694,14 +694,14 @@ def create_from_imgs(tfrecord_dir, img_dir, shuffle, ratio = None):
     with TFRecordExporter(tfrecord_dir, len(img_filenames)) as tfr:
         order = tfr.choose_shuffled_order() if shuffle else np.arange(len(img_filenames))
         for idx in range(order.size):
-            img = PIL.Image.open(img_filenames[order[idx]]).convert("RGB") 
-            
+            img = PIL.Image.open(img_filenames[order[idx]]).convert("RGB")
+
             img = crop_max_rectangle(img, ratio)
             img = pad_min_square(img)
-            
+
             pow2size = 2 ** int(np.round(np.log2(img.size[0])))
             img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
-            
+
             img = np.asarray(img)
             if channels == 1:
                 img = img[np.newaxis, :, :] # HW => CHW

@@ -25,7 +25,7 @@ import pretrained_networks
 # ----------------------------------------------------------------------------
 
 def save_gif(imgs, fn):
-    imgs[0].save(fn, save_all = True, append_imgs = imgs[1:], duration = 50, loop = 0)  
+    imgs[0].save(fn, save_all = True, append_imgs = imgs[1:], duration = 50, loop = 0)
 
 def broadcastLtnt(Gs, ltnt):
     return np.tile(ltnt[:, np.newaxis], [1, Gs.components.synthesis.input_shape[1], 1])
@@ -111,7 +111,7 @@ def generate_noisevar_imgs(network_pkl, seeds, num_samples, num_variants):
     Gs_kwargs.output_transform = dict(func = tflib.convert_imgs_to_uint8, nchw_to_nhwc = True)
     Gs_kwargs.minibatch_size = 4
     _, _, H, W = Gs.output_shape
-      
+
     for seed_idx, seed in enumerate(seeds):
         print("Generating image for seed %d (%d/%d)..." % (seed, seed_idx, len(seeds)))
         canvas = PIL.Image.new("RGB", (W * (num_variants + 2), H), "white")
@@ -121,13 +121,13 @@ def generate_noisevar_imgs(network_pkl, seeds, num_samples, num_variants):
 
         npimgs = imgs
         imgs = [misc.to_pil(img) for img in imgs]
-        
+
         save_gif(imgs, dnnlib.make_run_dir_path("noisevar%04d.gif" % seed))
         for i in range(num_variants + 1):
             canvas.paste(imgs[i], (i * W, 0))
 
         diff = np.std(np.mean(npimgs, axis = 3), axis = 0) * 4
-        diff = np.clip(diff + 0.5, 0, 255).astype(np.uint8)            
+        diff = np.clip(diff + 0.5, 0, 255).astype(np.uint8)
         canvas.paste(PIL.Image.fromarray(diff, "L"), (W * (num_variants + 1), 0))
 
         canvas.save(dnnlib.make_run_dir_path("noisevar%04d.png" % seed))
@@ -139,7 +139,7 @@ def generate_noisecomp_imgs(network_pkl, seeds, noise_ranges):
     print("Loading networks from %s..." % network_pkl)
     _G, _D, Gs = pretrained_networks.load_networks(network_pkl)[:3]
     Gsc = Gs.clone()
-    
+
     noise_vars = [var for name, var in Gsc.components.synthesis.vars.items() if name.startswith("noise")]
     noise_pairs = list(zip(noise_vars, tflib.run(noise_vars))) # [(var, val), ...]
 
@@ -154,12 +154,12 @@ def generate_noisecomp_imgs(network_pkl, seeds, noise_ranges):
         canvas = PIL.Image.new("RGB", (W * len(noise_ranges), H), "white")
 
         z = np.random.RandomState(seed).randn(1, *Gsc.input_shape[1:]) # [minibatch, component]
-        
+
         for i, noise_range in enumerate(noise_ranges):
             tflib.set_vars({var: val * (1 if vi in noise_range else 0) for vi, (var, val) in enumerate(noise_pairs)})
             imgs = Gsc.run(z, None, **Gs_kwargs) # [minibatch, height, width, channel]
             canvas.paste(misc.to_pil(imgs[0]), (i * W, 0))
-        
+
         canvas.save(dnnlib.make_run_dir_path("noisecomp%04d.png" % seed))
 
 # Latents sensitivity
@@ -197,7 +197,7 @@ def generate_ltntprtrb_imgs(network_pkl, seeds, num_samples, noise_range, dltnt,
             if dltnt:
                 ltnt = Gs.components.mapping.run(ltnt, None)[:, 0]
 
-        ltnt = np.tile(ltnt, (ltnt_size * len(noise_range), 1)) 
+        ltnt = np.tile(ltnt, (ltnt_size * len(noise_range), 1))
         tflib.set_vars({var: rnd.randn(*var.shape.as_list()) for var in noise_vars}) # [height, width]
 
         idx = 0
@@ -210,17 +210,17 @@ def generate_ltntprtrb_imgs(network_pkl, seeds, num_samples, noise_range, dltnt,
             imgs = Gs.components.synthesis.run(broadcastLtnt(Gs, ltnt), **Gs_kwargs)
         else:
             imgs = Gs.run(ltnt, None, **Gs_kwargs) # [minibatch, height, width, channel]
-        
+
         num_crops = int(ltnt_size / group_size)
         frameIdx, imgIdx = 0, 0
         for m in range(num_crops):
             canvas = PIL.Image.new("RGB", (W * len(noise_range), H * group_size), "white")
-            
+
             for i in range(group_size):
                 imgStart = frameIdx
                 for j in range(len(noise_range)):
                     canvas.paste(misc.to_pil(imgs[frameIdx]), (j * W, i * H))
-                    frameIdx += 1  
+                    frameIdx += 1
 
                 imgsOut = [misc.to_pil(img) for img in imgs[imgStart:frameIdx]]
                 save_gif(imgsOut, dnnlib.make_run_dir_path("latent_perturbation_%s_%04d_%04d.gif" % \
@@ -255,7 +255,7 @@ def slerp(a, b, ts):
 def projectImage(Gs, projc, img_fn):
     img = PIL.Image.open(img_fn).convert("RGB")
     img = misc.pad_min_square(img)
-    img = img.resize((Gs.output_shape[2], Gs.output_shape[3]), PIL.Image.ANTIALIAS) # resize mode? 
+    img = img.resize((Gs.output_shape[2], Gs.output_shape[3]), PIL.Image.ANTIALIAS) # resize mode?
     img = np.asarray(img)
 
     channels = img.shape[1] if img.ndim == 3 else 1
@@ -263,7 +263,7 @@ def projectImage(Gs, projc, img_fn):
 
     assert img.shape == tuple(Gs.output_shape[1:])
     img = misc.adjust_dynamic_range(img, [0, 255], [-1, 1])[np.newaxis]
-    return run_projector.project_img(projc, img) # w.append()       
+    return run_projector.project_img(projc, img) # w.append()
 
 def interpolate(network_pkl, seeds, dltnt, img_dir, samples_num, loss, lr):
     print("Loading networks from %s..." % network_pkl)
@@ -274,7 +274,7 @@ def interpolate(network_pkl, seeds, dltnt, img_dir, samples_num, loss, lr):
     proj = img_dir is not None
 
     mod = "w" if dltnt else "z"
-    if proj: 
+    if proj:
         mod = "p{}".format(img_dir.split("/")[-1])
         dltnt = True
 
@@ -293,7 +293,7 @@ def interpolate(network_pkl, seeds, dltnt, img_dir, samples_num, loss, lr):
         projc.lossType = loss
         projc.initial_learning_rate = lr
         projc.set_network(Gs)
-        
+
         print("Loading images from %s" % img_dir)
         img_fns = sorted(glob.glob(os.path.join(img_dir, "*")))
         seeds = range(len(img_fns[1:]))
@@ -307,12 +307,12 @@ def interpolate(network_pkl, seeds, dltnt, img_dir, samples_num, loss, lr):
 
     for seed_idx, seed in enumerate(seeds):
         print("Generating image for seed %d (%d/%d)..." % (seed, seed_idx, len(seeds)))
-        rnd = np.random.RandomState(seed)        
+        rnd = np.random.RandomState(seed)
 
         if not proj:
             tflib.set_vars({var: rnd.randn(*var.shape.as_list()) for var in noise_vars}) # [height, width]
             z = rnd.randn(2, *Gs.input_shape[1:]) # [minibatch, component]
-        
+
         # interpolate either in w space (if dltnt) or z space
         if dltnt:
             if proj:
@@ -324,9 +324,9 @@ def interpolate(network_pkl, seeds, dltnt, img_dir, samples_num, loss, lr):
         else:
             z = slerp(z[0], z[1], ts)
             imgs = Gs.run(z, None, **Gs_kwargs) # [minibatch, height, width, channel]
-        
+
         imgs = [misc.to_pil(img) for img in imgs]
-        save_gif(imgs, dnnlib.make_run_dir_path("interpolation_%s_%04d.gif" % (mod, seed)))        
+        save_gif(imgs, dnnlib.make_run_dir_path("interpolation_%s_%04d.gif" % (mod, seed)))
 
 def _parse_num_range(s):
     # Accept either a comma separated list of numbers "a,b,c" or a range "a-c" and return as a list of ints

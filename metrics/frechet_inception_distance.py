@@ -6,11 +6,11 @@ import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d
 import PIL.Image
-import glob 
+import glob
 
 from metrics import metric_base
 from training import misc
- 
+
 class FID(metric_base.MetricBase):
     def __init__(self, minibatch_per_gpu, **kwargs):
         super().__init__(**kwargs)
@@ -39,7 +39,7 @@ class FID(metric_base.MetricBase):
         else:
             imgs_iter = self._iterate_reals(minibatch_size = minibatch_size)
             feats_real = self._get_feats(imgs_iter, inception, minibatch_size)
-            mu_real, sigma_real = self._feats_to_stats(feats_real)            
+            mu_real, sigma_real = self._feats_to_stats(feats_real)
             misc.save_pkl((mu_real, sigma_real), cache_file)
 
         if paths is not None:

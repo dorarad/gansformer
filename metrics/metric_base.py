@@ -1,4 +1,4 @@
-# Common definitions for GAN metrics: provides iterators over the datasets, 
+# Common definitions for GAN metrics: provides iterators over the datasets,
 # file caching, progress reports and printing.
 import os
 import time
@@ -33,7 +33,7 @@ class MetricBase:
         data = data.get("run_func_kwargs", {})
         return dict(train = data, dataset = data.get("dataset_args", {}))
 
-    def _reset(self, network_pkl = None, run_dir = None, data_dir = None, dataset_args = None, 
+    def _reset(self, network_pkl = None, run_dir = None, data_dir = None, dataset_args = None,
             mirror_augment = None):
         self._dataset_args = dataset_args.copy() if dataset_args is not None else None
 
@@ -43,7 +43,7 @@ class MetricBase:
 
         self._network_pkl = network_pkl
         self._data_dir = data_dir
-          
+
         self._mirror_augment = mirror_augment
         self._eval_time = 0
         self._results = []
@@ -65,11 +65,11 @@ class MetricBase:
         self._progress_max = pmax
         self._progress_sec = psec
 
-    def run(self, network_pkl, num_imgs, run_dir = None, data_dir = None, dataset_args = None, 
-            mirror_augment = None, num_gpus = 1, tf_config = None, log_results = True, 
+    def run(self, network_pkl, num_imgs, run_dir = None, data_dir = None, dataset_args = None,
+            mirror_augment = None, num_gpus = 1, tf_config = None, log_results = True,
             Gs_kwargs = dict(is_validation = True), **kwargs):
 
-        self._reset(network_pkl = network_pkl, run_dir = run_dir, data_dir = data_dir, 
+        self._reset(network_pkl = network_pkl, run_dir = run_dir, data_dir = data_dir,
             dataset_args = dataset_args, mirror_augment = mirror_augment)
 
         time_begin = time.time()
@@ -78,7 +78,7 @@ class MetricBase:
             _G = _D = Gs = None
             if self._network_pkl is not None:
                 _G, _D, Gs = misc.load_pkl(self._network_pkl)[:3]
-            self._evaluate(Gs, Gs_kwargs = Gs_kwargs, num_gpus = num_gpus, 
+            self._evaluate(Gs, Gs_kwargs = Gs_kwargs, num_gpus = num_gpus,
                 num_imgs = num_imgs, **kwargs)
             self._report_progress(1, 1)
         self._eval_time = time.time() - time_begin
@@ -89,7 +89,7 @@ class MetricBase:
                 with dnnlib.util.Logger(log_file, "a", screen = False):
                     print(self.get_result_str().strip())
             print(self.get_result_str(screen = True).strip())
-        
+
         return self._results[0].value
 
     def get_result_str(self, screen = False):
@@ -103,7 +103,7 @@ class MetricBase:
         result_str = "%-30s" % network_name
         result_str += " time %-12s" % dnnlib.util.format_time(self._eval_time)
         nums = ""
-        for res in self._results: 
+        for res in self._results:
             nums += " " + self.name + res.suffix + " "
             nums += res.fmt % res.value
         if screen:
@@ -178,7 +178,7 @@ class MetricBase:
     # Iterate over images form the dataset and extract their features.
     # Args:
     #   img_iter: an iterator over image batches
-    #   featurizer: a feature extractor featurizer (e.g. inception/vgg), that receives an image batch 
+    #   featurizer: a feature extractor featurizer (e.g. inception/vgg), that receives an image batch
     #          and returns their vector feature embeddings
     #   minibatch_size: size of batches provides by the image iterator
     #   num_imgs: number of extracted images
@@ -191,7 +191,7 @@ class MetricBase:
             end = min(begin + minibatch_size, num_imgs)
 
             feats[begin:end] = featurizer.run(imgs[:end-begin], num_gpus = num_gpus, assume_frozen = True)
-            
+
             if end == num_imgs:
                 break
 
@@ -200,12 +200,12 @@ class MetricBase:
     # Generate images and extract their features using a generator model.
     # Args:
     #   generator: a model for generating images
-    #   featurizer: a feature extractor model (e.g. inception/vgg), that receives an image batch 
+    #   featurizer: a feature extractor model (e.g. inception/vgg), that receives an image batch
     #          and returns their vector feature embeddings
     #   minibatch_size: size of batches provides by the image iterator
     #   num_imgs: number of extracted iamges
     #   num_gpus: number of GPUs to use for generating the images
-    #   g_kwargs: generator arguments 
+    #   g_kwargs: generator arguments
     # Returns the features [num_imgs, featurizer.output_shape[1]]
     def _gen_feats(self, generator, featurizer, minibatch_size, num_imgs, num_gpus, g_kwargs):
         # Construct TensorFlow graph
@@ -231,7 +231,7 @@ class MetricBase:
     # Iterate over image files and extract their features.
     # Args:
     #   paths: a list of image patch to extract features for.
-    #   featurizer: a feature extractor featurizer (e.g. inception/vgg), that receives an image batch 
+    #   featurizer: a feature extractor featurizer (e.g. inception/vgg), that receives an image batch
     #          and returns their vector feature embeddings
     #   minibatch_size: size of batches provides by the image iterator
     #   num_imgs: number of extracted images

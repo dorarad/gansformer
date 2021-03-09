@@ -65,15 +65,15 @@ def _sanitize_tf_config(config_dict: dict = None) -> dict:
     # Defaults
     cfg = dict()
     # Random seed for NumPy. None = keep as is
-    cfg["rnd.np_random_seed"]               = None      
+    cfg["rnd.np_random_seed"]               = None
     # Random seed for TensorFlow. "auto" = derive from NumPy random state. None = keep as is
-    cfg["rnd.tf_random_seed"]               = "auto"    
+    cfg["rnd.tf_random_seed"]               = "auto"
     # 0 = Print all available debug info from TensorFlow. 1 = Print warnings and errors, but disable debug info
-    cfg["env.TF_CPP_MIN_LOG_LEVEL"]         = "1"       
+    cfg["env.TF_CPP_MIN_LOG_LEVEL"]         = "1"
     # False = Check that all ops are available on the designated device. True = Skip the check for ops that are not used
-    cfg["graph_options.place_pruned_graph"] = True      
+    cfg["graph_options.place_pruned_graph"] = True
     # False = Allocate all GPU memory at the beginning. True = Allocate only as much GPU memory as needed
-    cfg["gpu_options.allow_growth"]         = True      
+    cfg["gpu_options.allow_growth"]         = True
 
     # Remove defaults for environment variables that are already set
     for key in list(cfg):

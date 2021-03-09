@@ -18,10 +18,10 @@ def run(network_pkl, metrics, dataset, data_dir, mirror_augment, paths):
     num_gpus = dnnlib.submit_config.num_gpus
     metric_group = metric_base.MetricGroup([metric_defaults[metric] for metric in metrics])
     tf_config = {
-        "rnd.np_random_seed": 1000, 
-        "allow_soft_placement": True, 
+        "rnd.np_random_seed": 1000,
+        "allow_soft_placement": True,
         "gpu_options.per_process_gpu_memory_fraction": 1.0
-    }    
+    }
 
     metric_group.run(network_pkl, data_dir = data_dir, dataset_args = dataset_args, tf_config = tf_config,
         mirror_augment = mirror_augment, num_gpus = num_gpus, paths = paths)

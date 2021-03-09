@@ -39,7 +39,7 @@ class PlatformExtras:
     # A mixed bag of values used by dnnlib heuristics
     # Attributes:
     #    data_reader_buffer_size: Used by DataReader to size internal shared memory buffers
-    #    data_reader_process_count: Number of worker processes to spawn (zero for single 
+    #    data_reader_process_count: Number of worker processes to spawn (zero for single
     #                               thread operation)
     def __init__(self):
         self.data_reader_buffer_size = 1<<30    # 1 GB
@@ -50,27 +50,27 @@ _user_name_override = None
 class SubmitConfig(util.EasyDict):
     # Strongly typed config dict needed to submit runs
     # Attributes:
-    #     run_dir_root: Path to the run dir root. Can be optionally templated with tags 
+    #     run_dir_root: Path to the run dir root. Can be optionally templated with tags
     #         Needs to always be run through get_path_from_template
     #     run_desc: Description of the run. Will be used in the run dir and task name
     #     run_dir_ignore: List of file patterns used to ignore files when copying files to the run dir
-    #     run_dir_extra_files: List of (abs_path, rel_path) tuples of file paths. rel_path root will 
+    #     run_dir_extra_files: List of (abs_path, rel_path) tuples of file paths. rel_path root will
     #         be the src directory inside the run dir
     #     submit_target: Submit target enum value. Used to select where the run is actually launched
     #     num_gpus: Number of GPUs used/requested for the run
     #     print_info: Whether to print debug information when submitting
-    #     local.do_not_copy_source_files: Do not copy source files from the working directory to the 
+    #     local.do_not_copy_source_files: Do not copy source files from the working directory to the
     #         run dir.
     #     run_id: Automatically populated value during submit
     #     run_name: Automatically populated value during submit
     #     run_dir: Automatically populated value during submit
     #     run_func_name: Automatically populated value during submit
     #     run_func_kwargs: Automatically populated value during submit
-    #     user_name: Automatically populated value during submit. Can be set by the user which will then 
+    #     user_name: Automatically populated value during submit. Can be set by the user which will then
     #         override the automatic value
     #     task_name: Automatically populated value during submit
     #     host_name: Automatically populated value during submit
-    #     platform_extras: Automatically populated values during submit.  Used by various dnnlib libraries 
+    #     platform_extras: Automatically populated values during submit.  Used by various dnnlib libraries
     #         such as the DataReader class
     def __init__(self):
         super().__init__()
@@ -78,7 +78,7 @@ class SubmitConfig(util.EasyDict):
         # run (set these)
         self.run_dir_root = "" # should always be passed through get_path_from_template
         self.run_desc = ""
-        self.run_dir_ignore = ["__pycache__", "*.pyproj", "*.sln", "*.suo", ".cache", ".idea", ".vs", 
+        self.run_dir_ignore = ["__pycache__", "*.pyproj", "*.sln", "*.suo", ".cache", ".idea", ".vs",
                                ".vscode", "_cudacache"]
         self.run_dir_extra_files = []
 
@@ -173,7 +173,7 @@ def _create_run_dir_local(submit_config: SubmitConfig, resume: bool, create_new:
 
     if not os.path.exists(run_dir_root):
         os.makedirs(run_dir_root)
-    
+
     run_dir = os.path.join(run_dir_root, submit_config.run_name)
 
     if not resume:
@@ -289,7 +289,7 @@ def load_pkl(file_or_url):
     with open_file_or_url(file_or_url) as file:
         return pickle.load(file, encoding = "latin1")
 
-def submit_run(submit_config: SubmitConfig, run_func_name: str, create_newdir: bool = False, 
+def submit_run(submit_config: SubmitConfig, run_func_name: str, create_newdir: bool = False,
         resume: bool = False, load_config: bool = False, **run_func_kwargs) -> None:
     # Create a run dir, gather files related to the run, copy files to the run dir, and launch the run in appropriate place.
     # create_newdir: enforces the creation of a new run directory
@@ -326,15 +326,15 @@ def submit_run(submit_config: SubmitConfig, run_func_name: str, create_newdir: b
     # Farm specific preparations for a submit
     farm.finalize_submit_config(submit_config, host_run_dir)
 
-    # In case of resumption, load_config = True to load the prior submit_config file from the directory 
-    # (so to maintain the original configuration of the experiment rather than the newly provided 
+    # In case of resumption, load_config = True to load the prior submit_config file from the directory
+    # (so to maintain the original configuration of the experiment rather than the newly provided
     # command-line arguments.
     if load_config:
         config_file = os.path.join(host_run_dir, "submit_config.pkl")
         if os.path.exists(config_file):
             old_submit_config = submit_config
             submit_config = load_pkl(config_file)
-        
+
             submit_config["run_id"] = old_submit_config["run_id"]
             submit_config["run_name"] = old_submit_config["run_name"]
 

@@ -1,4 +1,4 @@
-# Tensorflow optimizer, supports: 
+# Tensorflow optimizer, supports:
 ### Gradient averaging for multi-GPU training
 ### Gradient accumulation for arbitrarily large minibatches
 ### Dynamic loss scaling and typecasts for FP16 training
@@ -175,13 +175,13 @@ class Optimizer:
                     # Sum within the device
                     if len(grad) == 0:
                         # No gradients => zero
-                        grad = tf.zeros(var.shape)  
+                        grad = tf.zeros(var.shape)
                     elif len(grad) == 1:
                         # Single gradient => use as is
-                        grad = grad[0]              
+                        grad = grad[0]
                     else:
                         # Multiple gradients => sum
-                        grad = tf.add_n(grad)       
+                        grad = tf.add_n(grad)
 
                     # Scale as needed
                     scale = 1.0 / len(device.grad_raw[var]) / len(self._devices)

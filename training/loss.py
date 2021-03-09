@@ -6,12 +6,12 @@ import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
-from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d 
+from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d
 import math
 from training import misc
-import os       
+import os
 
-def G_loss(G, D, 
+def G_loss(G, D,
         dataset,                 # The dataset object for the real images
         minibatch_size,          # size of each minibatch
         loss_type,               # The loss type: logistic, hinge, wgan
@@ -20,7 +20,7 @@ def G_loss(G, D,
         pl_minibatch_shrink = 2, # Minibatch shrink (for path regularization only)
         pl_decay = 0.01,         # Decay (for path regularization only)
         pl_weight = 2.0,         # Weight (for path regularization only)
-        **kwargs): 
+        **kwargs):
 
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
     labels = dataset.get_random_labels_tf(minibatch_size)
@@ -30,9 +30,9 @@ def G_loss(G, D,
     if loss_type == "logistic":
         loss = -tf.nn.softplus(fake_scores_out)
     elif loss_type == "logistic_ns":
-        loss = tf.nn.softplus(-fake_scores_out)    
+        loss = tf.nn.softplus(-fake_scores_out)
     elif loss_type == "hinge":
-        loss = -tf.maximum(0.0, 1.0 + fake_scores_out) 
+        loss = -tf.maximum(0.0, 1.0 + fake_scores_out)
     elif loss_type == "wgan":
         loss = -fake_scores_out
 
@@ -70,7 +70,7 @@ def G_loss(G, D,
 
     return loss, reg
 
-def D_loss(G, D, 
+def D_loss(G, D,
         reals,                  # A batch of real images
         labels,                 # A batch of labels (default 0s if no labels)
         minibatch_size,         # Size of each minibatch
@@ -78,7 +78,7 @@ def D_loss(G, D,
         reg_type,               # Regularization type: r1, t2, gp (mixed)
         gamma = 10.0,           # Regularization strength
         wgan_epsilon = 0.001,   # Wasserstein epsilon (for wgan only)
-        wgan_target = 1.0,      # Wasserstein target (for wgan only)              
+        wgan_target = 1.0,      # Wasserstein target (for wgan only)
         **kwargs):
 
     latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
@@ -94,7 +94,7 @@ def D_loss(G, D,
         loss = tf.nn.softplus(fake_scores_out)
         loss += tf.nn.softplus(-real_scores_out)
     elif loss_type == "hinge":
-        loss = tf.maximum(0.0, 1.0 + fake_scores_out) 
+        loss = tf.maximum(0.0, 1.0 + fake_scores_out)
         loss += tf.maximum(0.0, 1.0 - real_scores_out)
     elif loss_type == "wgan":
         loss = fake_scores_out - real_scores_out
@@ -114,7 +114,7 @@ def D_loss(G, D,
             gradient_penalty = tf.reduce_sum(tf.square(grads), axis = [1, 2, 3])
             gradient_penalty = autosummary("Loss/gradient_penalty", gradient_penalty)
             reg = gradient_penalty * (gamma * 0.5)
-        elif reg_type == "gp": 
+        elif reg_type == "gp":
             mixing_factors = tf.random_uniform([minibatch_size, 1, 1, 1], 0.0, 1.0, dtype = fake_imgs_out.dtype)
             mixed_imgs_out = tflib.lerp(tf.cast(reals, fake_imgs_out.dtype), fake_imgs_out, mixing_factors)
             mixed_scores_out = D.get_output_for(mixed_imgs_out, labels, is_training = True)

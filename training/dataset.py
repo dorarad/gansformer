@@ -208,5 +208,6 @@ def load_dataset(class_name = None, data_dir = None, verbose = False, **kwargs):
     if verbose:
         print("Dataset shape: ", misc.bcolored(np.int32(dataset.shape).tolist(), "blue"))
         print("Dynamic range: ", misc.bcolored(dataset.dynamic_range, "blue"))
-        print("Label size: ", misc.bcolored(dataset.label_size, "blue"))
+        if dataset.label_size > 0:
+            print("Label size: ", misc.bcolored(dataset.label_size, "blue"))
     return dataset

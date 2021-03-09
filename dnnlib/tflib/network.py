@@ -57,7 +57,7 @@ class Network:
     #     name: User-specified name, defaults to build func name if None
     #     scope: Unique TensorFlow scope containing template graph and variables, derived from the user-specified name
     #     static_kwargs: Arguments passed to the user-supplied build func
-    #     components: Container for sub-networks. Passed to the build func, and retained between calls
+    #     subnets: Container for sub-networks. Passed to the build func, and retained between calls
     #     num_inputs: Number of input tensors
     #     num_outputs: Number of output tensors
     #     input_shapes: Input tensor shapes (NC or NCHW), including minibatch dimension
@@ -103,7 +103,7 @@ class Network:
         self.name = None
         self.scope = None
         self.static_kwargs = util.EasyDict()
-        self.components = util.EasyDict()
+        self.subnets = util.EasyDict()
         self.num_inputs = 0
         self.num_outputs = 0
         self.input_shapes = [[]]
@@ -147,7 +147,7 @@ class Network:
         # Finalize build func kwargs
         build_kwargs = dict(self.static_kwargs)
         build_kwargs["is_template_graph"] = True
-        build_kwargs["components"] = self.components
+        build_kwargs["subnets"] = self.subnets
 
         # Build template graph
         with tfutil.absolute_variable_scope(self.scope, reuse = False), tfutil.absolute_name_scope(self.scope):  # ignore surrounding scopes
@@ -169,10 +169,10 @@ class Network:
             raise ValueError("Network input shapes not defined. Please call x.set_shape() for each input.")
         if any(t.shape.ndims is None for t in self.output_templates):
             raise ValueError("Network output shapes not defined. Please call x.set_shape() where applicable.")
-        if any(not isinstance(comp, Network) for comp in self.components.values()):
-            raise ValueError("Components of a Network must be Networks themselves.")
-        if len(self.components) != len(set(comp.name for comp in self.components.values())):
-            raise ValueError("Components of a Network must have unique names.")
+        if any(not isinstance(subnet, Network) for subnet in self.subnets.values()):
+            raise ValueError("Subnets of a Network must be Networks themselves.")
+        if len(self.subnets) != len(set(subnet.name for subnet in self.subnets.values())):
+            raise ValueError("Subnets of a Network must have unique names.")
 
         # List inputs and outputs.
         self.input_shapes = [t.shape.as_list() for t in self.input_templates]
@@ -184,7 +184,7 @@ class Network:
         # List variables.
         self.own_vars = OrderedDict((var.name[len(self.scope) + 1:].split(":")[0], var) for var in tf.global_variables(self.scope + "/"))
         self.vars = OrderedDict(self.own_vars)
-        self.vars.update((comp.name + "/" + name, var) for comp in self.components.values() for name, var in comp.vars.items())
+        self.vars.update((subnet.name + "/" + name, var) for subnet in self.subnets.values() for name, var in subnet.vars.items())
         self.trainables = OrderedDict((name, var) for name, var in self.vars.items() if var.trainable)
         self.var_global_to_local = OrderedDict((var.name.split(":")[0], name) for name, var in self.vars.items())
 
@@ -214,7 +214,7 @@ class Network:
         build_kwargs = dict(self.static_kwargs)
         build_kwargs.update(dynamic_kwargs)
         build_kwargs["is_template_graph"] = False
-        build_kwargs["components"] = self.components
+        build_kwargs["subnets"] = self.subnets
 
         # Build TensorFlow graph to evaluate the network
         with tfutil.absolute_variable_scope(self.scope, reuse = True), tf.name_scope(self.name):
@@ -267,7 +267,7 @@ class Network:
         state["version"]            = 4
         state["name"]               = self.name
         state["static_kwargs"]      = dict(self.static_kwargs)
-        state["components"]         = dict(self.components)
+        state["subnets"]            = dict(self.subnets)
         state["build_module_src"]   = self._build_module_src
         state["build_func_name"]    = self._build_func_name
         state["variables"]          = list(zip(self.own_vars.keys(), tfutil.run(list(self.own_vars.values()))))
@@ -286,7 +286,7 @@ class Network:
         assert state["version"] in [2, 3, 4]
         self.name = state["name"]
         self.static_kwargs = util.EasyDict(state["static_kwargs"])
-        self.components = util.EasyDict(state.get("components", {}))
+        self.subnets = util.EasyDict(state.get("subnets", {}))
         self._build_module_src = state["build_module_src"]
         self._build_func_name = state["build_func_name"]
 
@@ -518,11 +518,9 @@ class Network:
             # Scope does not contain ops as immediate children => recurse deeper
             contains_direct_ops = any("/" not in op.name[len(global_prefix):] and op.type not in ["Identity", "Cast", "Transpose"] for op in cur_ops)
 
-            # scope_name = scope[len(self.scope) + 1:] 
-            # rec_scope = (scope_name in ["G_mapping", "G_synthesis"]) or any((op.name[len(global_prefix):].startswith(part)) for part in ["AttLayer", "VocabLayer"] for op in cur_ops)
-            # if (level == 0 or not contains_direct_ops or rec_scope) and (len(cur_ops) + len(cur_vars)) > 1:
-
-            if (level == 0 or not contains_direct_ops) and (len(cur_ops) + len(cur_vars)) > 1:
+            scope_name = scope[len(self.scope) + 1:] 
+            rec_scope = scope_name in ["G_mapping", "G_synthesis"] or any((op.name[len(global_prefix):].startswith("AttLayer")) for op in cur_ops)
+            if (level <= 1 or not contains_direct_ops or rec_scope) and (len(cur_ops) + len(cur_vars)) > 1:
                 visited = set()
                 for rel_name in [op.name[len(global_prefix):] for op in cur_ops] + [name[len(local_prefix):] for name, _var in cur_vars]:
                     token = rel_name.split("/")[0]
@@ -540,7 +538,7 @@ class Network:
         recurse(self.scope, self.list_ops(), list(self.vars.items()), 0)
         return layers
 
-    def print_layers(self, title: str = None, hide_layers_with_no_params: bool = False) -> None:
+    def print_layers(self, title: str = None, hide_layers_with_no_params: bool = True) -> None:
         # Print a summary table of the network structure.
         rows = [[title if title is not None else self.name, "Params", "OutputShape", "WeightShape"]]
         rows += [["---"] * 4]

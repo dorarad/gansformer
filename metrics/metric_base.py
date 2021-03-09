@@ -65,7 +65,7 @@ class MetricBase:
         self._progress_max = pmax
         self._progress_sec = psec
 
-    def run(self, network_pkl, run_dir = None, data_dir = None, dataset_args = None, 
+    def run(self, network_pkl, num_imgs, run_dir = None, data_dir = None, dataset_args = None, 
             mirror_augment = None, num_gpus = 1, tf_config = None, log_results = True, 
             Gs_kwargs = dict(is_validation = True), **kwargs):
 
@@ -78,7 +78,8 @@ class MetricBase:
             _G = _D = Gs = None
             if self._network_pkl is not None:
                 _G, _D, Gs = misc.load_pkl(self._network_pkl)[:3]
-            self._evaluate(Gs, Gs_kwargs = Gs_kwargs, num_gpus = num_gpus, **kwargs)
+            self._evaluate(Gs, Gs_kwargs = Gs_kwargs, num_gpus = num_gpus, 
+                num_imgs = num_imgs, **kwargs)
             self._report_progress(1, 1)
         self._eval_time = time.time() - time_begin
 
@@ -116,7 +117,7 @@ class MetricBase:
             name = self.name
             tflib.autosummary.autosummary("Metrics/" + name + res.suffix, res.value)
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
         raise NotImplementedError # to be overridden by subclasses
 
     def _report_result(self, value, suffix = "", fmt = "%-10.4f"):
@@ -267,5 +268,5 @@ class MetricGroup:
 
 # Dummy metric for debugging purposes
 class DummyMetric(MetricBase):
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
         self._report_result(0.0)

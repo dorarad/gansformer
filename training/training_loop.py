@@ -34,11 +34,11 @@ def process_reals(x, drange_data, drange_net, mirror_augment):
             x = tf.where(tf.random_uniform([tf.shape(x)[0]]) < 0.5, x, tf.reverse(x, [3]))
     return x
     
-def read_data(data, name, shape):
+def read_data(data, name, shape, minibatch_gpu_in):
     var = tf.Variable(name = name, trainable = False, 
-        initial_value = tf.zeros([sched.minibatch_gpu] + shape))
+        initial_value = tf.zeros(shape))
     data_write = tf.concat([data, var[minibatch_gpu_in:]], axis = 0)
-    data_fetch_op = tf.assign(reals_var, data_write)
+    data_fetch_op = tf.assign(var, data_write)
     data_read = var[:minibatch_gpu_in]
     return data_read, data_fetch_op
 
@@ -102,7 +102,7 @@ def set_optimizer_ops(cN, lazy_regularization, no_op):
 
     cN.loss_op = tf.reduce_mean(cN.loss) if cN.loss is not None else no_op
     cN.regval_op = tf.reduce_mean(cN.reg) if cN.reg is not None else no_op 
-    cN.ops = {"loss": cN.loss_op, "reg": regval_op, "norm": cG.norm}
+    cN.ops = {"loss": cN.loss_op, "reg": cN.regval_op, "norm": cN.norm}
 
 # Loading and logging
 # ----------------------------------------------------------------------------
@@ -236,23 +236,22 @@ def training_loop(
 
             # Fetch training data via temporary variables
             with tf.name_scope("DataFetch"):
-                sched = training_schedule(cur_nimg = int(resume_kimg * 1000), dataset = dataset, **sched_args)
-                reals, labels_write = dataset.get_minibatch_tf()        
+                reals, labels = dataset.get_minibatch_tf()        
                 reals = process_reals(reals, dataset.dynamic_range, drange_net, mirror_augment)
-                reals, reals_fetch = read_data(reals, "reals", dataset.shape)
-                labels, labels_fetch = read_data(labels, "labels", [dataset.label_size])
+                reals, reals_fetch = read_data(reals, "reals", 
+                    [sched.minibatch_gpu] + dataset.shape, minibatch_gpu_in)
+                labels, labels_fetch = read_data(labels, "labels", 
+                    [sched.minibatch_gpu, dataset.label_size], minibatch_gpu_in)
                 data_fetch_ops += [reals_fetch, labels_fetch]
 
             # Evaluate loss functions
             with tf.name_scope("G_loss"):
-                cG.loss, cG.reg = dnnlib.util.call_func_by_name(G = cG.gpu, D = cD.gpu, 
-                    dataset = dataset, reals = reals_read, 
-                    minibatch_size = minibatch_gpu_in, **cG.loss_args)
+                cG.loss, cG.reg = dnnlib.util.call_func_by_name(G = cG.gpu, D = cD.gpu, dataset = dataset, 
+                    reals = reals, minibatch_size = minibatch_gpu_in, **cG.loss_args)
 
             with tf.name_scope("D_loss"):
-                cD.loss, cD.reg = dnnlib.util.call_func_by_name(G = cG.gpu, D = cD.gpu, 
-                    dataset = dataset, reals = reals_read, labels = labels_read, 
-                    minibatch_size = minibatch_gpu_in, **cD.loss_args)
+                cD.loss, cD.reg = dnnlib.util.call_func_by_name(G = cG.gpu, D = cD.gpu, dataset = dataset, 
+                    reals = reals, labels = labels, minibatch_size = minibatch_gpu_in, **cD.loss_args)
 
             for cN in [cG, cD]:
                 set_optimizer_ops(cN, lazy_regularization, no_op)
@@ -300,7 +299,7 @@ def training_loop(
             break
 
         # Choose training parameters and configure training ops
-        sched = training_schedule(cur_nimg = cur_nimg, dataset = dataset, **sched_args)
+        sched = training_schedule(sched_args, cur_nimg = cur_nimg, dataset = dataset)
         assert sched.minibatch_size % (sched.minibatch_gpu * num_gpus) == 0
         dataset.configure(sched.minibatch_gpu)
         for cN in [cG, cD]:
@@ -330,20 +329,20 @@ def training_loop(
             for _round in rounds:
                 cG.lossvals.update(tflib.run([cG.train_op, cG.ops], feed_dict)[1])
                 if cG.run_reg:
-                    _, cG.lossvals[3] = tflib.run([cG.reg_op, cG.reg_norm], feed_dict) 
+                    _, cG.lossvals["reg_norm"] = tflib.run([cG.reg_op, cG.reg_norm], feed_dict) 
 
                 tflib.run(data_fetch_op, feed_dict)
 
                 cD.lossvals.update(tflib.run([cD.train_op, cD.ops], feed_dict)[1])
                 if cD.run_reg:
-                    _, cD.lossvals[3] = tflib.run([cD.reg_op, cD.reg_norm], feed_dict) 
+                    _, cD.lossvals["reg_norm"] = tflib.run([cD.reg_op, cD.reg_norm], feed_dict) 
 
             tflib.run([Gs_update_op], feed_dict)
 
             # Track loss statistics 
             for cN in [cG, cD]:
-                for i in range(len(cN.lossvals_agg)):
-                    cN.lossvals_agg[i] = emaAvg(cN.lossvals_agg[i], cN.lossvals[i])
+                for k in cN.lossvals_agg:
+                    cN.lossvals_agg[k] = emaAvg(cN.lossvals_agg[k], cN.lossvals[k])
 
         # Perform maintenance tasks once per tick
         done = (cur_nimg >= total_kimg * 1000)
@@ -377,8 +376,8 @@ def training_loop(
 
             # Save snapshots
             if img_snapshot_ticks is not None and (cur_tick % img_snapshot_ticks == 0 or done):
-                visualize.eval(G, dataset, batch_size = sched.minibatch_gpu, training = True, 
-                    step = cur_nimg // 1000, eval_size = grid_size, latents = grid_latents, 
+                visualize.eval(G, dataset, batch_size = sched.minibatch_gpu, training = True,     
+                    step = cur_nimg // 1000, num = grid_size, latents = grid_latents, 
                     labels = grid_labels, drange_net = drange_net, **vis_args)
 
             if network_snapshot_ticks is not None and (cur_tick % network_snapshot_ticks == 0 or done):

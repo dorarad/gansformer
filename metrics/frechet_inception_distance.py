@@ -12,9 +12,8 @@ from metrics import metric_base
 from training import misc
  
 class FID(metric_base.MetricBase):
-    def __init__(self, num_imgs, minibatch_per_gpu, **kwargs):
+    def __init__(self, minibatch_per_gpu, **kwargs):
         super().__init__(**kwargs)
-        self.num_imgs = num_imgs
         self.minibatch_per_gpu = minibatch_per_gpu
 
     def _feats_to_stats(self, feats):
@@ -28,12 +27,12 @@ class FID(metric_base.MetricBase):
         fid = np.real(m + np.trace(sigma_fake + sigma_real - 2*s))
         return fid
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
         minibatch_size = num_gpus * self.minibatch_per_gpu
         inception = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/inception_v3_features.pkl")
 
         # Compute statistics for reals
-        cache_file = self._get_cache_file_for_reals(num_imgs = self.num_imgs)
+        cache_file = self._get_cache_file_for_reals(num_imgs)
         os.makedirs(os.path.dirname(cache_file), exist_ok = True)
         if os.path.isfile(cache_file):
             mu_real, sigma_real = misc.load_pkl(cache_file)
@@ -45,10 +44,10 @@ class FID(metric_base.MetricBase):
 
         if paths is not None:
             # Extract features for local sample image files (paths)
-            feats = self._paths_to_feats(paths, inception_func, minibatch_size, self.num_imgs)
+            feats = self._paths_to_feats(paths, inception_func, minibatch_size, num_imgs)
         else:
             # Extract features for newly generated fake images
-            feats = self._gen_feats(Gs, inception, minibatch_size, self.num_imgs, num_gpus, Gs_kwargs)
+            feats = self._gen_feats(Gs, inception, minibatch_size, num_imgs, num_gpus, Gs_kwargs)
 
         # Compute FID
         mu_fake, sigma_fake = _feats_to_stats(feats)

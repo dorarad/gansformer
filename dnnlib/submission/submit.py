@@ -318,7 +318,7 @@ def submit_run(submit_config: SubmitConfig, run_func_name: str, create_newdir: b
     #--------------------------------------------------------------------
     host_run_dir = _create_run_dir_local(submit_config, resume, create_new = create_newdir)
 
-    submit_config.task_name = "{0}-{1:05d}-{2}".format(submit_config.user_name, submit_config.run_id, submit_config.run_desc)
+    submit_config.task_name = "{}-{:05d}-{}".format(submit_config.user_name, submit_config.run_id, submit_config.run_desc)
     docker_valid_name_regex = "^[a-zA-Z0-9][a-zA-Z0-9_.-]+$"
     if not re.match(docker_valid_name_regex, submit_config.task_name):
         raise RuntimeError("Invalid task name.  Probable reason: unacceptable characters in your submit_config.run_desc.  Task name must be accepted by the following regex: " + docker_valid_name_regex + ", got " + submit_config.task_name)
@@ -330,14 +330,17 @@ def submit_run(submit_config: SubmitConfig, run_func_name: str, create_newdir: b
     # (so to maintain the original configuration of the experiment rather than the newly provided 
     # command-line arguments.
     if load_config:
-        old_submit_config = submit_config
-        submit_config = load_pkl(os.path.join(host_run_dir, "submit_config.pkl"))
+        config_file = os.path.join(host_run_dir, "submit_config.pkl")
+        if os.path.exists(config_file):
+            old_submit_config = submit_config
+            submit_config = load_pkl(config_file)
         
-        submit_config["run_func_kwargs"]["keep"] = True
-        submit_config["run_id"] = old_submit_config["run_id"]
-        submit_config["run_name"] = old_submit_config["run_name"]
-        submit_config["run_func_kwargs"]["resume_pkl"] = old_submit_config["run_func_kwargs"]["resume_pkl"]
-        submit_config["run_func_kwargs"]["resume_kimg"] = old_submit_config["run_func_kwargs"]["resume_kimg"]
+            submit_config["run_id"] = old_submit_config["run_id"]
+            submit_config["run_name"] = old_submit_config["run_name"]
+
+            if "resume_pkl" in old_submit_config["run_func_kwargs"]:
+                submit_config["run_func_kwargs"]["resume_pkl"] = old_submit_config["run_func_kwargs"]["resume_pkl"]
+                submit_config["run_func_kwargs"]["resume_kimg"] = old_submit_config["run_func_kwargs"]["resume_kimg"]
 
     _populate_run_dir(submit_config, host_run_dir)
     return farm.submit(submit_config, host_run_dir)

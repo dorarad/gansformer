@@ -132,14 +132,14 @@ class MetricBase:
         val = self._progress_lo + (pcur / pmax) * (self._progress_hi - self._progress_lo)
         dnnlib.RunContext.get().update(status_str, int(val), self._progress_max)
 
-    def _get_cache_file_for_reals(self, extension = "pkl", **kwargs):
+    def _get_cache_file_for_reals(self, num_imgs, extension = "pkl", **kwargs):
         all_args = dnnlib.EasyDict(metric_name = self.name, mirror_augment = self._mirror_augment)
         all_args.update(self._dataset_args)
         all_args.update(kwargs)
         md5 = hashlib.md5(repr(sorted(all_args.items())).encode("utf-8"))
         dataset_name = self._dataset_args.get("tfrecord_dir", None) or self._dataset_args.get("h5_file", None)
         dataset_name = os.path.splitext(os.path.basename(dataset_name))[0]
-        return os.path.join(".stylegan2-cache", "%s-%s-%s.%s" % (md5.hexdigest(), self.name, dataset_name, extension))
+        return os.path.join(".GANsformer-cache", "%s-%s-%s-%s.%s" % (md5.hexdigest(), self.name, dataset_name, num_imgs, extension))
 
     def _get_dataset_obj(self):
         if self._dataset_obj is None:

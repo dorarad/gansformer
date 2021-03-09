@@ -167,12 +167,10 @@ def training_loop(
     save_weight_histograms  = False,    # Include weight histograms in the tfevents file?
     img_snapshot_ticks      = 3,        # How often to save image snapshots? None = only save "reals.png" and "fakes-init.png".
     network_snapshot_ticks  = 3,        # How often to save network snapshots? None = only save "networks-final.pkl".
-    last_snapshots          = 10,
-    eval_size               = 100,      # Number of samples for evaluation
-    rich_eval_size          = 10,       # Number of samples for rich evaluation (heavier images)
+    last_snapshots          = 10,       # Maximal number of prior snapshots to save
+    eval_images_num         = 50000,    # Sample size for the metrics
     printname               = "",       # Experiment name for logging
     # Architecture
-    attention               = False,    # Introduce transformer layers
     merge                   = False):   # Generate several images and then merge them
 
     # Initialize dnnlib and TensorFlow
@@ -180,12 +178,8 @@ def training_loop(
     num_gpus = dnnlib.submit_config.num_gpus
     cG.name, cD.name = "g", "d"
 
-    # Load dataset
+    # Load dataset and configure training scheduler
     dataset = data.load_dataset(data_dir = dnnlib.convert_path(data_dir), verbose = True, **dataset_args)
-    # Labels are optional but not essential
-    grid_size, grid_reals, grid_labels = misc.setup_snapshot_img_grid(dataset, **grid_args)
-    grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
-    misc.save_img_grid(grid_reals, dnnlib.make_run_dir_path("reals.png"), drange = dataset.dynamic_range, grid_size = grid_size)
     sched = training_schedule(sched_args, cur_nimg = total_kimg * 1000, dataset = dataset)
 
     # Construct or load networks
@@ -203,7 +197,12 @@ def training_loop(
 
     G.print_layers(); D.print_layers()
     
-    # Train/Evaluate
+    # Train/Evaluate/Visualize
+    # Labels are optional but not essential
+    grid_size, grid_reals, grid_labels = misc.setup_snapshot_img_grid(dataset, **grid_args)
+    misc.save_img_grid(grid_reals, dnnlib.make_run_dir_path("reals.png"), drange = dataset.dynamic_range, grid_size = grid_size)
+    grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
+
     if eval: visualize.eval(G, dataset, batch_size = sched.minibatch_gpu, 
         drange_net = drange_net, **vis_args)
     if not train:
@@ -289,7 +288,7 @@ def training_loop(
     dnnlib.RunContext.get().update("", cur_epoch = resume_kimg, max_epoch = total_kimg)
     maintenance_time = dnnlib.RunContext.get().get_last_update_interval()
 
-    cur_tick, running_mb_counter = -1, 0
+    cur_tick, running_mb_counter = -1, 0
     cur_nimg = int(resume_kimg * 1000)
     tick_start_nimg = cur_nimg
     for cN in [cG, cD]:
@@ -387,8 +386,8 @@ def training_loop(
                 misc.save_pkl((G, D, Gs), pkl, remove = False)
                 
                 if cur_tick % network_snapshot_ticks == 0 or done:
-                    metric = metrics.run(pkl, run_dir = dnnlib.make_run_dir_path(), data_dir = dnnlib.convert_path(data_dir), 
-                        num_gpus = num_gpus, tf_config = tf_config)
+                    metric = metrics.run(pkl, num_imgs = eval_images_num, run_dir = dnnlib.make_run_dir_path(), 
+                        data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, tf_config = tf_config)
 
                 if last_snapshots > 0:
                     misc.rm(sorted(glob.glob(dnnlib.make_run_dir_path("network*.pkl")))[:-last_snapshots])

@@ -7,12 +7,13 @@ import dnnlib
 import glob
 import os
 import seaborn as sns
+from termcolor import colored
 
 # Colorful prints
 # ----------------------------------------------------------------------------
 
 # string -> bold string
-def bold(txt):
+def bold(txt, **kwargs):
     return colored(str(txt),attrs = ["bold"])
 
 # string -> colorful bold string

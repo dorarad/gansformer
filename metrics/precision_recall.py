@@ -149,26 +149,25 @@ def knn_precision_recall_features(ref_features, eval_features, feature_net, nhoo
     return state
 
 class PR(metric_base.MetricBase):
-    def __init__(self, num_imgs, nhood_size, minibatch_per_gpu, row_batch_size, col_batch_size, **kwargs):
+    def __init__(self, nhood_size, minibatch_per_gpu, row_batch_size, col_batch_size, **kwargs):
         super().__init__(**kwargs)
-        self.num_imgs = num_imgs
         self.nhood_size = nhood_size
         self.minibatch_per_gpu = minibatch_per_gpu
         self.row_batch_size = row_batch_size
         self.col_batch_size = col_batch_size
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
         minibatch_size = num_gpus * self.minibatch_per_gpu
         feature_net = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/vgg16.pkl")
 
         # Compute features for reals
-        cache_file = self._get_cache_file_for_reals(num_imgs = self.num_imgs)
+        cache_file = self._get_cache_file_for_reals(num_imgs)
         os.makedirs(os.path.dirname(cache_file), exist_ok = True)
         if os.path.isfile(cache_file):
             ref_features = misc.load_pkl(cache_file)
         else:
             imgs_iter = self._iterate_reals(minibatch_size = minibatch_size)
-            ref_features = self._get_feats(imgs_iter, feature_net, minibatch_size, self.num_imgs)
+            ref_features = self._get_feats(imgs_iter, feature_net, minibatch_size, num_imgs)
 
             misc.save_pkl(ref_features, cache_file)
 

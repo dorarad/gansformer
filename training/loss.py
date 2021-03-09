@@ -1,4 +1,7 @@
 # Loss functions for the generator and the discriminator
+from warnings import simplefilter
+simplefilter(action = "ignore", category = FutureWarning)
+
 import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib

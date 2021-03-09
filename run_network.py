@@ -1,6 +1,8 @@
 ####################################################################################################################################################
 # The code is still going through some refactoring and clean-up. Will be ready in couple days!
 ####################################################################################################################################################
+from warnings import simplefilter
+simplefilter(action = "ignore", category = FutureWarning)
 
 import argparse
 import copy
@@ -10,12 +12,10 @@ import os
 import dnnlib
 from dnnlib import EasyDict
 from metrics.metric_defaults import metric_defaults
+from training import misc
 
 # Suppress warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-
-from warnings import simplefilter
-simplefilter(action = "ignore", category = FutureWarning)
 
 # Conditional set: if property is not None, then assign d[name] := prop 
 # for every d in a set of dictionaries
@@ -67,7 +67,7 @@ def run(**args):
         "ffhq": 1.0
     }
     args.ratio = ratios.get(args.dataset, args.ratio)
-    dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.max_images, ratio = args.ratio,
+    dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.train_images_num, ratio = args.ratio,
         num_threads = args.num_threads)
     for arg in ["data_dir", "mirror_augment", "total_kimg"]:
         cset(train, arg, args[arg])
@@ -81,7 +81,7 @@ def run(**args):
     args.minibatch_std_size -= args.minibatch_std_size % args.minibatch_size
     args.latent_size -= args.latent_size % args.components_num
     if args.latent_size == 0:
-        print(bcolored("Error: latent-size is too small. Must best a multiply of components-num.", "red")) 
+        print(misc.bcolored("Error: latent-size is too small. Must best a multiply of components-num.", "red")) 
         exit()
 
     sched_args = {
@@ -96,20 +96,23 @@ def run(**args):
 
     # Logging and metrics configuration
     metrics = [metric_defaults[x] for x in args.metrics]
+    
+
     cset(cG.args, "truncation_psi", args.truncation_psi)
-    for arg in ["summarize", "keep_samples"]:
+    for arg in ["summarize", "keep_samples", "eval_images_num"]:
         cset(train, arg, args[arg])
 
     # Visualization
-    args.imgs = args.images
-    args.ltnts = args.latents
+    args.vis_imgs = args.vis_images
+    args.vis_ltnts = args.vis_latents
     vis_types = ["imgs", "ltnts", "maps", "layer_maps", "interpolations", "noise_var", "style_mix"]
     # Set of all the set visualization types option
-    vis.vis_types = {arg for arg in vis_types if args[arg]}
+    vis.vis_types = {arg for arg in vis_types if args["vis_{}".format(arg)]}
 
     vis_args = {
-        "grid": "vis_grid"    ,
-        "num": "vis_num"   ,
+        "attention": "transformer",
+        "grid": "vis_grid",
+        "num": "vis_num",
         "rich_num": "vis_rich_num",
         "section_size": "vis_section_size",
         "intrp_density": "intrpolation_density",
@@ -126,17 +129,20 @@ def run(**args):
 
     # Latent sizes
     if args.components_num > 1:
-        if not (args.attention or args.merge):
-            print(bcolored("Error: components-num > 1 but the model is not using components.", "red")) 
-            print(bcolored("Either add --attention for GANsformer or --merge for k-GAN).", "red"))
+        if not (args.transformer or args.kgan):
+            print(misc.bcolored("Error: components-num > 1 but the model is not using components.", "red")) 
+            print(misc.bcolored("Either add --transformer for GANsformer or --kgan for k-GAN).", "red"))
             exit()    
         args.latent_size = int(args.latent_size / args.components_num)
     cD.args.latent_size = cG.args.latent_size = cG.args.dlatent_size = args.latent_size 
     cset([cG.args, cD.args, vis], "components_num", args.components_num)
+    # mapping-dim default value is the latent-size
+    if args.mapping_dim is None:
+       args.mapping_dim = args.latent_size 
 
     # Mapping network
     for arg in ["layersnum", "lrmul", "dim", "resnet", "shared_dim"]:
-        cset(cG.args, arg, args["mapping_{}".formt(arg)])    
+        cset(cG.args, arg, args["mapping_{}".format(arg)])    
 
     # StyleGAN settings
     for arg in ["style", "latent_stem", "fused_modconv", "local_noise"]:
@@ -144,16 +150,16 @@ def run(**args):
     cD.args.mbstd_group_size = args.minibatch_std_size
 
     # GANsformer
-    cset([cG.args, train], "attention", args.transformer)
-    cset(cD.args, "attention", args.d_transformer)
-    cset([cG.args, cD.args], "num_heads", args.num_heads)
+    cset(cG.args, "transformer", args.transformer)
+    cset(cD.args, "transformer", args.d_transformer)
 
     args.norm = args.normalize
     for arg in ["norm", "integration", "ltnt_gate", "img_gate", "kmeans", 
                 "kmeans_iters", "mapping_ltnt2ltnt"]:
         cset(cG.args, arg, args[arg])  
 
-    cset([cG.args, cD.args], "use_pos", args["use_pos"])  
+    for arg in ["use_pos", "num_heads"]:
+        cset([cG.args, cD.args], arg, args[arg])  
 
     # Positional encoding
     for arg in ["dim", "init", "directions_num"]:
@@ -164,7 +170,7 @@ def run(**args):
     for arg in ["layer", "type", "same"]:
         field = "merge_{}".format(arg)
         cset(cG.args, field, args[field])  
-    cset([cG.args, train], "merge", args.merge)
+    cset([cG.args, train], "merge", args.kgan)
 
     # Attention
     for arg in ["start_res", "end_res", "ltnt2ltnt", "img2img", "local_attention"]:
@@ -200,13 +206,15 @@ def run(**args):
     # directory: 'args.expname:001' after the first restart, then 'args.expname:002' after the second, etc.
 
     # Find the latest directory that matches the experiment
-    exp_dir = sorted(glob.glob("{}/{}:*".format(args.result_dir, args.expname)))[-1]
-    run_id = int(exp_dir.split(":")[-1])
+    exp_dir = sorted(glob.glob("{}/{}:*".format(args.result_dir, args.expname)))
+    run_id = 0
+    if len(exp_dir) > 0:
+        run_id = int(exp_dir[-1].split(":")[-1])
     # If restart, then work over a new directory
     if args.restart:
         run_id += 1
 
-    run_name = "{}:{0:03d}".format(args.expname, run_id)
+    run_name = "{}:{:03d}".format(args.expname, run_id)
     train.printname = "{} ".format(misc.bold(args.expname))
 
     snapshot, kimg, resume = None, 0, False
@@ -235,7 +243,7 @@ def run(**args):
         train.resume_pkl = snapshot
         train.resume_kimg = kimg
     else:
-        print("Start model training from scratch.", "white")
+        print(misc.bcolored("Start model training from scratch.", "white"))
 
     # Run environment configuration
     sc.run_dir_root = args.result_dir
@@ -250,8 +258,7 @@ def run(**args):
     kwargs.update(dataset_args = dataset_args, vis_args = vis, sched_args = sched, grid_args = grid, metric_arg_list = metrics, tf_config = tf_config)
     kwargs.submit_config = copy.deepcopy(sc)
     kwargs.resume = resume
-    # If reload new options from the command line, no need to load the original configuration file
-    kwargs.load_config = not args.reload
+    kwargs.load_config = args.reload
 
     dnnlib.submit_run(**kwargs)
 
@@ -301,8 +308,8 @@ def main():
     ## Resumption
     parser.add_argument("--pretrained_pkl",     help = "Filename for a snapshot to resume (optional)", default = None, type = str)
     parser.add_argument("--restart",            help = "Restart training from scratch", default = False, action = "store_true") 
-    parser.add_argument("--reload",             help = "Reload new options from the command line when resuming training. " + 
-                                                       "If False, uses instead original experiment configuration file (default: %(default)s)", default = False, action = "store_true") 
+    parser.add_argument("--reload",             help = "Reload options from the original experiment configuration file. " + 
+                                                       "If False, uses the command line arguments when resuming training (default: %(default)s)", default = False, action = "store_true") 
     parser.add_argument("--recompile",          help = "Recompile model from source code when resuming training. " + 
                                                        "If False, loading modules created when the experiment first started", default = None, action = "store_true")
     parser.add_argument("--last_snapshots",     help = "Number of last snapshots to save. -1 for all (default: 8)", default = None, type = int)
@@ -311,9 +318,9 @@ def main():
     parser.add_argument("--data-dir",           help = "Datasets root directory", required = True)
     parser.add_argument("--dataset",            help = "Training dataset name (subdirectory of data-dir).", required = True)
     parser.add_argument("--ratio",              help = "Image height/width ratio in the dataset", default = 1.0, type = float) 
-    parser.add_argument("--max-images",         help = "Maximum number of images to train on. If not specified, train on the whole dataset.", efault = None, type = int) 
     parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 4, type = int)
     parser.add_argument("--mirror-augment",     help = "Perform horizontal flip augmentation for the data (default: %(default)s)", default = False)
+    parser.add_argument("--train-images-num",   help = "Maximum number of images to train on. If not specified, train on the whole dataset.", default = None, type = int) 
 
     ## Training
     parser.add_argument("--batch-size",         help = "Global batch size (optimization step) (default: %(default)s)", default = 32, type = int) 
@@ -321,16 +328,17 @@ def main():
     parser.add_argument("--total-kimg",         help = "Training length in thousands of images (default: %(default)s)", metavar = "KIMG", default = 25000, type = int)
     parser.add_argument("--gamma",              help = "R1 regularization weight (default: %(default)s)", default = 10, type = float)
     parser.add_argument("--clip",               help = "Gradient clipping threshold (optional)", default = None, type = float) 
-    parser.add_argument("--g-lr",               help = "Generator learning rate (default: 0.002)", default = None, type = float)
-    parser.add_argument("--d-lr",               help = "Discriminator learning rate (default: 0.002)", default = None, type = float)
+    parser.add_argument("--g-lr",               help = "Generator learning rate (default: %(default)s)", default = 0.002, type = float)
+    parser.add_argument("--d-lr",               help = "Discriminator learning rate (default: %(default)s)", default = 0.002, type = float)
 
     ## Logging and evaluation
     parser.add_argument("--result-dir",         help = "Root directory for experiments (default: %(default)s)", default = "results", metavar = "DIR")
-    parser.add_argument("--metrics",            help = "Comma-separated list of metrics or none (default: %(default)s)", default = "fid20k", type = _parse_comma_sep)
+    parser.add_argument("--metrics",            help = "Comma-separated list of metrics or none (default: %(default)s)", default = "fid", type = _parse_comma_sep)
     parser.add_argument("--summarize",          help = "Create TensorBoard summaries (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool) 
     parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images " + 
                                                        "(used only for visualizations, _not used_ in training or for computing metrics) (default: %(default)s)", default = 0.65, type = float)
     parser.add_argument("--keep-samples",       help = "Keep all prior samples during training, or if False, just the most recent ones (default: False)", default = None, action = "store_true")     
+    parser.add_argument("--eval-images-num",    help = "Number of images to evaluate metrics on (default: 50,000)", default = None, type = float)
 
     ## Visualization 
     parser.add_argument("--vis-images",         help = "Save image samples", default = None, action = "store_true") 
@@ -365,7 +373,7 @@ def main():
     parser.add_argument("--mapping-shared-dim", help = "Perform one shared mapping to all latent components concatenated together using the set dimension (default: disabled)", default = None, type = int)    
 
     # Loss
-    parser.add_argument("--pathreg",            help = "Use path regularization in generator training (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool)    
+    parser.add_argument("--pathreg",            help = "Use path regularization in generator training (default: False", default = None, metavar = "BOOL", type = _str_to_bool)    
     parser.add_argument("--g-loss",             help = "Generator loss type (default: %(default)s)", default = "logistic_ns", choices = ["logistic", "logistic_ns", "hinge", "wgan"], type = str)    
     parser.add_argument("--g-reg-weight",       help = "Generator regularization weight (default: %(default)s)", default = 1.0, type = float) 
 
@@ -438,20 +446,20 @@ def main():
     parser.add_argument("--pos-directions-num", help = "Positional encoding number of spatial directions (default: %(default)s)", default = 2, type = int) 
 
     ## k-GAN
-    parser.add_argument("--merge",              help = "Generate components-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true") 
+    parser.add_argument("--kgan",               help = "Generate components-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true") 
     parser.add_argument("--merge-layer",        help = "Merge layer, where images get combined through alpha-composition (default: %(default)s)", default = -1, type = int) 
-    parser.add_argument("--merge-type",         help = "Merge type (default: additive)", default = None, choices = ["sum", "softmax", "max", "leaves"], action = str) 
+    parser.add_argument("--merge-type",         help = "Merge type (default: additive)", default = None, choices = ["sum", "softmax", "max", "leaves"], type = str) 
     parser.add_argument("--merge-same",         help = "Merge images with same alpha weights across all spatial positions (default: %(default)s)", default = None, action = "store_true") 
 
     args = parser.parse_args()
 
     if not os.path.exists(args.data_dir):
-        print(bcolored("Error: dataset root directory does not exist.", "red"))
+        print(misc.bcolored("Error: dataset root directory does not exist.", "red"))
         exit()
 
     for metric in args.metrics:
         if metric not in metric_defaults:
-            print(bcolored("Error: unknown metric \"%s\"" % metric, "red"))
+            print(misc.bcolored("Error: unknown metric \"%s\"" % metric, "red"))
             exit()
 
     run(**vars(args))

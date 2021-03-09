@@ -203,10 +203,10 @@ def load_dataset(class_name = None, data_dir = None, verbose = False, **kwargs):
 
     assert class_name is not None
     if verbose:
-        print(bcolored("Streaming data using %s %s..." % (class_name, data_dir), "white"))
-    dataset = dnnlib.util.get_obj_by_name(class_name)(data_dir = data_dir, **kwargs)
+        print(misc.bcolored("Streaming data using %s %s..." % (class_name, data_dir), "white"))
+    dataset = dnnlib.util.get_obj_by_name(class_name)(**kwargs)
     if verbose:
-        print("Dataset shape: ", misc.bcolored(np.int32(dataset.shape).tolist(), "yellow"))
-        print("Dynamic range: ", misc.bcolored(dataset.dynamic_range, "yellow"))
-        print("Label size: ", misc.bcolored(dataset.label_size, "yellow"))
+        print("Dataset shape: ", misc.bcolored(np.int32(dataset.shape).tolist(), "blue"))
+        print("Dynamic range: ", misc.bcolored(dataset.dynamic_range, "blue"))
+        print("Label size: ", misc.bcolored(dataset.label_size, "blue"))
     return dataset

@@ -60,7 +60,7 @@ def eval(G,
     latents             = None,       # Source latents to generate images from
     labels              = None,       # Source labels to generate images from (0 if no labels are used)
     # Model settings
-    components_num,                   # Number of components the model has
+    components_num      = 1,          # Number of components the model has
     drange_net          = [-1,1],     # Model image output range
     # Visualization settings
     vis_types           = None,       # Visualization types to be created
@@ -258,7 +258,7 @@ def eval(G,
 
         # Create latent mixes
         mixes = {
-            "layer": (np.arange(wlatents_layers.shape[2]) < row_lens[:,None]).astype(np.float32)[:,None,None,None,:,None]
+            "layer": (np.arange(wlatents_layers.shape[2]) < row_lens[:,None]).astype(np.float32)[:,None,None,None,:,None],
             "component": (np.arange(wlatents_layers.shape[1]) < row_lens[:,None]).astype(np.float32)[:,None,None,:,None,None]
         }
         ws = wlatents_layers[:cols+rows]
@@ -281,7 +281,7 @@ def eval(G,
             # Place image mixes respectively at each position (row_idx, col_idx)
             for row_idx, row_elem in enumerate([None] + list(range(len(row_lens) * rows))):
                 for col_idx, col_elem in enumerate([None] + list(range(cols))):
-                    if row_elem, col_elem == (None, None):  continue
+                    if (row_elem, col_elem) == (None, None):  continue
                     if row_elem is None:                    img = orig_imgs[col_elem]
                     elif col_elem is None:                  img = orig_imgs[cols + (row_elem % rows)]
                     else:                                   img =  mix_imgs[row_elem, col_elem]

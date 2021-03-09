@@ -62,6 +62,7 @@ def eval(G,
     # Model settings
     components_num      = 1,          # Number of components the model has
     drange_net          = [-1,1],     # Model image output range
+    attention           = False,      # Whereas the model produces attention maps (for visualization)
     # Visualization settings
     vis_types           = None,       # Visualization types to be created
     num                 = 100,        # Number of produced samples

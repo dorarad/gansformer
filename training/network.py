@@ -1,5 +1,5 @@
 ﻿# Network architectures for the GANSformer model, as well as multiple baselines such as
-# vanilla GAN, StyleGAN2, k-GAN and SAGAN, all implemented as extensions of the same 
+# vanilla GAN, StyleGAN2, k-GAN and SAGAN, all implemented as extensions of the same
 # model skeleton for most precise comparability under same settings.
 # See readme for architecture overview.
 import numpy as np
@@ -62,7 +62,7 @@ def dense_layer(x, dim, gain = 1, use_wscale = True, lrmul = 1, weight_var = "we
     if len(get_shape(x)) > 2:
         x = tf.reshape(x, (-1, element_dim(x)))
 
-    w = get_weight([get_shape(x)[1], dim], gain = gain, use_wscale = use_wscale, 
+    w = get_weight([get_shape(x)[1], dim], gain = gain, use_wscale = use_wscale,
         lrmul = lrmul, weight_var = weight_var)
 
     return tf.matmul(x, w)
@@ -88,11 +88,11 @@ def norm(x, norm_type, parametric = True):
         x = tf.contrib.layers.layer_norm(inputs = x, begin_norm_axis = -1, begin_params_axis = -1)
     return x
 
-# Normalization operation used in attention layers. Does not scale back features x (the image) 
-# with parametrized gain and bias, since these will be controlled by the additive/multiplicative 
+# Normalization operation used in attention layers. Does not scale back features x (the image)
+# with parametrized gain and bias, since these will be controlled by the additive/multiplicative
 # integration of as part of the transformer layer (where the latent y will modulate the image features x)
 # after x gets normalized, by controlling their scale and bias (similar to the FiLM and StyleGAN approaches).
-# 
+#
 # Arguments:
 # - x: [batch_size * num, channels]
 # - num: number of elements in the x set (e.g. number of positions WH)
@@ -111,7 +111,7 @@ def att_norm(x, num, integration, norm):
         x -= tf.reduce_mean(x, axis = norm_axis, keepdims = True)
     if integration in ["mul", "both"]:
         x *= tf.rsqrt(tf.reduce_mean(tf.square(x), axis = norm_axis, keepdims = True) + 1e-8)
-    
+
     # return x to its original shape
     x = tf.reshape(x, shape)
     return x
@@ -120,19 +120,19 @@ def att_norm(x, num, integration, norm):
 # work about GANs for further details).
 def minibatch_stddev_layer(x, group_size = 4, num_new_features = 1, dims = 2):
     # Minibatch must be divisible by (or smaller than) group_size
-    group_size = tf.minimum(group_size, get_shape(x)[0])    
-    s = x.shape # [NCHW] 
+    group_size = tf.minimum(group_size, get_shape(x)[0])
+    s = x.shape # [NCHW]
     # Split minibatch into M groups of size G. Split channels into n channel groups c
     y = tf.reshape(x, [group_size, -1, num_new_features, s[1]//num_new_features, s[2]] + ([s[3]] if dims == 2 else [])) # [GMncHW]
     y = tf.cast(y, tf.float32) # [GMncHW]
 
     # Subtract group mean, then compute variance and stddev
-    y -= tf.reduce_mean(y, axis = 0, keepdims = True) # [GMncHW] 
+    y -= tf.reduce_mean(y, axis = 0, keepdims = True) # [GMncHW]
     y = tf.reduce_mean(tf.square(y), axis = 0) # [MncHW]
     y = tf.sqrt(y + 1e-8) # [MncHW]
 
     # Take average over dim and pixels
-    y = tf.reduce_mean(y, axis = [2, 3] + ([4] if dims == 2 else []), keepdims = True) # [Mn111] 
+    y = tf.reduce_mean(y, axis = [2, 3] + ([4] if dims == 2 else []), keepdims = True) # [Mn111]
     # Split channels into c channel groups
     y = tf.reduce_mean(y, axis = [2]) # [Mn11]
     # Replicate over group and pixels
@@ -164,32 +164,32 @@ def logits_mask(x, mask):
 # Positional encoding
 # ----------------------------------------------------------------------------
 
-# 2d linear embeddings [size, size, dim] in a [-rng, rng] range where size = grid size and 
-# dim = the embedding dimension. Each embedding consists of 'num' parts, with each part measuring 
+# 2d linear embeddings [size, size, dim] in a [-rng, rng] range where size = grid size and
+# dim = the embedding dimension. Each embedding consists of 'num' parts, with each part measuring
 # positional similarity along another direction, uniformly spanning the 2d space.
 def get_linear_embeddings(size, dim, num, rng = 1.0):
     pi = tf.constant(math.pi)
     theta = tf.range(0, pi, pi / num)
     dirs = tf.stack([tf.cos(theta), tf.sin(theta)], axis = -1)
-    embs = tf.get_variable(name = "emb", shape = [num, int(dim / num)], 
+    embs = tf.get_variable(name = "emb", shape = [num, int(dim / num)],
         initializer = tf.random_uniform_initializer())
-    
+
     c = tf.linspace(-rng, rng, size)
     x = tf.tile(tf.expand_dims(c, axis = 0), [size, 1])
     y = tf.tile(tf.expand_dims(c, axis = 1), [1, size])
     xy = tf.stack([x,y], axis = -1)
-    
-    lens = tf.reduce_sum(tf.expand_dims(xy, axis = 2) * dirs, axis = -1, keepdims = True)  
+
+    lens = tf.reduce_sum(tf.expand_dims(xy, axis = 2) * dirs, axis = -1, keepdims = True)
     emb = tf.reshape(lens * embs, [size, size, dim])
     return emb
 
-# 2d sinusoidal embeddings [size, size, dim] with size = grid size and dim = embedding dimension 
+# 2d sinusoidal embeddings [size, size, dim] with size = grid size and dim = embedding dimension
 # (see "Attention is all you need" paper)
-def get_sinusoidal_embeddings(size, dim, num = 2): 
+def get_sinusoidal_embeddings(size, dim, num = 2):
     # Standard positional embeddings in the two spatial w,h directions
     if num == 2:
         c = tf.expand_dims(tf.to_float(tf.linspace(-1.0, 1.0, size)), axis = -1)
-        i = tf.to_float(tf.range(int(dim / 4))) 
+        i = tf.to_float(tf.range(int(dim / 4)))
 
         peSin = tf.sin(c / (tf.pow(10000.0, 4 * i / dim)))
         peCos = tf.cos(c / (tf.pow(10000.0, 4 * i / dim)))
@@ -197,10 +197,10 @@ def get_sinusoidal_embeddings(size, dim, num = 2):
         peSinX = tf.tile(tf.expand_dims(peSin, axis = 0), [size, 1, 1])
         peCosX = tf.tile(tf.expand_dims(peCos, axis = 0), [size, 1, 1])
         peSinY = tf.tile(tf.expand_dims(peSin, axis = 1), [1, size, 1])
-        peCosY = tf.tile(tf.expand_dims(peCos, axis = 1), [1, size, 1]) 
+        peCosY = tf.tile(tf.expand_dims(peCos, axis = 1), [1, size, 1])
 
         emb = tf.concat([peSinX, peCosX, peSinY, peCosY], axis = -1)
-    # Extension to 'num' spatial directions. Each embedding consists of 'num' parts, with each  
+    # Extension to 'num' spatial directions. Each embedding consists of 'num' parts, with each
     # part measuring positional similarity along another direction, uniformly spanning the 2d space.
     # Each such part has a sinus and cosine components.
     else:
@@ -223,19 +223,19 @@ def get_sinusoidal_embeddings(size, dim, num = 2):
     return emb
 
 # 2d positional embeddings of dimension 'dim' in a range of resolutions from 2x2 up to 'max_res x max_res'
-# 
+#
 # pos_type: supports several types of embedding schemes:
 # - sinus: (see "Attention is all you need")
 # - linear: where each position gets a value of [-1, 1] * trainable_vector, in each spatial
 #   direction based on its location.
-# - trainable: where an embedding of position [w,h] is [emb_w, emb_h] (independent parts in 
+# - trainable: where an embedding of position [w,h] is [emb_w, emb_h] (independent parts in
 #   each spatial direction)
-# - trainable2d: where an embedding of position [w,h] is emb_{w,h} (a different embedding for 
+# - trainable2d: where an embedding of position [w,h] is emb_{w,h} (a different embedding for
 #   each position)
-# 
-# dir_num: Each embedding consists of 'dir_num' parts, with each path measuring positional similarity 
+#
+# dir_num: Each embedding consists of 'dir_num' parts, with each path measuring positional similarity
 # along another direction, uniformly spanning the 2d space.
-# 
+#
 # shared: True for using same embeddings for all directions / parts
 # init: uniform or normal distribution for trainable embeddings initialization
 def get_positional_embeddings(max_res, dim, pos_type = "sinus", dir_num = 2, init = "uniform", shared = False):
@@ -243,7 +243,7 @@ def get_positional_embeddings(max_res, dim, pos_type = "sinus", dir_num = 2, ini
     initializer = tf.random_uniform_initializer() if init == "uniform" else tf.initializers.random_normal()
     for res in range(max_res + 1):
         with tf.variable_scope("pos_emb%d" % res):
-            size = 2 ** res            
+            size = 2 ** res
             if pos_type == "sinus":
                 emb = get_sinusoidal_embeddings(size, dim, num = dir_num)
             elif pos_type == "linear":
@@ -252,7 +252,7 @@ def get_positional_embeddings(max_res, dim, pos_type = "sinus", dir_num = 2, ini
                 emb = tf.get_variable(name = "emb", shape = [size, size, dim], initializer = initializer)
             else: # pos_type == "trainable"
                 xemb = tf.get_variable(name = "x_emb", shape = [size, int(dim / 2)], initializer = initializer)
-                yemb = xemb if shared else tf.get_variable(name = "y_emb", shape = [size, int(dim / 2)], 
+                yemb = xemb if shared else tf.get_variable(name = "y_emb", shape = [size, int(dim / 2)],
                     initializer = initializer)
                 xemb = tf.tile(tf.expand_dims(xemb, axis = 0), [size, 1, 1])
                 yemb = tf.tile(tf.expand_dims(yemb, axis = 1), [1, size, 1])
@@ -260,10 +260,10 @@ def get_positional_embeddings(max_res, dim, pos_type = "sinus", dir_num = 2, ini
             embs.append(emb)
     return embs
 
-# Produce trainable embeddings of shape [size, dim], uniformly/normally initialized 
+# Produce trainable embeddings of shape [size, dim], uniformly/normally initialized
 def get_embeddings(size, dim, init = "uniform", name = None):
     initializer = tf.random_uniform_initializer() if init == "uniform" else tf.initializers.random_normal()
-    with tf.variable_scope(name):    
+    with tf.variable_scope(name):
         emb = tf.get_variable(name = "emb", shape = [size, dim], initializer = initializer)
     return emb
 
@@ -278,8 +278,8 @@ def get_relative_embeddings(l, dim, embs):
 # Non-Linear networks
 # ----------------------------------------------------------------------------
 
-# Non-linear layer with a resnet connection. Accept features 'x' of dimension 'dim', 
-# and use nonlinearty 'act'. Optionally perform attention from x to y 
+# Non-linear layer with a resnet connection. Accept features 'x' of dimension 'dim',
+# and use nonlinearty 'act'. Optionally perform attention from x to y
 # (meaning information flows y -> x).
 def nnlayer(x, dim, act, lrmul, y = None, ff = True, name = "", **kwargs):
     _x = x
@@ -291,8 +291,8 @@ def nnlayer(x, dim, act, lrmul, y = None, ff = True, name = "", **kwargs):
         with tf.variable_scope("Dense%s_0" % name):
             x = apply_bias_act(dense_layer(x, dim, lrmul = lrmul), act = act, lrmul = lrmul)
         with tf.variable_scope("Dense%s_1" % name):
-            x = apply_bias_act(dense_layer(x, dim, lrmul = lrmul), lrmul = lrmul)  
- 
+            x = apply_bias_act(dense_layer(x, dim, lrmul = lrmul), lrmul = lrmul)
+
         x = tf.nn.leaky_relu(x + _x)
 
     return x
@@ -303,7 +303,7 @@ def nnlayer(x, dim, act, lrmul, y = None, ff = True, name = "", **kwargs):
 # - mean: mean pooling
 # - cnct: concatenate all spatial features together to one vector and compress them to dimension 'dim'
 # - 2d: turn a tensor [..., dim] into [-1, dim] so to create one large batch with all the elements from the last axis.
-def mlp(x, resnet, layers_num, dim, act, lrmul, pooling = "mean", transformer = False, norm_type = None, **kwargs): 
+def mlp(x, resnet, layers_num, dim, act, lrmul, pooling = "mean", transformer = False, norm_type = None, **kwargs):
     shape = get_shape(x)
 
     if len(get_shape(x)) > 2:
@@ -325,14 +325,14 @@ def mlp(x, resnet, layers_num, dim, act, lrmul, pooling = "mean", transformer = 
             x = norm(x, norm_type)
 
         with tf.variable_scope("Dense%d" % layer_idx):
-            x = apply_bias_act(dense_layer(x, dim, lrmul = lrmul), act = act, lrmul = lrmul) 
+            x = apply_bias_act(dense_layer(x, dim, lrmul = lrmul), act = act, lrmul = lrmul)
 
-    else:    
+    else:
         for layer_idx in range(layers_num):
             with tf.variable_scope("Dense%d" % layer_idx):
                 x = apply_bias_act(dense_layer(x, dim, lrmul = lrmul), act = act, lrmul = lrmul)
                 x = norm(x, norm_type)
-    
+
     x = tf.reshape(x, [-1] + shape[1:-1] + [dim])
     return x
 
@@ -340,11 +340,11 @@ def mlp(x, resnet, layers_num, dim, act, lrmul, pooling = "mean", transformer = 
 # ----------------------------------------------------------------------------
 
 # Convolution layer with optional upsampling or downsampling
-def conv2d_layer(x, dim, kernel, up = False, down = False, resample_kernel = None, gain = 1, 
+def conv2d_layer(x, dim, kernel, up = False, down = False, resample_kernel = None, gain = 1,
         use_wscale = True, lrmul = 1, weight_var = "weight"):
     assert not (up and down)
     assert kernel >= 1 and kernel % 2 == 1
-    w = get_weight([kernel, kernel, get_shape(x)[1], dim], gain = gain, use_wscale = use_wscale, 
+    w = get_weight([kernel, kernel, get_shape(x)[1], dim], gain = gain, use_wscale = use_wscale,
         lrmul = lrmul, weight_var = weight_var)
     if up:
         x = upsample_conv_2d(x, w, data_format = "NCHW", k = resample_kernel)
@@ -359,31 +359,31 @@ def modulated_conv2d_layer(x, y, dim, kernel, # Convolution parameters
     up = False,             # Whether to upsample features after convolution
     down = False,           # Whether to downsample features before convolution
     resample_kernel = None, # resample_kernel for up/downsampling
-    modulate = True,        # Whether y should modulate x (control its gain/bias) 
+    modulate = True,        # Whether y should modulate x (control its gain/bias)
     demodulate = True,      # Whether to normalize/scale back x gain/bias
     fused_modconv = True,   # Whether to fuse the convlution and modulate operations together (see StyleGAN2)
     noconv = False,         # Whether to skip convlution itself (so to perform only modulation)
-    gain = 1, use_wscale = True, lrmul = 1, # Parameters for creating the convolution weight 
+    gain = 1, use_wscale = True, lrmul = 1, # Parameters for creating the convolution weight
     weight_var = "weight", mod_weight_var = "mod_weight", mod_bias_var = "mod_bias"):
 
     assert not (up and down)
     assert kernel >= 1 and kernel % 2 == 1
 
-    w = get_weight([kernel, kernel, get_shape(x)[1], dim], gain = gain, use_wscale = use_wscale, 
+    w = get_weight([kernel, kernel, get_shape(x)[1], dim], gain = gain, use_wscale = use_wscale,
         lrmul = lrmul, weight_var = weight_var)
     ww = w[np.newaxis]
 
     # Modulate and demodulate
     # Transform incoming W to style and add bias (initially 1)
-    s = dense_layer(y, dim = get_shape(x)[1], weight_var = mod_weight_var) # [BI] 
-    s = apply_bias_act(s, bias_var = mod_bias_var) + 1 # [BI] 
-    
+    s = dense_layer(y, dim = get_shape(x)[1], weight_var = mod_weight_var) # [BI]
+    s = apply_bias_act(s, bias_var = mod_bias_var) + 1 # [BI]
+
     if modulate:
         # Scale input features
         ww *= s[:, np.newaxis, np.newaxis, :, np.newaxis] # [BkkIO]
         if demodulate:
             # Scale output features according to Scaling factor
-            d = tf.rsqrt(tf.reduce_sum(tf.square(ww), axis = [1, 2, 3]) + 1e-8) # [BO] 
+            d = tf.rsqrt(tf.reduce_sum(tf.square(ww), axis = [1, 2, 3]) + 1e-8) # [BO]
             ww *= d[:, np.newaxis, np.newaxis, np.newaxis, :] # [BkkIO]
     else:
         ww += tf.zeros_like(s[:, np.newaxis, np.newaxis, :, np.newaxis])
@@ -391,7 +391,7 @@ def modulated_conv2d_layer(x, y, dim, kernel, # Convolution parameters
     # Reshape/scale input
     # If fused, reshape to convolution groups. Otherwise, scale input activations directly.
     if fused_modconv:
-        x = tf.reshape(x, [1, -1, get_shape(x)[-2], get_shape(x)[-1]]) 
+        x = tf.reshape(x, [1, -1, get_shape(x)[-2], get_shape(x)[-1]])
         w = tf.reshape(tf.transpose(ww, [1, 2, 3, 0, 4]), [ww.shape[1], ww.shape[2], ww.shape[3], -1])
     else:
         if modulate:
@@ -416,7 +416,7 @@ def modulated_conv2d_layer(x, y, dim, kernel, # Convolution parameters
     if fused_modconv:
         x = tf.reshape(x, [-1, dim] + get_shape(x)[-2:])
     elif modulate and demodulate:
-        x *= d[:, :, np.newaxis, np.newaxis] # [BOhw] 
+        x *= d[:, :, np.newaxis, np.newaxis] # [BOhw]
 
     return x
 
@@ -437,14 +437,14 @@ def att2d_layer(x, dim, kernel, grid, up = False, down = False, resample_kernel 
     x = tf.transpose(x, [0, 2, 3, 1]) # [N, H, W, C]
 
     # extract local patches for each image position
-    x_patches = tf.image.extract_patches(x, sizes = [1, kernel, kernel, 1], 
+    x_patches = tf.image.extract_patches(x, sizes = [1, kernel, kernel, 1],
         strides = [1, 1, 1, 1], rates = [1, 1, 1, 1], padding = "SAME") # [N, H, W, k*k, C]
     x_patches = tf.reshape(x_patches, [-1, kernel * kernel, depth]) # [N * H * W, k*k, C]
     x_flat = tf.reshape(x, [-1, 1, depth]) # [N * H * W, 1, C]
 
     kwargs = {
-        "num_heads": num_heads, 
-        "integration": "add", 
+        "num_heads": num_heads,
+        "integration": "add",
         "from_pos": tf.zeros([1, depth]),
         "to_pos": grid
     }
@@ -474,7 +474,7 @@ def process_input(t, t_pos, t_len, name):
     else:
         if t_len is None:
             print("If {}_tensor has two dimensions, must specify {}_len.".format(name, name))
-            raise        
+            raise
         # Infer batch size for the 2-dims case
         batch_size = tf.cast(shape[0] / t_len, tf.int32)
 
@@ -486,7 +486,7 @@ def process_input(t, t_pos, t_len, name):
     return t, t_pos, shape, t_len, batch_size
 
 # Transpose tensor to scores
-def transpose_for_scores(x, batch_size, num_heads, elem_num, head_size):  
+def transpose_for_scores(x, batch_size, num_heads, elem_num, head_size):
     x = tf.reshape(x, [batch_size, elem_num, num_heads, head_size]) # [B, N, H, S]
     x = tf.transpose(x, [0, 2, 1, 3]) # [B, H, N, S]
     return x
@@ -506,7 +506,7 @@ def compute_probs(scores, dp):
 #
 # Gate attention values either row-wise (from) or column-wise so that some of the elements
 # in the from/to_tensor will not participate in sending/receiving information, when gate
-# value is low for them.             
+# value is low for them.
 def gate_attention(att_probs, tensor, pos, num_heads, from_len, to_len, name, gate_bias = 0):
     nc, np = "{}_cont".format(name), "{}_pos".format(name)
     gate = apply_bias_act(dense_layer(tensor, num_heads, name = nc), name = nc)
@@ -517,37 +517,37 @@ def gate_attention(att_probs, tensor, pos, num_heads, from_len, to_len, name, ga
     att_probs *= gate
     return att_probs
 
-# Normalizes the 'tensor' elements, and then integrate the new information from 
-# 'control' with 'tensor', where 'control' controls the bias/gain of 'tensor'. 
+# Normalizes the 'tensor' elements, and then integrate the new information from
+# 'control' with 'tensor', where 'control' controls the bias/gain of 'tensor'.
 # norm types: batch, instance, layers
 # integration types: add, mul, both
 def integrate(tensor, tensor_len, control, integration, norm):
     dim = get_shape(tensor)[-1]
 
     # Normalize tensor
-    if norm is not None: 
+    if norm is not None:
         tensor = att_norm(tensor, tensor_len, integration, norm)
 
     # Compute gain/bias
     control_dim = {"add": dim, "mul": dim, "both": 2 * dim}[integration]
     bias = gain = control = apply_bias_act(dense_layer(control, control_dim, name = "out"), name = "out")
-    if integration == "both": 
+    if integration == "both":
         gain, bias = tf.split(control, 2, axis = -1)
 
     # Modulate the bias/gain of 'tensor'
     if integration != "add":
-        tensor *= (gain + 1) 
+        tensor *= (gain + 1)
     if integration != "mul":
         tensor += bias
 
-    return tensor    
+    return tensor
 
 # (The following 2 functions are optional, and are only used when --kmeans)
 
 #### K-means (as part of Duplex Attention)
 #
-# Basically, given the attention scores between 'from' elements to 'to' elements, compute 
-# the 'to' centroids of the inferred assignments relations, as in the k-means algorithm. 
+# Basically, given the attention scores between 'from' elements to 'to' elements, compute
+# the 'to' centroids of the inferred assignments relations, as in the k-means algorithm.
 #
 # (Intuitively, given that the bed region will get assigned to one latent, and the chair region
 # will get assigned to another latent, we will compute the centroid/mean of that region and use
@@ -555,8 +555,8 @@ def integrate(tensor, tensor_len, control, integration, norm):
 # ---------------------------------------------------------------------------------------------
 
 # Compute relative weights of different 'from' elements for each 'to' centroid.
-# Namely, compute assignments of 'from' elements to 'to' elements, by normalizing the 
-# attention distribution over the rows, to obtain the weight contribution of each 
+# Namely, compute assignments of 'from' elements to 'to' elements, by normalizing the
+# attention distribution over the rows, to obtain the weight contribution of each
 # 'from' element to the 'to' centroid.
 #
 # Returns [batch_size, num_heads, to_len, from_len] for each element in 'to'
@@ -568,19 +568,19 @@ def compute_assignments(att_probs):
 
 # Given queries (function of the 'from' elements) and the centroid_assignemnts
 # between 'from' and 'to' elements, compute the centroid/mean queries.
-# 
-# Some of the code here meant to be backward compatible with the pretrained networks 
+#
+# Some of the code here meant to be backward compatible with the pretrained networks
 # and may improve in further versions of the repository.
 def compute_centroids(_queries, queries, to_from, to_len, from_len, batch_size, num_heads, size_head,
     init_parametric = True):
     from_elements = tf.concat([_queries, queries - _queries], axis = -1)
     from_elements = transpose_for_scores(from_elements, batch_size, num_heads, from_len, 2 * size_head) # [B, N, F, H]
 
-    # to_from represent centroid_assignments of 'from' elements to 'to' elements 
+    # to_from represent centroid_assignments of 'from' elements to 'to' elements
     # [batch_size, num_head, to_len, from_len]
     if to_from is not None:
-        # upsample centroid_assignments from the prior generator layer 
-        # (where image grid dimensions were x2 smaller)        
+        # upsample centroid_assignments from the prior generator layer
+        # (where image grid dimensions were x2 smaller)
         if get_shape(to_from)[-2] < to_len:
             s = int(math.sqrt(get_shape(to_from)[-2]))
             to_from = upsample_2d(tf.reshape(to_from, [batch_size * num_heads, s, s, from_len]), factor = 2, data_format = "NHWC")
@@ -591,7 +591,7 @@ def compute_centroids(_queries, queries, to_from, to_len, from_len, batch_size, 
             to_from = upsample_2d(tf.reshape(to_from, [batch_size * num_heads, to_len, s, s]), factor = 2, data_format = "NCHW")
             to_from = tf.reshape(to_from, [batch_size, num_heads, to_len, from_len])
 
-        # Given: 
+        # Given:
         # 1. Centroid assignments of 'from' elements to 'to' centroid
         # 2. 'from' elements (queries)
         # Compute the 'to' respective centroids
@@ -599,31 +599,31 @@ def compute_centroids(_queries, queries, to_from, to_len, from_len, batch_size, 
 
     # Centroids initialization
     if to_from is None or init_parametric:
-        to_centroids = tf.tile(tf.get_variable("toasgn_init", shape = [1, num_heads, to_len, 2 * size_head], 
-            initializer = tf.initializers.random_normal()), [batch_size, 1, 1, 1]) 
+        to_centroids = tf.tile(tf.get_variable("toasgn_init", shape = [1, num_heads, to_len, 2 * size_head],
+            initializer = tf.initializers.random_normal()), [batch_size, 1, 1, 1])
 
     return from_elements, to_from, to_centroids
 
 # ---------------------------------------------------------------------------------------------
 
-# Transformer (multi-head attention) function originated from the Google-BERT repository.  
+# Transformer (multi-head attention) function originated from the Google-BERT repository.
 # https://github.com/google-research/bert/blob/master/modeling.py#L558
-# 
-# We adopt their from/to notation: 
+#
+# We adopt their from/to notation:
 # from_tensor: [batch_size, from_len, dim] a list of 'from_len' elements
 # to_tensor: [batch_size, to_len, dim] a list of 'to_len' elements
-# 
+#
 # Each element in 'from_tensor' attends to elements from 'to_tensor',
 # Then we compute a weighted sum over the 'to_tensor' elements, and use it to update
-# the elements at 'from_tensor' (through additive/multiplicative integration). 
+# the elements at 'from_tensor' (through additive/multiplicative integration).
 #
-# Overall it means that information flows in the direction to->from, or that the 'to' 
-# modulates the 'from'. For instance, if from=image, and to=latents, then the latents 
+# Overall it means that information flows in the direction to->from, or that the 'to'
+# modulates the 'from'. For instance, if from=image, and to=latents, then the latents
 # will control the image features. If from = to then this implements self-attention.
-# 
+#
 # We first project 'from_tensor' into a 'query', and 'to_tensor' into 'key' and 'value'.
 # Then, the query and key tensors are dot-producted and softmaxed to obtain
-# attention distribution over the to_tensor elements. The values are then 
+# attention distribution over the to_tensor elements. The values are then
 # interpolated (weighted-summed) using this distribution, to get 'context'.
 # The context is used to modulate the bias/gain of the 'from_tensor' (depends on 'intervention').
 # Notation: B - batch_size, F - from_len, T - to_len, N - num_heads, H - head_size
@@ -632,7 +632,7 @@ def transformer_layer(
         from_tensor,        to_tensor,        # The from/to tensors [batch_size, t_len, dim] or [batch_size * t_len, dim]
         from_len = None,    to_len = None,    # The from/to tensors lengths (must be specified if from/to has 2 dims)
         from_pos = None,    to_pos = None,    # The positional encodings of the form/to tensors (optional)
-        from_gate = False,  to_gate = False,  # Add sigmoid gate on from/to, so that info may not be sent/received 
+        from_gate = False,  to_gate = False,  # Add sigmoid gate on from/to, so that info may not be sent/received
                                               # when gate is low (i.e. the attention probs may not sum to 1)
         # Additional options
         num_heads = 1,                        # Number of attention heads
@@ -650,10 +650,10 @@ def transformer_layer(
     # Validate input shapes and map them to 2d
     from_tensor, from_pos, from_shape, from_len, batch_size = process_input(from_tensor, from_pos, from_len, "from")
     to_tensor,   to_pos,   to_shape,   to_len,   _          = process_input(to_tensor, to_pos, to_len, "to")
-    
+
     size_head = int(dim / num_heads)
     to_from = att_vars.get("centroid_assignments")
-    
+
     with tf.variable_scope("AttLayer_{}".format(name)):
         # Compute queries, keys and values
         queries = apply_bias_act(dense_layer(from_tensor, dim, name = "query"), name = "query") # [B*F, N*H]
@@ -668,7 +668,7 @@ def transformer_layer(
             keys += apply_bias_act(dense_layer(to_pos, dim, name = "to_pos"), name = "to_pos")
 
         if kmeans:
-            from_elements, to_from, to_centroids = compute_centroids(_queries, queries, to_from, 
+            from_elements, to_from, to_centroids = compute_centroids(_queries, queries, to_from,
                 to_len, from_len, batch_size, num_heads, size_head)
 
         # Reshape queries, keys and values, and then compute att_scores
@@ -683,18 +683,18 @@ def transformer_layer(
                 if kmeans:
                     if i > 0:
                         # Compute relative weights of different 'from' elements for each 'to' centroid
-                        to_from = compute_assignments(att_probs)                        
-                        # Given: 
+                        to_from = compute_assignments(att_probs)
+                        # Given:
                         # 1. Centroid assignments of 'from' elements to 'to' centroid
                         # 2. 'from' elements (queries)
                         # Compute the 'to' respective centroids
                         to_centroids = tf.matmul(to_from, from_elements)
 
-                    # Compute attention scores based on dot products between 
+                    # Compute attention scores based on dot products between
                     # 'from' queries and the 'to' centroids.
-                    w = tf.get_variable(name = "st_weights", shape = [num_heads, 1, get_shape(from_elements)[-1]], 
+                    w = tf.get_variable(name = "st_weights", shape = [num_heads, 1, get_shape(from_elements)[-1]],
                         initializer = tf.ones_initializer())
-                    att_scores = tf.matmul(from_elements * w, to_centroids, transpose_b = True) 
+                    att_scores = tf.matmul(from_elements * w, to_centroids, transpose_b = True)
 
                 # Scale attention scores given head size (see BERT)
                 att_scores = tf.multiply(att_scores, 1.0 / math.sqrt(float(size_head)))
@@ -707,14 +707,14 @@ def transformer_layer(
 
         # Gate attention values for the from/to elements
         if to_gate:
-            att_probs = gate_attention(att_probs, to_tensor, to_pos, num_heads, 
+            att_probs = gate_attention(att_probs, to_tensor, to_pos, num_heads,
                 from_len = 1, to_len = to_len, name = "e")
         if from_gate:
-            att_probs = gate_attention(att_probs, from_tensor, from_pos, num_heads, 
+            att_probs = gate_attention(att_probs, from_tensor, from_pos, num_heads,
                 from_len = from_len, to_len = 1, name = "n", gate_bias = 1)
 
         # Compute relative weights of different 'from' elements for each 'to' centroid
-        if kmeans: 
+        if kmeans:
             to_from = compute_assignments(att_probs)
 
         # Compute weighted-sum of the values using the attention distribution
@@ -735,7 +735,7 @@ def transformer_layer(
 # Also merge their the latent vectors that have used to create the images respectively
 # Arguments:
 # - x: the image features, [batch_size * k, C, H, W]
-# - k: the number of images to merge together  
+# - k: the number of images to merge together
 # - type: the type of the merge (sum, softmax, max, leaves)
 # - same: whether to merge all images equally along all WH positions
 # Returns the merged images [batch_size, C, H, W] and latents [batch_size, k, layers_num, dim]
@@ -773,7 +773,7 @@ def merge_images(x, dlatents, k, type, same = False):
     if dlatents is not None:
         scores = tf.reduce_mean(tf.reduce_mean(scores, axis = 2), axis = [-2, -1], keepdims = True) # [B, k, 1, 1]
         dlatents = tf.tile(tf.reduce_sum(dlatents * scores, axis = 1, keepdims = True), [1, k, 1, 1]) # [B, k, L, D]
-    
+
     return x
 
 ############################################## Generator ##############################################
@@ -784,7 +784,7 @@ def merge_images(x, dlatents, k, type, same = False):
 def G_GANsformer(
     latents_in,                               # First input: Latent vectors (z) [batch_size, latent_size]
     labels_in,                                # Second input (optional): Conditioning labels [batch_size, label_size]
-    # General arguments 
+    # General arguments
     is_training             = False,          # Network is under training? Enables and disables specific features
     is_validation           = False,          # Network is under validation? Chooses which value to use for truncation_psi
     return_dlatents         = False,          # Return dlatents in addition to the images?
@@ -803,7 +803,7 @@ def G_GANsformer(
     # Mixing
     style_mixing            = 0.9,            # Probability of mixing styles during training. None = disable
     component_mixing        = 0.0,            # Probability of mixing components during training. None = disable
-    component_dropout       = 0.0,            # Dropout over the k latent components 0 = disable    
+    component_dropout       = 0.0,            # Dropout over the k latent components 0 = disable
     **kwargs):                                # Arguments for sub-networks (mapping and synthesis)
 
     # Validate arguments
@@ -834,8 +834,8 @@ def G_GANsformer(
     if not is_training:
         kwargs["attention_dropout"] = 0.0
 
-    # Useful variables 
-    k = kwargs["components_num"] 
+    # Useful variables
+    k = kwargs["components_num"]
     latent_size = kwargs["latent_size"]
     dlatent_size = kwargs["dlatent_size"]
 
@@ -851,12 +851,12 @@ def G_GANsformer(
     num_layers = subnets.synthesis.input_shape[2]
     # Set mapping network
     if "mapping" not in subnets:
-        subnets.mapping = tflib.Network("G_mapping", func_name = globals()[mapping_func], 
+        subnets.mapping = tflib.Network("G_mapping", func_name = globals()[mapping_func],
             dlatent_broadcast = num_layers, **kwargs)
 
-    # If latents_in used for dlatents (skipping mapping network), 
+    # If latents_in used for dlatents (skipping mapping network),
     # then need latent per each synthesis network layer, see StyleGAN for details.
-    if take_dlatents: 
+    if take_dlatents:
         latents_in.set_shape([None, latents_num, num_layers, latent_size])
     else:
         latents_in.set_shape([None, latents_num, latent_size])
@@ -869,15 +869,13 @@ def G_GANsformer(
     component_mask = tf.expand_dims(component_mask, axis = 1)
 
     # Setup variables
-    dlatent_avg = tf.get_variable("dlatent_avg", shape = [dlatent_size], 
-        initializer = tf.initializers.zeros(), trainable = False)
+    dlatent_avg = tf.get_variable("dlatent_avg", shape = [dlatent_size], initializer = tf.initializers.zeros(), trainable = False)
 
     if take_dlatents:
-        dlatents = latents_in 
+        dlatents = latents_in
     else:
         # Evaluate mapping network
-        dlatents = subnets.mapping.get_output_for(latents_in, labels_in, latent_pos, component_mask, 
-            is_training = is_training, **kwargs)
+        dlatents = subnets.mapping.get_output_for(latents_in, labels_in, latent_pos, component_mask, is_training = is_training, **kwargs)
         dlatents = tf.cast(dlatents, tf.float32)
 
     # Update moving average of W latent space
@@ -888,9 +886,9 @@ def G_GANsformer(
             with tf.control_dependencies([update_op]):
                 dlatents = tf.identity(dlatents)
 
-    # Mixing (see StyleGAN): mixes together some of the W latents mapped from one set of 
-    # source latents A, and another set of source latents B. Mixing can be between latents 
-    # that correspond either to different layers or to the different k components used in 
+    # Mixing (see StyleGAN): mixes together some of the W latents mapped from one set of
+    # source latents A, and another set of source latents B. Mixing can be between latents
+    # that correspond either to different layers or to the different k components used in
     # the GANsformer.
     # Used only during training, and by default only layers are mixes as in StyleGAN.
     def mixing(latents_in, dlatents, prob, num, idx):
@@ -899,8 +897,7 @@ def G_GANsformer(
 
         with tf.variable_scope("StyleMix"):
             latents2 = tf.random_normal(get_shape(latents_in))
-            dlatents2 = subnets.mapping.get_output_for(latents2, labels_in, latent_pos, component_mask, 
-                is_training = is_training, **kwargs)
+            dlatents2 = subnets.mapping.get_output_for(latents2, labels_in, latent_pos, component_mask, is_training = is_training, **kwargs)
             dlatents2 = tf.cast(dlatents2, tf.float32)
             mixing_cutoff = tf.cond(
                 tf.random_uniform([], 0.0, 1.0) < prob,
@@ -928,12 +925,12 @@ def G_GANsformer(
             dlatents = tflib.lerp(dlatent_avg, dlatents, layer_psi)
 
     # Evaluate synthesis network
-    imgs_out, maps_out = subnets.synthesis.get_output_for(dlatents, latent_pos, component_mask, 
-        is_training = is_training, force_clean_graph = is_template_graph, **kwargs) 
+    imgs_out, maps_out = subnets.synthesis.get_output_for(dlatents, latent_pos, component_mask,
+        is_training = is_training, force_clean_graph = is_template_graph, **kwargs)
 
     # Return requested outputs
     imgs_out = tf.identity(imgs_out, name = "images_out") # [batch_size, num_channels, H, W]
-    maps_out = tf.identity(maps_out, name = "maps_out") # [batch_size, k (components_num), layers_num, heads_num, H, W]  
+    maps_out = tf.identity(maps_out, name = "maps_out") # [batch_size, k (components_num), layers_num, heads_num, H, W]
     ret = (imgs_out, maps_out)
 
     if return_dlatents:
@@ -958,7 +955,7 @@ def G_mapping(
     dlatent_size            = 512,          # Disentangled latent (w) dimensionality
     label_size              = 0,            # Label dimensionality, 0 if no labels
     # General settings
-    dlatent_broadcast       = None,         # Output disentangled latent (w) as [batch_size, dlatent_size] 
+    dlatent_broadcast       = None,         # Output disentangled latent (w) as [batch_size, dlatent_size]
                                             # or [batch_size, dlatent_broadcast, dlatent_size]
     normalize_latents       = True,         # Normalize latent vectors (z) before feeding them to the mapping layers?
     transformer             = False,        # Whereas the generator uses attention or not (i.e. GANsformer or StyleGAN)
@@ -971,12 +968,12 @@ def G_mapping(
     mapping_resnet          = False,        # Use resnet connections in mapping network
     mapping_shared_dim      = 0,            # Perform a shared mapping with that dimension to all latents concatenated together
     # Attention options
-    num_heads               = 1,            # Number of attention heads 
+    num_heads               = 1,            # Number of attention heads
     use_pos                 = False,        # Use positional encoding for latents
     ltnt_gate               = False,        # Gate attention scores so that info may not be sent/received when value is low
     attention_dropout       = 0.12,         # Attention dropout rate
     **_kwargs):                             # Ignore unrecognized keyword args
-    
+
     # Short names
     act = mapping_nonlinearity
     k = components_num
@@ -992,13 +989,13 @@ def G_mapping(
 
     # Inputs
     latents_in.set_shape([None, latents_num, latent_size])
-    labels_in.set_shape([None, label_size])  
+    labels_in.set_shape([None, label_size])
     latent_pos.set_shape([k, dlatent_size])
     component_mask.set_shape([None, 1, k])
 
     batch_size = get_shape(latents_in)[0]
 
-    if not use_pos: 
+    if not use_pos:
         latent_pos = None
 
     # Set internal and output dimensions
@@ -1032,11 +1029,11 @@ def G_mapping(
     # Set optional attention arguments (By default, none since mapping_ltnt2ltnt = False)
     mlp_kwargs = {}
     if ltnt2ltnt:
-        mlp_kwargs.update({        "transformer": ltnt2ltnt, 
+        mlp_kwargs.update({        "transformer": ltnt2ltnt,
            "num_heads": num_heads, "att_dp": attention_dropout,
-           "from_gate": ltnt_gate, "to_gate": ltnt_gate, 
+           "from_gate": ltnt_gate, "to_gate": ltnt_gate,
            "from_pos": latent_pos, "to_pos": latent_pos,
-           "from_len": k,          "to_len": k, 
+           "from_len": k,          "to_len": k,
         })
 
     # Mapping layers
@@ -1053,7 +1050,7 @@ def G_mapping(
             x = tf.reshape(apply_bias_act(dense_layer(x, k * net_dim, name = "outmap"), name = "outmap"),
                 [batch_size, k, net_dim])
         else:
-            x = mlp(x, resnet, layersnum, net_dim, act, lrmul, pooling = "batch", 
+            x = mlp(x, resnet, layersnum, net_dim, act, lrmul, pooling = "batch",
                 att_mask = component_mask, **mlp_kwargs)
 
     if global_latent:
@@ -1073,8 +1070,8 @@ def G_mapping(
         with tf.variable_scope("Broadcast"):
             x = tf.tile(x[:, :, np.newaxis], [1, 1, dlatent_broadcast, 1])
 
-    # Output  
-    x = tf.identity(x, name = "dlatents_out") 
+    # Output
+    x = tf.identity(x, name = "dlatents_out")
     return x # [batch_size, dlatent_broadcast, k (components_num), dlatent_dim]
 
 ########################################## Synthesis network ##########################################
@@ -1083,7 +1080,7 @@ def G_mapping(
 # This function supports different generator forms:
 # - GANsformer (--transformer)
 # - GAN (--latent-stem --style = False)
-# - StyleGAN (--style) 
+# - StyleGAN (--style)
 # - SAGAN (--img2img)
 # - k-GAN (--kgan)
 def G_synthesis(
@@ -1114,9 +1111,9 @@ def G_synthesis(
     # GANsformer settings
     transformer         = False,        # Whereas the generator uses attention or not (i.e. GANsformer or StyleGAN)
     components_num      = 1,            # Number of Latent (z) vector components z_1,...,z_k
-    num_heads           = 1,            # Number of attention heads 
+    num_heads           = 1,            # Number of attention heads
     attention_dropout   = 0.12,         # Attention dropout rate
-    ltnt_gate           = False,        # Gate attention from latents, such that components may not send information 
+    ltnt_gate           = False,        # Gate attention from latents, such that components may not send information
                                         # when gate value is low
     img_gate            = False,        # Gate attention for images, such that some image positions may not get updated
                                         # or receive information when gate value is low
@@ -1126,7 +1123,7 @@ def G_synthesis(
     kmeans              = False,        # Track and update image-to-latents assignment centroids, used in the duplex attention
     kmeans_iters        = 1,            # Number of K-means iterations per transformer layer
                                         # Note that centroids are carried from layer to layer
-    # Attention directions and layers: 
+    # Attention directions and layers:
     # image->latents, latents->image, image->image (SAGAN), resolution to be applied at
     start_res           = 0,            # Transformer minimum resolution layer to be used at
     end_res             = 20,           # Transformer maximum resolution layer to be used at
@@ -1158,7 +1155,7 @@ def G_synthesis(
     assert resolution == 2**resolution_log2 and resolution >= 4
     assert architecture in ["orig", "skip", "resnet"]
 
-    # Network dimension, is set to fmap_base and then reduces with increasing stage 
+    # Network dimension, is set to fmap_base and then reduces with increasing stage
     # according to fmap_decay, in the range of [fmap_min, fmap_max] (see StyleGAN)
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
     # Get global latent (the last one)
@@ -1167,15 +1164,15 @@ def G_synthesis(
     # k-GAN variables (not used by default)
     m = merge_layer
     merge_final_layer = (m == -1)
-    if m == -1: 
+    if m == -1:
         m = resolution_log2 + 1
-    
+
     # Inputs
     dlatents_in.set_shape([None, latents_num, num_layers, dlatent_size])
-    component_mask.set_shape([None, 1, k]) 
-    latent_pos.set_shape([k, dlatent_size])  
+    component_mask.set_shape([None, 1, k])
+    latent_pos.set_shape([k, dlatent_size])
     # Disable latent_pos if we don't want to use it
-    if not use_pos: 
+    if not use_pos:
         latent_pos = None
 
     batch_size = get_shape(dlatents_in)[0]
@@ -1195,19 +1192,19 @@ def G_synthesis(
         batch_multiplier = 1
         if merge and res < m:
             batch_multiplier = k
-        noise_shape = [batch_multiplier, 1, 2**res, 2**res]  
+        noise_shape = [batch_multiplier, 1, 2**res, 2**res]
 
-        # For k-GAN only, need noise for each image out of the k 
+        # For k-GAN only, need noise for each image out of the k
         if merge and res < m:
             noise_shape[0] = k
 
         # Create new noise variable
-        noise_layers.append(tf.get_variable("noise%d" % layer_idx, shape = noise_shape, 
+        noise_layers.append(tf.get_variable("noise%d" % layer_idx, shape = noise_shape,
             initializer = tf.initializers.random_normal(), trainable = False))
 
     def add_noise(x, layer_idx):
         if randomize_noise:
-            # Random noise is same for all channels 
+            # Random noise is same for all channels
             shape = get_shape(x) # NCHW
             shape[1] = 1
             noise = tf.random_normal(shape)
@@ -1216,7 +1213,7 @@ def G_synthesis(
             if merge:
                 batch_mul = tf.cast(get_shape(x)[0] / get_shape(noise)[0], tf.int32)
                 noise = tf.tile(noise, (batch_mul, 1, 1, 1))
-        
+
         strength = tf.get_variable("noise_strength", shape = [], initializer = tf.initializers.zeros())
         x += strength * noise
         return x
@@ -1227,7 +1224,7 @@ def G_synthesis(
         # Image features resolution of current layer
         res = (layer_idx + 5) // 2
         # Global latent for features global modulation (as in StyleGAN)
-        dlatent_global = get_global(dlatents_in)[:, layer_idx + 1] 
+        dlatent_global = get_global(dlatents_in)[:, layer_idx + 1]
         # If bottom-up connections exist, use the (iteratively updated) latents
         # Otherwise, use the input latents corresponding to the current layer
         new_dlatents = None
@@ -1241,12 +1238,12 @@ def G_synthesis(
             _fused_modconv, noconv = False, True
 
         # Modulate image features and perform convolution
-        x = modulated_conv2d_layer(x, dlatent_global, dim, kernel, up = up, 
-            resample_kernel = resample_kernel, fused_modconv = _fused_modconv, modulate = style, noconv = noconv) 
+        x = modulated_conv2d_layer(x, dlatent_global, dim, kernel, up = up,
+            resample_kernel = resample_kernel, fused_modconv = _fused_modconv, modulate = style, noconv = noconv)
         shape = get_shape(x)
 
         # Transformer layer
-        if transformer and res >= start_res and res < end_res: 
+        if transformer and res >= start_res and res < end_res:
             # Reshape image features for transformer layer [batch_size (B), img_feats (WH), feat_dim (C)]
             x = tf.transpose(tf.reshape(x, [shape[0], shape[1], shape[2] * shape[3]]), [0, 2, 1])
 
@@ -1266,28 +1263,28 @@ def G_synthesis(
                 "kmeans_iters": kmeans_iters,   # Number of K-means iterations per layer
                 "att_vars": att_vars,           # K-means variables carried over from layer to layer (only when --kmeans)
             }
-            # Perform attention from image to latents, meaning that information will flow 
+            # Perform attention from image to latents, meaning that information will flow
             # latents -> image (from/to naming matches with Google BERT repository)
-            x, att_map, att_vars = transformer_layer(from_tensor = x, to_tensor = dlatents, dim = dim, 
+            x, att_map, att_vars = transformer_layer(from_tensor = x, to_tensor = dlatents, dim = dim,
                 name = "l2n", **kwargs)
 
-            ################################ Optional transformer layers ################################                             
+            ################################ Optional transformer layers ################################
             # image->image, image->latents, latents->latents
-            kwargs = { 
+            kwargs = {
                 "num_heads": num_heads,   "att_dp": attention_dropout,
-                "from_gate": ltnt_gate,   "from_pos": latent_pos    
+                "from_gate": ltnt_gate,   "from_pos": latent_pos
             }
 
             # Latent->Latent self-attention
             if ltnt2ltnt:
-                new_dlatents = nnlayer(dlatents, dlatent_size, y = dlatents, act = "lrelu", 
+                new_dlatents = nnlayer(dlatents, dlatent_size, y = dlatents, act = "lrelu",
                     name = "l2l", to_pos = latent_pos, to_gate = ltnt_gate, **kwargs)
-            
+
             # Bottom-Up: Image->Latent attention
             if img2ltnt:
-                new_dlatents = nnlayer(dlatents, dlatent_size, y = x, act = "lrelu", 
+                new_dlatents = nnlayer(dlatents, dlatent_size, y = x, act = "lrelu",
                     name = "n2l", to_pos = grid_poses[res], to_gate = img_gate, **kwargs)
-            
+
             # Image->Image self-attention (SAGAN) (not used by default)
             if res == img2img:
                 kwargs["from_pos"] = kwargs["to_pos"] = grid_poses[res]
@@ -1309,11 +1306,11 @@ def G_synthesis(
     def block(x, res, dlatents, dim, att_vars, up = True): # res = 3..resolution_log2
         t = x
         with tf.variable_scope("Conv0_up"):
-            x, dlatents, att_map1, att_vars = layer(x, dlatents, layer_idx = res*2-5, 
+            x, dlatents, att_map1, att_vars = layer(x, dlatents, layer_idx = res*2-5,
                 dim = dim, kernel = 3, up = up, att_vars = att_vars)
 
         with tf.variable_scope("Conv1"):
-            x, dlatents, att_map2, att_vars = layer(x, dlatents, layer_idx = res*2-4, 
+            x, dlatents, att_map2, att_vars = layer(x, dlatents, layer_idx = res*2-4,
                 dim = dim, kernel = 3, att_vars = att_vars)
 
         if architecture == "resnet":
@@ -1344,11 +1341,11 @@ def G_synthesis(
                 # If end_res >= resolution_log2, need to perform transformer on highest resolution too
                 if transformer and res <= end_res:
                     with tf.variable_scope("extraLayer"):
-                        t = modulated_conv2d_layer(t, dlatents[:, res*2-3], dim = nf(res-1), 
-                            kernel = 3, fused_modconv = fused_modconv, modulate = style) 
+                        t = modulated_conv2d_layer(t, dlatents[:, res*2-3], dim = nf(res-1),
+                            kernel = 3, fused_modconv = fused_modconv, modulate = style)
 
             # Convert image features to output image (with num_channels, e.g. RGB)
-            t = modulated_conv2d_layer(t, dlatents[:, res*2-2], dim = num_channels, 
+            t = modulated_conv2d_layer(t, dlatents[:, res*2-2], dim = num_channels,
                 kernel = 1, demodulate = False, fused_modconv = fused_modconv, modulate = style)
             t = apply_bias_act(t)
 
@@ -1360,26 +1357,26 @@ def G_synthesis(
             if y is not None:
                 t += y
 
-            return t 
+            return t
 
     # Early layers
     imgs_out, dlatents, att_maps = None, None, []
-    att_vars = {"centroid_assignments": None} 
+    att_vars = {"centroid_assignments": None}
 
-    # x is img_feats: the evolving image features grid, starting from 4x4, and 
+    # x is img_feats: the evolving image features grid, starting from 4x4, and
     # iteratively processed and upsampled up to the desirable resolution.
 
     # Stem: initial 4x4 image grid -- either constant (StyleGAN) or mapped from the latents (standard GAN)
     with tf.variable_scope("4x4"):
         # Default option, trainable constant 4x4 image grid stem
-        if not latent_stem: 
+        if not latent_stem:
             with tf.variable_scope("Const"):
                 stem_size = k if merge else 1
-                x = tf.get_variable("const", shape = [stem_size, nf(1), 4, 4], 
+                x = tf.get_variable("const", shape = [stem_size, nf(1), 4, 4],
                     initializer = tf.initializers.random_normal())
                 x = tf.tile(x, [batch_size, 1, 1, 1])
         # If latent_stem, map the latents to an initial 4x4 image grid
-        else:            
+        else:
             with tf.variable_scope("Dense"):
                 x = dense_layer(get_global(dlatents_in)[:, 0], dim = nf(1) * 16, gain = np.sqrt(2) / 4)
                 x = tf.reshape(x, [-1, nf(1), 4, 4])
@@ -1389,12 +1386,12 @@ def G_synthesis(
 
         # First modulation layer over 4x4
         with tf.variable_scope("Conv"):
-            x, dlatents, att_map, att_vars = layer(x, dlatents, layer_idx = 0, dim = nf(1), 
+            x, dlatents, att_map, att_vars = layer(x, dlatents, layer_idx = 0, dim = nf(1),
                 kernel = 3, att_vars = att_vars)
             att_maps.append(att_map)
         if architecture == "skip":
             imgs_out = torgb(x, imgs_out, 2, get_global(dlatents_in))
-    
+
     # Main layers
     merged = False
     for res in range(3, resolution_log2 + 1):
@@ -1402,9 +1399,9 @@ def G_synthesis(
             # Generator block: transformer, convolution and upsampling
             x, dlatents, _att_maps, att_vars = block(x, res, dlatents, dim = nf(res-1), att_vars = att_vars)
             att_maps += _att_maps
-            
+
             # Merge images, for k-GAN only, not used by default
-            if merge and (not merged) and res >= m: 
+            if merge and (not merged) and res >= m:
                 with tf.variable_scope("merge%s" % (res)):
                     x, dlatents_in = merge_images(x, dlatents_in, k, merge_type, merge_same)
                 merged = True
@@ -1423,8 +1420,8 @@ def G_synthesis(
 
         maps_out = []
         for att_map in att_list:
-            # Reshape attention map into spatial 
-            s = int(math.sqrt(get_shape(att_map)[2])) 
+            # Reshape attention map into spatial
+            s = int(math.sqrt(get_shape(att_map)[2]))
             att_map = tf.transpose(tf.reshape(att_map, [-1, s, s, k]), [0, 3, 1, 2]) # [NCHW]
             # Upsample attention map to final image resolution
             # (since attention map of early generator layers have lower resolutions)
@@ -1473,13 +1470,13 @@ def D_GANsformer(
     # GANsformer settings
     transformer         = False,        # Whereas the discriminator uses attention or not
     components_num      = 1,            # Number of aggregator variables
-    num_heads           = 1,            # Number of attention heads 
+    num_heads           = 1,            # Number of attention heads
     attention_dropout   = 0.12,         # Attention dropout rate
-    ltnt_gate           = False,        # Gate attention from latents, such that components may not send information 
+    ltnt_gate           = False,        # Gate attention from latents, such that components may not send information
                                         # when gate value is low
     img_gate            = False,        # Gate attention for images, such that some image positions may not get updated
                                         # or receive information when gate value is low
-    # Attention directions and layers 
+    # Attention directions and layers
     # image->latents, latents->image, image->image (SAGAN), resolution to be applied at
     start_res           = 0,            # Transformer minimum resolution layer to be used at
     end_res             = 20,           # Transformer maximum resolution layer to be used at
@@ -1491,9 +1488,9 @@ def D_GANsformer(
     use_pos             = False,        # Use positional encoding for latents
     pos_type            = "sinus",      # Positional encoding type: linear, sinus, trainable, trainable2d
     pos_init            = "uniform",    # Positional encoding initialization distribution: normal or uniform
-    pos_directions_num  = 2,            # Positional encoding number of spatial directions    
+    pos_directions_num  = 2,            # Positional encoding number of spatial directions
     **_kwargs):                         # Ignore unrecognized keyword args
-    
+
     # Set variables
     act = nonlinearity
     resolution_log2 = int(np.log2(resolution))
@@ -1503,7 +1500,7 @@ def D_GANsformer(
     assert architecture in ["orig", "skip", "resnet"]
     assert resolution == 2**resolution_log2 and resolution >= 4
 
-    # Network dimension, is set to fmap_base and then reduces with increasing stage 
+    # Network dimension, is set to fmap_base and then reduces with increasing stage
     # according to fmap_decay, in the range of [fmap_min, fmap_max] (see StyleGAN)
     def nf(stage): return np.clip(int(fmap_base / (2.0 ** (stage * fmap_decay))), fmap_min, fmap_max)
 
@@ -1518,14 +1515,14 @@ def D_GANsformer(
 
     # Positional encodings
     latent_pos = None
-    if use_pos: 
-        latent_pos = get_embeddings(components_num, latent_size, name = "ltnt_emb")    
+    if use_pos:
+        latent_pos = get_embeddings(components_num, latent_size, name = "ltnt_emb")
 
     grid_poses = get_positional_embeddings(resolution_log2, pos_dim, pos_type, pos_directions_num, pos_init)
     if local_attention:
         att2d_grid = get_embeddings(3 * 3, 16, name = "att2d_grid")
 
-    # Convert input image (e.g. RGB) to image features 
+    # Convert input image (e.g. RGB) to image features
     def fromrgb(x, y, res): # res = 2..resolution_log2
         with tf.variable_scope("FromRGB"):
             t = apply_bias_act(conv2d_layer(y, dim = nf(res-1), kernel = 1), act = act)
@@ -1547,7 +1544,7 @@ def D_GANsformer(
             # Main image->Latents (bottom-up) transformer layer
             kwargs = {
                 "num_heads": num_heads,  "att_dp": attention_dropout,
-                "from_gate": ltnt_gate,  "to_gate": img_gate, 
+                "from_gate": ltnt_gate,  "to_gate": img_gate,
                 "from_pos": latent_pos,  "to_pos": grid_poses[res]
             }
             aggregators = transformer_layer(from_tensor = aggregators, to_tensor = x, dim = latent_size, name = "n2l", **kwargs)[0]
@@ -1563,7 +1560,7 @@ def D_GANsformer(
             # Latents->Latents self-attention
             if ltnt2ltnt:
                 kwargs.update({"from_gate": ltnt_gate, "from_pos": latent_pos})
-                aggregators = nnlayer(aggregators, latent_size, act = "lrelu", y = aggregators, name = "l2l", **kwargs) 
+                aggregators = nnlayer(aggregators, latent_size, act = "lrelu", y = aggregators, name = "l2l", **kwargs)
 
             # Image->Image self-attention (SAGAN)
             if img2img > 0 and res == img2img:
@@ -1586,7 +1583,7 @@ def D_GANsformer(
             x = apply_bias_act(conv2d_layer(x, dim = nf(res-1), kernel = ksize), act = act)
 
         with tf.variable_scope("Conv1_down"):
-            x = apply_bias_act(conv2d_layer(x, dim = nf(res-2), kernel = ksize, down = True, 
+            x = apply_bias_act(conv2d_layer(x, dim = nf(res-2), kernel = ksize, down = True,
                 resample_kernel = resample_kernel), act = act)
 
         if architecture == "resnet":
@@ -1595,18 +1592,18 @@ def D_GANsformer(
                 x = (x + t) * (1 / np.sqrt(2))
 
         return x, aggregators
-    
+
     def downsample(y):
         with tf.variable_scope("Downsample"):
             return downsample_2d(y, k = resample_kernel)
 
 
-    # x is img_feats: the evolving image features grid, starting from the input resolution, and iteratively 
+    # x is img_feats: the evolving image features grid, starting from the input resolution, and iteratively
     # processed and downsampled until making final binary prediction about the image source (real / fake).
     x = None
 
     # Initialize aggregator variables, used only when attention is used in the discriminator
-    aggregators = tf.get_variable(name = "aggregators", shape = [components_num, latent_size], 
+    aggregators = tf.get_variable(name = "aggregators", shape = [components_num, latent_size],
         initializer = tf.random_uniform_initializer())
     aggregators = tf.tile(tf.expand_dims(aggregators, axis = 0), [batch_size, 1, 1]) # [batch_size, k, dim]
 
@@ -1623,7 +1620,7 @@ def D_GANsformer(
                 images_in = downsample(images_in)
 
     # Final layers
-    with tf.variable_scope("4x4"):         
+    with tf.variable_scope("4x4"):
         if architecture == "skip":
             x = fromrgb(x, images_in, 2)
         # Minibatch standard deviation layer (see StyleGAN)
@@ -1637,7 +1634,7 @@ def D_GANsformer(
             x = apply_bias_act(dense_layer(x, dim = nf(0)), act = act) # [batch_size, nf(0)]
 
     if transformer:
-        with tf.variable_scope("ComponentScores"):  
+        with tf.variable_scope("ComponentScores"):
             if mbstd_group_size > 1:
                 with tf.variable_scope("MinibatchStddev"):
                     aggregators = tf.transpose(aggregators, [0, 2, 1])

@@ -32,7 +32,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 @article{hudson2021gansformer,
   title={Generative Adversarial Transformers},
   author={Hudson, Drew A and Zitnick, C. Lawrence},
-  journal={arXiv preprint},
+  journal={arXiv preprint:2103.01209},
   year={2021}
 }
 ```

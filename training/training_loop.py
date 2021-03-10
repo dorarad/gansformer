@@ -185,17 +185,17 @@ def training_loop(
     # Construct or load networks
     with tf.device("/gpu:0"):
         no_op = tf.no_op()
-        G, D = None, None
+        G, D, Gs = None, None, None
         if resume_pkl is None or recompile:
             print(misc.bcolored("Constructing networks...", "white"))
             G = tflib.Network("G", num_channels = dataset.shape[0], resolution = dataset.shape[1], label_size = dataset.label_size, **cG.args)
             D = tflib.Network("D", num_channels = dataset.shape[0], resolution = dataset.shape[1], label_size = dataset.label_size, **cD.args)
             Gs = G.clone("Gs")
+        if resume_pkl is not None:
+            G, D, Gs = load_nets(resume_pkl, G, D, Gs, recompile)
 
-            if resume_pkl is not None:
-                G, D, Gs = load_nets(resume_pkl, G, D, Gs, recompile)
-
-    G.print_layers(); D.print_layers()
+    G.print_layers()
+    D.print_layers()
 
     # Train/Evaluate/Visualize
     # Labels are optional but not essential
@@ -354,20 +354,19 @@ def training_loop(
             total_time = dnnlib.RunContext.get().get_time_since_start() + resume_time
 
             # Report progress
-            print("tick %s kimg %s minibatch %s loss/reg: G (%s %s) D (%s %s), norms: G (%s %s) D (%s %s) time %s sec/tick %s sec/kimg %s %s" % (
+            print("tick %s kimg %s loss/reg: G (%s %s) D (%s %s), grad norms: G (%s %s) D (%s %s) time %s sec/tick %s sec/kimg %s %s" % (
                 misc.bold("%-5d" % autosummary("Progress/tick", cur_tick)),
                 misc.bcolored("%-8.1f" % autosummary("Progress/kimg", cur_nimg / 1000.0), "red"),
-                "%-4d" % autosummary("Progress/minibatch", sched.minibatch_size),
-                misc.bcolored("%.3f" % (cG.lossvals_agg["loss"] or -1), "blue"),
-                misc.bold("%.3f" % (cG.lossvals_agg["reg"] or -1)),
-                misc.bcolored("%.3f" % (cD.lossvals_agg["loss"] or -1), "blue"),
-                misc.bold("%.3f" % (cD.lossvals_agg["reg"] or -1)),
+                misc.bcolored("%.3f" % (cG.lossvals_agg["loss"] or 0), "blue"),
+                misc.bold("%.3f" % (cG.lossvals_agg["reg"] or 0)),
+                misc.bcolored("%.3f" % (cD.lossvals_agg["loss"] or 0), "blue"),
+                misc.bold("%.3f" % (cD.lossvals_agg["reg"] or 0)),
                 misc.cond_bcolored(cG.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cG.lossvals_agg["reg_norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["reg_norm"], 20.0, "red"),
-                misc.bold("%-12s" % dnnlib.util.format_time(autosummary("Timing/total_sec", total_time))),
-                "%-7.1f" % autosummary("Timing/sec_per_tick", tick_time),
+                misc.bold("%-6s" % dnnlib.util.format_time(autosummary("Timing/total_sec", total_time))),
+                "%-6.1f" % autosummary("Timing/sec_per_tick", tick_time),
                 "%-7.2f" % autosummary("Timing/sec_per_kimg", tick_time / tick_kimg),
                 printname))
 
@@ -377,7 +376,7 @@ def training_loop(
             # Save snapshots
             if img_snapshot_ticks is not None and (cur_tick % img_snapshot_ticks == 0 or done):
                 visualize.eval(G, dataset, batch_size = sched.minibatch_gpu, training = True,
-                    step = cur_nimg // 1000, num = grid_size, latents = grid_latents,
+                    step = cur_nimg // 1000, grid_size = grid_size, latents = grid_latents, 
                     labels = grid_labels, drange_net = drange_net, **vis_args)
 
             if network_snapshot_ticks is not None and (cur_tick % network_snapshot_ticks == 0 or done):

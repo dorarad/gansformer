@@ -19,10 +19,6 @@ def curr_batch_size(total_num, idx, batch_size):
 # Mathematical utilities
 # ----------------------------------------------------------------------------
 
-# Broadcast the latent across all layers
-def broadcastLtnt(Gs, ltnt):
-    return np.tile(ltnt[:, :, np.newaxis], [1, 1, Gs.components.synthesis.input_shape[2], 1])
-
 # Linear interpolation
 def lerp(a, b, ts):
     ts = ts[:, np.newaxis]
@@ -70,7 +66,9 @@ def eval(G,
                                       # (requires more memory and disk space, and therefore rich_num < num)
     grid                = None,       # Whether to save the samples in one large grid files
                                       # or in separated files one per sample
+    grid_size           = None,       # Grid proportions (w, h)
     step                = None,       # Step number to be used in visualization filenames
+    verbose             = None,       # Verbose print progress messages
     # Visualization-specific settings
     alpha               = 0.3,        # Proportion for generated images and attention maps blends
     intrp_density       = 8,          # Number of samples in between two end points of an interpolation
@@ -79,7 +77,7 @@ def eval(G,
     noise_samples_num   = 100,        # Number of samples used to compute noise variation visualization
     section_size        = 100):       # Visualization section size (section_size <= num) for reducing memory footprint
 
-    pattern_of = lambda dir, step, suffix: "eval/{}/{}%06d.{}".format(dir, "" if step is None else (step + "_"), suffix)
+    def pattern_of(dir, step, suffix): return "eval/{}/{}%06d.{}".format(dir, "" if step is None else "{}_".format(step), suffix)
 
     # For time efficiency, during training save only image and map samples
     # rather than richer visualizations
@@ -91,27 +89,33 @@ def eval(G,
         if vis is None:
             vis = {"imgs", "maps", "ltnts", "interpolations", "noise_var"}
 
-    # By default saves image samples in one grid file during training
+    # Set default options
+    # Save image samples in one grid file during training    
     if grid is None:
         grid = training
+    # Disable verbose during training
+    if verbose:
+        verbose = not training
+    # If grid size is provided, set number of visualized images accordingly
+    if grid_size is not None:
+        num = np.prod(grid_size)
 
     # build image functions
-    save_images = save_imgs_builder(drange_net, grid)
-    save_blends = save_blends_builder(drange_net, grid, alpha)
+    save_images = misc.save_images_builder(drange_net, grid_size, grid, verbose)
+    save_blends = misc.save_blends_builder(drange_net, grid_size, grid, verbose, alpha)
 
     # Set up logging
-    grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
-    noise_vars = [var for name, var in Gs.components.synthesis.vars.items() if name.startswith("noise")]
+    noise_vars = [var for name, var in G.subnets.synthesis.vars.items() if name.startswith("noise")]
     noise_var_vals = {var: np.random.randn(*var.shape.as_list()) for var in noise_vars}
     tflib.set_vars(noise_var_vals)
 
     # Create directories
     dirs = []
-    if save_imgs:            dirs += ["images"]
-    if save_ltnts:           dirs += ["latents-z", "latents-w"]
-    if save_maps:            dirs += ["maps", "softmaps", "blends", "softblends"]
-    if save_layer_maps:      dirs += ["layer_maps"]
-    if save_interpolations:  dirs += ["interpolations-z", "interpolation-w"]
+    if "imgs" in vis:            dirs += ["images"]
+    if "ltnts" in vis:           dirs += ["latents-z", "latents-w"]
+    if "maps" in vis:            dirs += ["maps", "softmaps", "blends", "softblends"]
+    if "layer_maps" in vis:      dirs += ["layer_maps"]
+    if "interpolations" in vis:  dirs += ["interpolations-z", "interpolation-w"]
 
     for dir in dirs:
         misc.mkdir(dnnlib.make_run_dir_path("eval/{}".format(dir)))
@@ -119,7 +123,7 @@ def eval(G,
     # Produce visualizations
     for idx in range(0, num, section_size):
         curr_size = curr_batch_size(num, idx, section_size)
-        if num > curr_size:
+        if verbose and num > curr_size:
             print("--- Batch {}/{}".format(idx + 1, num))
 
         # Compute source latents images will be produced from
@@ -129,36 +133,40 @@ def eval(G,
             labels = dataset.get_minibatch_np(curr_size)
 
         # Run network over latents and produce images and attention maps
-        print("Running network...")
+        if verbose:
+            print("Running network...")
         images, attmaps_all_layers, wlatents_all_layers = G.run(latents, labels, randomize_noise = False,
             minibatch_size = batch_size, return_dlatents = True) # is_visualization = True
         # For memory efficiency, save full information only for a small amount of images
         attmaps_all_layers = attmaps_all_layers[:rich_num]
-        wlatents = wlatents_layers[:,:,0]
+        wlatents = wlatents_all_layers[:,:,0]
 
         # Save image samples
-        if save_imgs:
-            print("Saving image samples...")
+        if "imgs" in vis:
+            if verbose:
+                print("Saving image samples...")
             save_images(images, pattern_of("images", step, "png"), idx)
 
         # Save latent vectors
-        if save_ltnts:
-            print("Saving latents...")
+        if "ltnts" in vis:
+            if verbose:
+                print("Saving latents...")
             misc.save_npys(latents, pattern_of("latents-z", step, "npy"), idx)
             misc.save_npys(wlatents, pattern_of("latents-w", step, "npy"), idx)
 
         # For the GANsformer model, save attention maps
         if attention:
-            if save_maps:
+            if "maps" in vis:
                 soft_maps = attmaps_all_layers[:,:,-1,0]
 
-                pallete = np.expand_dims(get_colors(components_num), axis = [2, 3])
+                pallete = np.expand_dims(misc.get_colors(components_num), axis = [2, 3])
                 maps = (soft_maps == np.amax(soft_maps, axis = 1, keepdims = True)).astype(float)
 
                 soft_maps = np.sum(pallete * np.expand_dims(soft_maps, axis = 2), axis = 1)
                 maps = np.sum(pallete * np.expand_dims(maps, axis = 2), axis = 1)
 
-                print("Saving maps...")
+                if verbose:
+                    print("Saving maps...")
                 save_images(soft_maps, pattern_of("softmaps", step, "png"), idx)
                 save_images(maps, pattern_of("maps", step, "png"), idx)
 
@@ -167,7 +175,7 @@ def eval(G,
 
             # Save maps from all attention heads and layers
             # (for efficiency, only for a small number of images)
-            if save_layer_maps:
+            if "layer_maps" in vis:
                 all_maps = []
                 maps_fakes = np.split(attmaps_all_layers, attmaps_all_layers.shape[2], axis = 2)
                 for layer, lmaps in enumerate(maps_fakes):
@@ -177,7 +185,8 @@ def eval(G,
                         hmap = np.sum(pallete * hmap, axis = 1)
                         all_maps.append((hmap, "l{}_h{}".format(layer, head)))
 
-                print("Saving layer maps...")
+                if verbose:
+                    print("Saving layer maps...")
                 for i in trange(rich_num):
                     misc.mkdir(dnnlib.make_run_dir_path("eval/layer_maps/%06d" % i))
 
@@ -187,10 +196,11 @@ def eval(G,
 
     # Produce interpolations between pairs or source latents
     # In the GANsformer case, varying one component at a time
-    if save_interpolations:
+    if "interpolations" in vis:
         ts = np.array(np.linspace(0.0, 1.0, num = intrp_density, endpoint = True))
 
-        print("Generating interpolations...")
+        if verbose:
+            print("Generating interpolations...")
         for i in trange(rich_num):
             misc.mkdir(dnnlib.make_run_dir_path("eval/interpolations-z/%06d" % i))
             misc.mkdir(dnnlib.make_run_dir_path("eval/interpolations-w/%06d" % i))
@@ -240,8 +250,9 @@ def eval(G,
     # Compute noise variance map
     # Shows what areas vary the most given fixed source
     # latents due to the use of stochastic local noise
-    if save_noise_var:
-        print("Generating noise variance...")
+    if "noise_var" in vis:
+        if verbose:
+            print("Generating noise variance...")
         z = np.tile(np.random.randn(1, *G.input_shape[1:]), [noise_samples_num, 1, 1])
         imgs = G.run(z, labels, minibatch_size = batch_size)[0]
         imgs = np.stack([misc.to_pil(img, drange = drange_net) for img in imgs], axis = 0)
@@ -252,25 +263,26 @@ def eval(G,
     # Compute style mixing table, varying using the latent A in some of the layers and latent B in rest.
     # For the GANsformer, also produce component mixes (using latents from A in some of the components,
     # and latents from B in the rest.
-    if save_style_mix:
-        print("Generating style mixes...")
+    if "style_mix" in vis:
+        if verbose:
+            print("Generating style mixes...")
         cols, rows = 4, 2
         row_lens = np.array([2, 5, 8, 11])
 
         # Create latent mixes
         mixes = {
-            "layer": (np.arange(wlatents_layers.shape[2]) < row_lens[:,None]).astype(np.float32)[:,None,None,None,:,None],
-            "component": (np.arange(wlatents_layers.shape[1]) < row_lens[:,None]).astype(np.float32)[:,None,None,:,None,None]
+            "layer": (np.arange(wlatents_all_layers.shape[2]) < row_lens[:,None]).astype(np.float32)[:,None,None,None,:,None],
+            "component": (np.arange(wlatents_all_layers.shape[1]) < row_lens[:,None]).astype(np.float32)[:,None,None,:,None,None]
         }
-        ws = wlatents_layers[:cols+rows]
+        ws = wlatents_all_layers[:cols+rows]
         orig_imgs = images[:cols+rows]
-        col_ltnts = wlatents_layers[:cols][None, None]
-        row_ltnts = wlatents_layers[cols:cols+rows][None,:,None]
+        col_ltnts = wlatents_all_layers[:cols][None, None]
+        row_ltnts = wlatents_all_layers[cols:cols+rows][None,:,None]
 
         for name, mix in mixes.items():
             # Produce image mixes
             mix_ltnts = mix * row_ltnts  + (1 - mix) * col_ltnts
-            mix_ltnts = np.reshape(mix_ltnts, [-1, *wlatents_layers.shape[1:]])
+            mix_ltnts = np.reshape(mix_ltnts, [-1, *wlatents_all_layers.shape[1:]])
             mix_imgs = G.run(mix_ltnts, labels, randomize_noise = False, take_dlatents = True,
                 minibatch_size = batch_size)[0]
             mix_imgs = np.reshape(mix_imgs, [len(row_lens) * rows, cols, *mix_imgs.shape[1:]])
@@ -291,4 +303,5 @@ def eval(G,
 
             canvas.save(dnnlib.make_run_dir_path("eval/{}_mixing.png".format(name)))
 
-    print(misc.bcolored("Visualizations Completed!", "blue"))
+    if verbose:
+        print(misc.bcolored("Visualizations Completed!", "blue"))

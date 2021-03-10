@@ -1210,6 +1210,7 @@ def G_synthesis(
             noise = tf.random_normal(shape)
         else:
             # For k-GAN only, before merging, features have dimension batch_size * k
+            noise = noise_layers[layer_idx]
             if merge:
                 batch_mul = tf.cast(get_shape(x)[0] / get_shape(noise)[0], tf.int32)
                 noise = tf.tile(noise, (batch_mul, 1, 1, 1))

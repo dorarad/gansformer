@@ -314,28 +314,34 @@ def save_gif(imgs, filename, duration = 50):
     imgs[0].save(filename, save_all = True, append_images = imgs[1:], duration = duration, loop = 0)
 
 # Save a list of images with ordering and according to a path template
-def save_images_builder(drange, grid = False):
+def save_images_builder(drange, grid_size, grid = False, verbose = False):
     def save_images(imgs, path, offset = 0):
         if grid:
-            misc.save_img_grid(grid_fakes, dnnlib.make_run_dir_path(path % offset))
+            save_img_grid(imgs, dnnlib.make_run_dir_path(path % offset), grid_size)
         else:
-            for i, img in tqdm(list(enumerate(imgs))):
-                misc.to_pil(img, drange = drange).save(dnnlib.make_run_dir_path(path % (offset + i)))
+            imgs = enumerate(imgs)
+            if verbose:
+                imgs = tqdm(list(imgs))
+            for i, img in imgs:
+                to_pil(img, drange = drange).save(dnnlib.make_run_dir_path(path % (offset + i)))
     return save_images
 
 # Save a list of blended two-layer images with ordering and according to a path template
-def save_blends_builder(drange, grid = False, alpha = 0.3):
+def save_blends_builder(drange, grid_size, grid = False, verbose = False, alpha = 0.3):
     def save_blends(imgs_a, imgs_b, path, offset = 0):
         if grid:
-            img_a = to_pil(create_img_grid(imgs, grid_size), drange)
-            img_b = to_pil(create_img_grid(imgs, grid_size), drange)
+            img_a = to_pil(create_img_grid(imgs_a, grid_size), drange)
+            img_b = to_pil(create_img_grid(imgs_b, grid_size), drange)
             blend = PIL.Image.blend(img_a, img_b, alpha = alpha)
             blend.save(dnnlib.make_run_dir_path(path % offset))
         else:
             img_pairs = zip(imgs_a, listimgs_b)
-            for i, (img_a, img_b) in tqdm(list(enumerate(img_pairs))):
-                img_a = misc.to_pil(img_a, drange = drange)
-                img_b = misc.to_pil(img_b, drange = drange)
+            img_pairs = enumerate(img_pairs)
+            if verbose:
+                img_pairs = tqdm(list(img_pairs))            
+            for i, (img_a, img_b) in img_pairs:
+                img_a = to_pil(img_a, drange = drange)
+                img_b = to_pil(img_b, drange = drange)
                 blend = PIL.Image.blend(img_a, img_b, alpha = alpha)
                 blend.save(dnnlib.make_run_dir_path(path % (offset + i)))
     return save_blends

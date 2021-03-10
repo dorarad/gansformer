@@ -2,6 +2,7 @@
 # file caching, progress reports and printing.
 import os
 import time
+import pickle
 import hashlib
 import numpy as np
 import tensorflow as tf
@@ -27,7 +28,7 @@ class MetricBase:
         self._reset()
 
     # Loading data from previous training runs
-    def parse_config_for_previous_run(run_dir):
+    def _parse_config_for_previous_run(self, run_dir):
         with open(os.path.join(run_dir, "submit_config.pkl"), "rb") as f:
             data = pickle.load(f)
         data = data.get("run_func_kwargs", {})
@@ -49,7 +50,7 @@ class MetricBase:
         self._results = []
 
         if run_dir is not None and (dataset_args is None or mirror_augment is None):
-            run_config = parse_config_for_previous_run(run_dir)
+            run_config = self._parse_config_for_previous_run(run_dir)
             self._dataset_args = dict(run_config["dataset"])
             self._mirror_augment = run_config["train"].get("mirror_augment", False)
 
@@ -183,7 +184,7 @@ class MetricBase:
     #   minibatch_size: size of batches provides by the image iterator
     #   num_imgs: number of extracted images
     # Returns the features [num_imgs, featurizer.output_shape[1]]
-    def _get_feats(self, img_iter, featurizer, minibatch_size, num_imgs):
+    def _get_feats(self, img_iter, featurizer, minibatch_size, num_gpus, num_imgs):
         feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
 
         for idx, imgs in enumerate(img_iter):
@@ -221,10 +222,10 @@ class MetricBase:
                 result_expr.append(featurizer.clone().get_output_for(imgs))
 
         # Compute features for newly generated 'num_imgs' images
-        feats = np.empty([self.num_imgs, model.output_shape[1]], dtype = np.float32)
-        for begin in range(0, self.num_imgs, minibatch_size):
-            self._report_progress(begin, self.num_imgs)
-            end = min(begin + minibatch_size, self.num_imgs)
+        feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
+        for begin in range(0, num_imgs, minibatch_size):
+            self._report_progress(begin, num_imgs)
+            end = min(begin + minibatch_size, num_imgs)
             feats[begin:end] = np.concatenate(tflib.run(result_expr), axis = 0)[:end-begin]
         return feats
 
@@ -236,7 +237,7 @@ class MetricBase:
     #   minibatch_size: size of batches provides by the image iterator
     #   num_imgs: number of extracted images
     # Returns the features [num_imgs, featurizer.output_shape[1]]
-    def _paths_to_feats(self, paths, featurizer, minibatch_size, num_imgs = None):
+    def _paths_to_feats(self, paths, featurizer, minibatch_size, num_gpus, num_imgs = None):
         paths = glob.glob(paths)
         if num_imgs is not None:
             paths = paths[:num_imgs]
@@ -245,7 +246,7 @@ class MetricBase:
         print("Evaluting FID on {} imgs.".format(num_imgs))
 
         imgs = self._iterate_files(paths, minibatch_size)
-        feats = self._get_feats(imgs, featurizer, num_imgs, minibatch_size)
+        feats = self._get_feats(imgs, featurizer, num_gpus, num_imgs, minibatch_size)
         return feats
 
 # Group of multiple metrics

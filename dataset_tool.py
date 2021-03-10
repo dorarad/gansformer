@@ -18,6 +18,7 @@ from tqdm import tqdm
 import seaborn as sns
 import math
 import os
+import tensorflow_datasets as tfds
 
 def error(msg):
     print("Error: " + msg)
@@ -676,7 +677,7 @@ def pad_min_square(img):
 # - shuffle: whether to shuffle the dataset before saving
 def create_from_imgs(tfrecord_dir, img_dir, shuffle, ratio = None):
     print("Loading images from %s" % img_dir)
-    img_filenames = sorted(glob.glob(os.path.join(img_dir, "*")))
+    img_filenames = sorted(glob.glob("{}/**/*.png".format(img_dir)))
     if len(img_filenames) == 0:
         error("No input images found")
 
@@ -695,6 +696,26 @@ def create_from_imgs(tfrecord_dir, img_dir, shuffle, ratio = None):
         order = tfr.choose_shuffled_order() if shuffle else np.arange(len(img_filenames))
         for idx in range(order.size):
             img = PIL.Image.open(img_filenames[order[idx]]).convert("RGB")
+
+            img = crop_max_rectangle(img, ratio)
+            img = pad_min_square(img)
+
+            pow2size = 2 ** int(np.round(np.log2(img.size[0])))
+            img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
+
+            img = np.asarray(img)
+            if channels == 1:
+                img = img[np.newaxis, :, :] # HW => CHW
+            else:
+                img = img.transpose([2, 0, 1]) # HWC => CHW
+            tfr.add_img(img)
+
+def create_from_tfds(tfrecord_dir, dataset_name, ratio = None):
+    print("Loading dataset %s" % dataset_name)
+    ds = tfds.load(dataset_name, split = "train")
+    with TFRecordExporter(tfrecord_dir, len(img_filenames)) as tfr:
+        for ex in tfds.as_numpy(ds):
+            img = PIL.Image.fromarray(ex["imaegs"])
 
             img = crop_max_rectangle(img, ratio)
             img = pad_min_square(img)

@@ -213,7 +213,7 @@ def create_var_with_large_initial_value(initial_value: np.ndarray, *args, **kwar
 # images conversions
 #----------------------------------------------------------------------------
 
-def convert_images_from_uint8(images, drange=[-1,1], nhwc_to_nchw = False):
+def convert_imgs_from_uint8(images, drange=[-1,1], nhwc_to_nchw = False):
     # Convert a minibatch of images from uint8 to float32 with configurable dynamic range
     # Can be used as an input transformation for Network.run()
     images = tf.cast(images, tf.float32)
@@ -221,7 +221,7 @@ def convert_images_from_uint8(images, drange=[-1,1], nhwc_to_nchw = False):
         images = tf.transpose(images, [0, 3, 1, 2])
     return images * ((drange[1] - drange[0]) / 255) + drange[0]
 
-def convert_images_to_uint8(images, drange=[-1,1], nchw_to_nhwc = False, shrink = 1, lst = False):
+def convert_imgs_to_uint8(images, drange=[-1,1], nchw_to_nhwc = False, shrink = 1, lst = False):
     # Convert a minibatch of images from float32 to uint8 with configurable dynamic range
     # Can be used as an output transformation for Network.run()
     if lst:

@@ -115,8 +115,8 @@ def run(**args):
         "num": "vis_num",
         "rich_num": "vis_rich_num",
         "section_size": "vis_section_size",
-        "intrp_density": "intrpolation_density",
-        "intrp_per_component": "intrpolation_per_component",
+        "intrp_density": "interpolation_density",
+        "intrp_per_component": "interpolation_per_component",
         "alpha": "blending_alpha"
     }
     for arg, cmd_arg in vis_args.items():
@@ -206,15 +206,15 @@ def run(**args):
     # directory: 'args.expname:001' after the first restart, then 'args.expname:002' after the second, etc.
 
     # Find the latest directory that matches the experiment
-    exp_dir = sorted(glob.glob("{}/{}:*".format(args.result_dir, args.expname)))
+    exp_dir = sorted(glob.glob("{}/{}-*".format(args.result_dir, args.expname)))
     run_id = 0
     if len(exp_dir) > 0:
-        run_id = int(exp_dir[-1].split(":")[-1])
+        run_id = int(exp_dir[-1].split("-")[-1])
     # If restart, then work over a new directory
     if args.restart:
         run_id += 1
 
-    run_name = "{}:{:03d}".format(args.expname, run_id)
+    run_name = "{}-{:03d}".format(args.expname, run_id)
     train.printname = "{} ".format(misc.bold(args.expname))
 
     snapshot, kimg, resume = None, 0, False
@@ -239,7 +239,7 @@ def run(**args):
         resume = True
 
     if snapshot:
-        print(misc.bcolored("Resuming {}, kimg {}".format(snapshot, kimg), "white"))
+        print(misc.bcolored("Resuming {}, kimg {}".format(run_name, kimg), "white"))
         train.resume_pkl = snapshot
         train.resume_kimg = kimg
     else:
@@ -338,7 +338,7 @@ def main():
     parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images " +
                                                        "(used only for visualizations, _not used_ in training or for computing metrics) (default: %(default)s)", default = 0.65, type = float)
     parser.add_argument("--keep-samples",       help = "Keep all prior samples during training, or if False, just the most recent ones (default: False)", default = None, action = "store_true")
-    parser.add_argument("--eval-images-num",    help = "Number of images to evaluate metrics on (default: 50,000)", default = None, type = float)
+    parser.add_argument("--eval-images-num",    help = "Number of images to evaluate metrics on (default: 50,000)", default = None, type = int)
 
     ## Visualization
     parser.add_argument("--vis-images",         help = "Save image samples", default = None, action = "store_true")
@@ -349,13 +349,13 @@ def main():
     parser.add_argument("--vis-noise-var",      help = "Create noise variation visualization", default = None, action = "store_true")
     parser.add_argument("--vis-style-mix",      help = "Create style mixing visualization", default = None, action = "store_true")
 
-    parser.add_argument("--vis-grid",               help = "Whether to save the samples in one large grid files (default: True in training)", default = None, action = "store_true")
-    parser.add_argument("--vis-num",            help = "Image height/width ratio in the dataset", default = None, type = int)
-    parser.add_argument("--vis-rich-num",       help = "Number of samples for which richer visualizations will be created (default: 5)", default = None, type = int)
-    parser.add_argument("--vis-section-size",       help = "Visualization section size to process at one (section-size <= vis-num) for memory footprint (default: 100)", default = None, type = int)
-    parser.add_argument("--blending-alpha",     help = "Proportion for generated images and attention maps blends (default: 0.3)", default = None, type = float)
-    parser.add_argument("--intrpolation-density",       help = "Number of samples in between two end points of an interpolation (default: 8)", default = None, type = int)
-    parser.add_argument("--intrpolation-per-component", help = "Whether to perform interpolation along particular latent components when true, or all of them at once otherwise (default: False)", default = None, action = "store_true")
+    parser.add_argument("--vis-grid",                    help = "Whether to save the samples in one large grid files (default: True in training)", default = None, action = "store_true")
+    parser.add_argument("--vis-num",                     help = "Image height/width ratio in the dataset", default = None, type = int)
+    parser.add_argument("--vis-rich-num",                help = "Number of samples for which richer visualizations will be created (default: 5)", default = None, type = int)
+    parser.add_argument("--vis-section-size",            help = "Visualization section size to process at one (section-size <= vis-num) for memory footprint (default: 100)", default = None, type = int)
+    parser.add_argument("--blending-alpha",              help = "Proportion for generated images and attention maps blends (default: 0.3)", default = None, type = float)
+    parser.add_argument("--interpolation-density",       help = "Number of samples in between two end points of an interpolation (default: 8)", default = None, type = int)
+    parser.add_argument("--interpolation-per-component", help = "Whether to perform interpolation along particular latent components when true, or all of them at once otherwise (default: False)", default = None, action = "store_true")
 
     # Model
     # ------------------------------------------------------------------------------------------------------

@@ -21,7 +21,7 @@ class IS(metric_base.MetricBase):
 
         if paths is not None:
             # Extract features for local sample image files (paths)
-            feats = self._paths_to_feats(paths, inception_func, minibatch_size, num_imgs)
+            feats = self._paths_to_feats(paths, inception_func, minibatch_size, num_gpus, num_imgs)
         else:
             # Extract features for newly generated fake images
             feats = self._gen_feats(Gs, inception, minibatch_size, num_imgs, num_gpus, Gs_kwargs)

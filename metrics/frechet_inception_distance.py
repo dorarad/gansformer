@@ -38,17 +38,17 @@ class FID(metric_base.MetricBase):
             mu_real, sigma_real = misc.load_pkl(cache_file)
         else:
             imgs_iter = self._iterate_reals(minibatch_size = minibatch_size)
-            feats_real = self._get_feats(imgs_iter, inception, minibatch_size)
+            feats_real = self._get_feats(imgs_iter, inception, minibatch_size, num_gpus, num_imgs)
             mu_real, sigma_real = self._feats_to_stats(feats_real)
             misc.save_pkl((mu_real, sigma_real), cache_file)
 
         if paths is not None:
             # Extract features for local sample image files (paths)
-            feats = self._paths_to_feats(paths, inception_func, minibatch_size, num_imgs)
+            feats = self._paths_to_feats(paths, inception_func, minibatch_size, num_gpus, num_imgs)
         else:
             # Extract features for newly generated fake images
             feats = self._gen_feats(Gs, inception, minibatch_size, num_imgs, num_gpus, Gs_kwargs)
 
         # Compute FID
-        mu_fake, sigma_fake = _feats_to_stats(feats)
+        mu_fake, sigma_fake = self._feats_to_stats(feats)
         self._report_result(self.compute_fid(mu_real, sigma_real, mu_fake, sigma_fake))

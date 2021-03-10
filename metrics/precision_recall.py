@@ -167,13 +167,13 @@ class PR(metric_base.MetricBase):
             ref_features = misc.load_pkl(cache_file)
         else:
             imgs_iter = self._iterate_reals(minibatch_size = minibatch_size)
-            ref_features = self._get_feats(imgs_iter, feature_net, minibatch_size, num_imgs)
+            ref_features = self._get_feats(imgs_iter, feature_net, minibatch_size, num_gpus, num_imgs)
 
             misc.save_pkl(ref_features, cache_file)
 
         if paths is not None:
             # Extract features for local sample image files (paths)
-            feats = self._paths_to_feats(paths, feat_func, minibatch_size)
+            feats = self._paths_to_feats(paths, feat_func, minibatch_size, num_gpus, num_imgs)
         else:
             # Extract features for newly generated fake imgs
             feats = self._gen_feats(Gs, inception, minibatch_size, num_gpus, Gs_kwargs)

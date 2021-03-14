@@ -215,7 +215,7 @@ def adjust_dynamic_range(data, drange_in, drange_out, hsv = False):
 
 def adjust_dynamic_range_aux(data, drange_in, drange_out):
     if drange_in != drange_out:
-        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / 
+        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / \
             (np.float32(drange_in[1]) - np.float32(drange_in[0]))
         bias = (np.float32(drange_out[0]) - np.float32(drange_in[0]) * scale)
         data = data * scale + bias

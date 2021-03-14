@@ -1,3 +1,8 @@
+# import warnings filter
+from warnings import simplefilter
+# ignore all future warnings
+simplefilter(action='ignore', category=FutureWarning)
+
 import argparse
 import copy
 import glob

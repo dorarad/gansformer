@@ -12,20 +12,15 @@ import numpy as np
 import tensorflow as tf
 import PIL.Image
 import cv2
-import matplotlib.pyplot as plt
-from collections import defaultdict
-from tqdm import tqdm
-import seaborn as sns
-import math
-import os
-import tensorflow_datasets as tfds
+import io
+from tqdm import tqdm, trange
 
 def error(msg):
     print("Error: " + msg)
     exit(1)
 
 class TFRecordExporter:
-    def __init__(self, tfrecord_dir, expected_imgs, verbose = False, progress_interval = 10):
+    def __init__(self, tfrecord_dir, expected_imgs, verbose = False, progress_interval = 10, shards_num = 5):
         self.tfrecord_dir       = tfrecord_dir
         self.tfr_prefix         = os.path.join(self.tfrecord_dir, os.path.basename(self.tfrecord_dir))
         self.expected_imgs      = expected_imgs
@@ -37,6 +32,7 @@ class TFRecordExporter:
         self.progress_interval  = progress_interval
         self.writer_index       = 0
         self.initialized        = False
+        self.shards_num         = shards_num
 
         if self.verbose:
             print("Creating dataset %s" % tfrecord_dir)
@@ -62,7 +58,7 @@ class TFRecordExporter:
         np.random.RandomState(123).shuffle(order)
         return order
 
-    def add_img(self, img, shards_num = 5):
+    def add_img(self, img):
         if self.verbose and self.curr_imgnum % self.progress_interval == 0:
             print("%d / %d\r" % (self.curr_imgnum, self.expected_imgs), end = "", flush = True)
 
@@ -75,11 +71,13 @@ class TFRecordExporter:
 
             for lod in range(self.resolution_log2 - 1):
                 tfr_writers_lod = []
-                for shard in range(shards_num):
-                    tfr_opt = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.NONE)
-                    tfr_file = self.tfr_prefix + "-r%02d.tfrecords%dof%d" % (self.resolution_log2 - lod, shard + 1, shards_num)
-                    tfr_writers_lod.append(tf.python_io.TFRecordWriter(tfr_file, tfr_opt))
+                for shard in range(self.shards_num):
+                    tfr_opt = tf.io.TFRecordOptions("")
+                    tfr_file = self.tfr_prefix + "-r%02d.tfrecords%dof%d" % (self.resolution_log2 - lod, shard + 1, self.shards_num)
+                    tfr_writers_lod.append(tf.io.TFRecordWriter(tfr_file, tfr_opt))
                 self.tfr_writers.append(tfr_writers_lod)
+
+            self.initialized = True
 
         assert img.shape == self.shape
 
@@ -100,7 +98,7 @@ class TFRecordExporter:
 
             tfr_writers[self.writer_index].write(ex.SerializeToString())
 
-        self.writer_index = (self.writer_index + 1) % shards_num
+        self.writer_index = (self.writer_index + 1) % self.shards_num
         self.curr_imgnum += 1
 
     def add_labels(self, labels):
@@ -675,11 +673,13 @@ def pad_min_square(img):
 # - tfrecord_dir: the output directory
 # - img_dir: the input directory
 # - shuffle: whether to shuffle the dataset before saving
-def create_from_imgs(tfrecord_dir, img_dir, shuffle, ratio = None):
+def create_from_imgs(tfrecord_dir, img_dir, shuffle = False, ratio = None, max_imgs = None, shards_num = 5):
     print("Loading images from %s" % img_dir)
     img_filenames = sorted(glob.glob("{}/**/*.png".format(img_dir)))
     if len(img_filenames) == 0:
         error("No input images found")
+    if max_imgs is None:
+        max_imgs =len(img_filenames)
 
     # Check image shape
     img = np.asarray(PIL.Image.open(img_filenames[0]).convert("RGB"))
@@ -692,9 +692,9 @@ def create_from_imgs(tfrecord_dir, img_dir, shuffle, ratio = None):
     # if resolution != 2 ** int(np.floor(np.log2(resolution))):
     #     error("Input image resolution must be a power-of-two")
 
-    with TFRecordExporter(tfrecord_dir, len(img_filenames)) as tfr:
+    with TFRecordExporter(tfrecord_dir, len(img_filenames), shards_num = shards_num) as tfr:
         order = tfr.choose_shuffled_order() if shuffle else np.arange(len(img_filenames))
-        for idx in range(order.size):
+        for idx in trange(max_imgs):
             img = PIL.Image.open(img_filenames[order[idx]]).convert("RGB")
 
             img = crop_max_rectangle(img, ratio)
@@ -710,12 +710,14 @@ def create_from_imgs(tfrecord_dir, img_dir, shuffle, ratio = None):
                 img = img.transpose([2, 0, 1]) # HWC => CHW
             tfr.add_img(img)
 
-def create_from_tfds(tfrecord_dir, dataset_name, ratio = None):
+def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, shards_num = 64):
+    import tensorflow_datasets as tfds
+
     print("Loading dataset %s" % dataset_name)
-    ds = tfds.load(dataset_name, split = "train")
-    with TFRecordExporter(tfrecord_dir, len(img_filenames)) as tfr:
-        for ex in tfds.as_numpy(ds):
-            img = PIL.Image.fromarray(ex["imaegs"])
+    ds = tfds.load(dataset_name, split = "train", data_dir = "{}/tfds".format(tfrecord_dir))
+    with TFRecordExporter(tfrecord_dir, len(img_filenames), shards_num = shards_num) as tfr:
+        for ex in tqdm(tfds.as_numpy(ds)):
+            img = PIL.Image.fromarray(ex["image"])
 
             img = crop_max_rectangle(img, ratio)
             img = pad_min_square(img)
@@ -724,11 +726,35 @@ def create_from_tfds(tfrecord_dir, dataset_name, ratio = None):
             img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
 
             img = np.asarray(img)
-            if channels == 1:
-                img = img[np.newaxis, :, :] # HW => CHW
-            else:
-                img = img.transpose([2, 0, 1]) # HWC => CHW
+            img = img.transpose([2, 0, 1]) # HWC => CHW
             tfr.add_img(img)
+
+def create_from_lmdb(tfrecord_dir, lmdb_dir, ratio = None, max_imgs = None, shards_num = 64):
+    import lmdb
+    print("Loading dataset %s" % lmdb_dir)
+
+    with lmdb.open(lmdb_dir, readonly = True).begin(write = False) as txn:
+        if max_imgs is None:
+            max_imgs = txn.stat()["entries"]
+            
+        with TFRecordExporter(tfrecord_dir, max_imgs, verbose = False, shards_num = shards_num) as tfr:
+            for idx, (_key, value) in tqdm(enumerate(txn.cursor()), total = max_imgs):
+                # try:
+                img = PIL.Image.open(io.BytesIO(value))
+
+                img = crop_max_rectangle(img, ratio)
+                img = pad_min_square(img)
+
+                pow2size = 2 ** int(np.round(np.log2(img.size[0])))
+                img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
+
+                img = np.asarray(img)
+                img = img.transpose([2, 0, 1]) # HWC => CHW
+                tfr.add_img(img)
+                # except:
+                #     print(sys.exc_info()[1])
+                if tfr.curr_imgnum == max_imgs:
+                    break
 
 def create_from_npy(tfrecord_dir, npy_filename, shuffle):
     print("Loading NPY archive from %s" % npy_filename)

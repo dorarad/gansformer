@@ -78,7 +78,7 @@ def download_file(url, dir = None, path = None, unzip = False, drive = False, md
     if unzip:
         unzip_fn(path, dir)
 
-def task(task, name, size, dir, redownload, download = None, prepare = lambda: None):
+def prepare_task(task, name, size, dir, redownload, download = None, prepare = lambda: None):
     # try:
     if task:
         print(misc.bcolored("Preparing the {} dataset...".format(name), "blue"))
@@ -100,18 +100,18 @@ def prepare(tasks, data_dir, redownload, shards_num = None, max_images = None):
         mkdir("{}/{}".format(data_dir, task))
 
     if "ffhq" in tasks:
-        task("ffhq", "FFHQ", 13, data_dir, redownload,
+        prepare_task("ffhq", "FFHQ", 13, data_dir, redownload,
             download = lambda: download_file(urls["ffhq"]["url"], data_dir, drive = True,
                 path = urls["ffhq"]["path"], md5 = urls["ffhq"]["md5"]))
     if "clevr" in tasks:
         shards_num = shards_num or 5
-        task("clevr", "CLEVR", 18, data_dir, redownload, 
+        prepare_task("clevr", "CLEVR", 18, data_dir, redownload, 
             download = lambda: download_file(urls["clevr"], "{}/clevr".format(data_dir), unzip = True),
             prepare = lambda: dataset_tool.create_from_imgs("{}/clevr".format(data_dir), "{}/clevr/CLEVR_v1.0/images".format(data_dir), 
                 ratio = 0.75, shards_num = shards_num, max_imgs = max_images))
     if "bedrooms" in tasks:
         shards_num = shards_num or 32
-        task("bedrooms", "LSUN-Bedrooms", 43, data_dir, redownload, 
+        prepare_task("bedrooms", "LSUN-Bedrooms", 43, data_dir, redownload, 
             download = lambda: download_file(urls["bedrooms"], "{}/bedrooms".format(data_dir), unzip = True),
             prepare = lambda: dataset_tool.create_from_lmdb("{}/bedrooms".format(data_dir), 
                  "{}/bedrooms/bedroom_train_lmdb".format(data_dir), ratio = 188/256, 

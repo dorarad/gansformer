@@ -145,6 +145,10 @@ class Optimizer:
                     (grads, _) = tf.clip_by_global_norm(grads, clip_norm = self.clip, use_norm = norm)
             grad_list = zip(grads, varnames)
 
+            # Ignore corrupted gradients that contain NaNs/Infs
+            def is_bad(grad): return tf.logical_or(tf.math,is_nan(grad), tf.math.is_inf(grad))
+            grad_list = [(tf.where(is_bad(grad), tf.zeros_like(grad), grad), varname) for grad, varname in grad_list]
+
         # Register gradients
         for grad, var in grad_list:
             if var not in device.grad_raw:

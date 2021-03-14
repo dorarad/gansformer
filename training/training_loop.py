@@ -144,7 +144,7 @@ def training_loop(
     metric_arg_list         = [],       # MetricGroup Options
     tf_config               = {},       # tflib.init_tf() options
     eval                    = False,    # Evaluation mode
-    train                   = True,     # Training mode
+    train                   = False,    # Training mode
     # Data
     data_dir                = None,     # Directory to load datasets from
     total_kimg              = 25000,    # Total length of the training, measured in thousands of real images
@@ -162,7 +162,6 @@ def training_loop(
     recompile               = False,    # Recompile network from source code (otherwise loads from snapshot)
     # Logging
     summarize               = True,     # Create TensorBoard summaries
-    keep_samples            = False,    # Keep all prior samples during training
     save_tf_graph           = False,    # Include full TensorFlow computation graph in the tfevents file?
     save_weight_histograms  = False,    # Include weight histograms in the tfevents file?
     img_snapshot_ticks      = 3,        # How often to save image snapshots? None = only save "reals.png" and "fakes-init.png".
@@ -292,6 +291,7 @@ def training_loop(
     tick_start_nimg = cur_nimg
     for cN in [cG, cD]:
         cN.lossvals_agg = {k: None for k in ["loss", "reg", "norm", "reg_norm"]}
+        cN.opt.reset_optimizer_state()
 
     # Training loop
     while cur_nimg < total_kimg * 1000:
@@ -302,8 +302,6 @@ def training_loop(
         sched = training_schedule(sched_args, cur_nimg = cur_nimg, dataset = dataset)
         assert sched.minibatch_size % (sched.minibatch_gpu * num_gpus) == 0
         dataset.configure(sched.minibatch_gpu)
-        for cN in [cG, cD]:
-            cN.opt.reset_optimizer_state()
 
         # Run training ops
         feed_dict = {
@@ -354,7 +352,7 @@ def training_loop(
             total_time = dnnlib.RunContext.get().get_time_since_start() + resume_time
 
             # Report progress
-            print("tick %s kimg %s loss/reg: G (%s %s) D (%s %s), grad norms: G (%s %s) D (%s %s) time %s sec/tick %s sec/kimg %s %s" % (
+            print("tick %s kimg %s loss/reg: G (%s %s) D (%s %s), grad norms: G (%s %s) D (%s %s) time %s sec/tick %s sec/kimg %s maintenance %ss peak GPUmem %sGB %s" % (
                 misc.bold("%-5d" % autosummary("Progress/tick", cur_tick)),
                 misc.bcolored("%-8.1f" % autosummary("Progress/kimg", cur_nimg / 1000.0), "red"),
                 misc.bcolored("%.3f" % (cG.lossvals_agg["loss"] or 0), "blue"),
@@ -368,6 +366,8 @@ def training_loop(
                 misc.bold("%-6s" % dnnlib.util.format_time(autosummary("Timing/total_sec", total_time))),
                 "%-6.1f" % autosummary("Timing/sec_per_tick", tick_time),
                 "%-7.2f" % autosummary("Timing/sec_per_kimg", tick_time / tick_kimg),
+                "%2.1f" % autosummary("Timing/maintenance_sec", maintenance_time),
+                "%2.1f" % autosummary("Resources/peak_gpu_mem_gb", peak_gpu_mem_op.eval() / 2**30),                
                 printname))
 
             autosummary("Timing/total_hours", total_time / (60.0 * 60.0))

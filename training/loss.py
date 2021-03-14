@@ -98,8 +98,6 @@ def D_loss(G, D,
         loss += tf.maximum(0.0, 1.0 - real_scores_out)
     elif loss_type == "wgan":
         loss = fake_scores_out - real_scores_out
-
-    if loss_type == "wgan":
         with tf.name_scope("EpsilonPenalty"):
             epsilon_penalty = autosummary("Loss/epsilon_penalty", tf.square(real_scores_out))
             loss += epsilon_penalty * wgan_epsilon

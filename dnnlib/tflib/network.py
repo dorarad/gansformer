@@ -57,7 +57,7 @@ class Network:
     #     name: User-specified name, defaults to build func name if None
     #     scope: Unique TensorFlow scope containing template graph and variables, derived from the user-specified name
     #     static_kwargs: Arguments passed to the user-supplied build func
-    #     subnets: Container for sub-networks. Passed to the build func, and retained between calls
+    #     components: Container for sub-networks. Passed to the build func, and retained between calls
     #     num_inputs: Number of input tensors
     #     num_outputs: Number of output tensors
     #     input_shapes: Input tensor shapes (NC or NCHW), including minibatch dimension
@@ -103,7 +103,7 @@ class Network:
         self.name = None
         self.scope = None
         self.static_kwargs = util.EasyDict()
-        self.subnets = util.EasyDict()
+        self.components = util.EasyDict()
         self.num_inputs = 0
         self.num_outputs = 0
         self.input_shapes = [[]]
@@ -147,7 +147,7 @@ class Network:
         # Finalize build func kwargs
         build_kwargs = dict(self.static_kwargs)
         build_kwargs["is_template_graph"] = True
-        build_kwargs["subnets"] = self.subnets
+        build_kwargs["components"] = self.components
 
         # Build template graph
         with tfutil.absolute_variable_scope(self.scope, reuse = False), tfutil.absolute_name_scope(self.scope):  # ignore surrounding scopes
@@ -169,10 +169,10 @@ class Network:
             raise ValueError("Network input shapes not defined. Please call x.set_shape() for each input.")
         if any(t.shape.ndims is None for t in self.output_templates):
             raise ValueError("Network output shapes not defined. Please call x.set_shape() where applicable.")
-        if any(not isinstance(subnet, Network) for subnet in self.subnets.values()):
-            raise ValueError("Subnets of a Network must be Networks themselves.")
-        if len(self.subnets) != len(set(subnet.name for subnet in self.subnets.values())):
-            raise ValueError("Subnets of a Network must have unique names.")
+        if any(not isinstance(component, Network) for component in self.components.values()):
+            raise ValueError("components of a Network must be Networks themselves.")
+        if len(self.components) != len(set(component.name for component in self.components.values())):
+            raise ValueError("components of a Network must have unique names.")
 
         # List inputs and outputs.
         self.input_shapes = [t.shape.as_list() for t in self.input_templates]
@@ -184,7 +184,7 @@ class Network:
         # List variables.
         self.own_vars = OrderedDict((var.name[len(self.scope) + 1:].split(":")[0], var) for var in tf.global_variables(self.scope + "/"))
         self.vars = OrderedDict(self.own_vars)
-        self.vars.update((subnet.name + "/" + name, var) for subnet in self.subnets.values() for name, var in subnet.vars.items())
+        self.vars.update((component.name + "/" + name, var) for component in self.components.values() for name, var in component.vars.items())
         self.trainables = OrderedDict((name, var) for name, var in self.vars.items() if var.trainable)
         self.var_global_to_local = OrderedDict((var.name.split(":")[0], name) for name, var in self.vars.items())
 
@@ -206,7 +206,7 @@ class Network:
         if len(in_expr) > self.num_inputs:
             in_expr = in_expr[:self.num_inputs]
         if len(in_expr) < self.num_inputs:
-            in_expr = in_expr + (tf.zeros([tf.shape(in_expr[0])[0]]), )
+            in_expr = in_expr + (None,) * (self.num_inputs - len(in_expr))
         assert len(in_expr) == self.num_inputs
         assert not all(expr is None for expr in in_expr)
 
@@ -214,7 +214,7 @@ class Network:
         build_kwargs = dict(self.static_kwargs)
         build_kwargs.update(dynamic_kwargs)
         build_kwargs["is_template_graph"] = False
-        build_kwargs["subnets"] = self.subnets
+        build_kwargs["components"] = self.components
 
         # Build TensorFlow graph to evaluate the network
         with tfutil.absolute_variable_scope(self.scope, reuse = True), tf.name_scope(self.name):
@@ -267,7 +267,7 @@ class Network:
         state["version"]            = 4
         state["name"]               = self.name
         state["static_kwargs"]      = dict(self.static_kwargs)
-        state["subnets"]            = dict(self.subnets)
+        state["components"]            = dict(self.components)
         state["build_module_src"]   = self._build_module_src
         state["build_func_name"]    = self._build_func_name
         state["variables"]          = list(zip(self.own_vars.keys(), tfutil.run(list(self.own_vars.values()))))
@@ -286,7 +286,7 @@ class Network:
         assert state["version"] in [2, 3, 4]
         self.name = state["name"]
         self.static_kwargs = util.EasyDict(state["static_kwargs"])
-        self.subnets = util.EasyDict(state.get("subnets", {}))
+        self.components = util.EasyDict(state.get("components", {}))
         self._build_module_src = state["build_module_src"]
         self._build_func_name = state["build_func_name"]
 
@@ -332,12 +332,19 @@ class Network:
         # Copy the values of all variables from the given network, including sub-networks.
         names = [name for name in self.vars.keys() if self.translate(name) in src_net.vars]
         uninitialized = [name for name in self.vars.keys() if self.translate(name) not in src_net.vars]
+        # excess = [name for name in src_net.vars.keys() if self.translate(name) not in self.vars]
+
         names_new = []
         mismatch = False
 
+        # if len(excess) > 0:
+        #     print(bcolored("Excess variables:", "red"))
+        #     for name in excess:
+        #         print("{}: {}".format(bold(name), src_net.vars[name].shape))
+
         if len(uninitialized) > 0:
             print(bcolored("Uninitialized variables:", "red"))
-            for var in uninitialized:
+            for name in uninitialized:
                 print("{}: {}".format(bold(name), self.vars[name].shape))
 
         for name in names:

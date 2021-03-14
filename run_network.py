@@ -1,9 +1,6 @@
 ####################################################################################################################################################
 # The code is still going through some refactoring and clean-up. Will be ready in couple days!
 ####################################################################################################################################################
-from warnings import simplefilter
-simplefilter(action = "ignore", category = FutureWarning)
-
 import argparse
 import copy
 import glob
@@ -42,6 +39,14 @@ def run(**args):
     vis       = EasyDict()                                                       # visualize.eval() options
     grid      = EasyDict(size = "1080p", layout = "random")                      # setup_snapshot_img_grid() options
     sc        = dnnlib.SubmitConfig()                                            # dnnlib.submit_run() options
+
+    # If the flag is specified without arguments (--arg), set to True
+    for arg in ["summarize", "keep_samples", "style", "fused_modconv", "local_noise"]:
+        if args[arg] is None:
+            args[arg] = True
+
+    if not args.train and not args.eval:
+        print(misc.bcolored("Warning: Neither --train nor --eval are provided. Therefore, we only print network shapes.", "red"))
 
     # Environment configuration
     tf_config = {
@@ -97,9 +102,9 @@ def run(**args):
     # Logging and metrics configuration
     metrics = [metric_defaults[x] for x in args.metrics]
 
-
     cset(cG.args, "truncation_psi", args.truncation_psi)
-    for arg in ["summarize", "keep_samples", "eval_images_num"]:
+    cset(vis, "keep_samples", args.keep_samples)
+    for arg in ["summarize", "eval_images_num"]:
         cset(train, arg, args[arg])
 
     # Visualization
@@ -116,7 +121,7 @@ def run(**args):
         "rich_num": "vis_rich_num",
         "section_size": "vis_section_size",
         "intrp_density": "interpolation_density",
-        "intrp_per_component": "interpolation_per_component",
+        # "intrp_per_component": "interpolation_per_component",
         "alpha": "blending_alpha"
     }
     for arg, cmd_arg in vis_args.items():
@@ -136,13 +141,11 @@ def run(**args):
         args.latent_size = int(args.latent_size / args.components_num)
     cD.args.latent_size = cG.args.latent_size = cG.args.dlatent_size = args.latent_size
     cset([cG.args, cD.args, vis], "components_num", args.components_num)
-    # mapping-dim default value is the latent-size
-    if args.mapping_dim is None:
-       args.mapping_dim = args.latent_size
 
     # Mapping network
     for arg in ["layersnum", "lrmul", "dim", "resnet", "shared_dim"]:
-        cset(cG.args, arg, args["mapping_{}".format(arg)])
+        field = "mapping_{}".format(arg)
+        cset(cG.args, field, args[field])
 
     # StyleGAN settings
     for arg in ["style", "latent_stem", "fused_modconv", "local_noise"]:
@@ -172,12 +175,16 @@ def run(**args):
         cset(cG.args, field, args[field])
     cset([cG.args, train], "merge", args.kgan)
 
+    if args.kgan and args.transformer:
+        print(misc.bcolored("Error: either have --transformer for GANsformer or --kgan for k-GAN, not both.", "red"))
+        exit()
+
     # Attention
-    for arg in ["start_res", "end_res", "ltnt2ltnt", "img2img", "local_attention"]:
+    for arg in ["start_res", "end_res", "ltnt2ltnt", "img2img"]: # , "local_attention"
         cset(cG.args, arg, args["g_{}".format(arg)])
         cset(cD.args, arg, args["d_{}".format(arg)])
     cset(cG.args, "img2ltnt", args.g_img2ltnt)
-    cset(cD.args, "ltnt2img", args.d_ltnt2img)
+    # cset(cD.args, "ltnt2img", args.d_ltnt2img)
 
     # Mixing and dropout
     for arg in ["style_mixing", "component_mixing", "component_dropout", "attention_dropout"]:
@@ -187,7 +194,7 @@ def run(**args):
     gloss_args = {
         "loss_type": "g_loss",
         "reg_weight": "g_reg_weight",
-        "pathreg": "pathreg",
+        # "pathreg": "pathreg",
     }
     dloss_args = {
         "loss_type": "d_loss",
@@ -239,7 +246,7 @@ def run(**args):
         resume = True
 
     if snapshot:
-        print(misc.bcolored("Resuming {}, kimg {}".format(run_name, kimg), "white"))
+        print(misc.bcolored("Resuming {}, from {}, kimg {}".format(run_name, snapshot, kimg), "white"))
         train.resume_pkl = snapshot
         train.resume_kimg = kimg
     else:
@@ -302,17 +309,17 @@ def main():
 
     parser.add_argument("--expname",            help = "Experiment name", default = "exp", type = str)
     parser.add_argument("--eval",               help = "Evaluation mode (default: False)", default = None, action = "store_true")
-    parser.add_argument("--train",              help = "Train mode (default: False)", default = None, metavar = "BOOL", type = _str_to_bool)
+    parser.add_argument("--train",              help = "Train mode (default: False)", default = None, action = "store_true")
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
 
     ## Resumption
-    parser.add_argument("--pretrained_pkl",     help = "Filename for a snapshot to resume (optional)", default = None, type = str)
+    parser.add_argument("--pretrained-pkl",     help = "Filename for a snapshot to resume (optional)", default = None, type = str)
     parser.add_argument("--restart",            help = "Restart training from scratch", default = False, action = "store_true")
     parser.add_argument("--reload",             help = "Reload options from the original experiment configuration file. " +
                                                        "If False, uses the command line arguments when resuming training (default: %(default)s)", default = False, action = "store_true")
     parser.add_argument("--recompile",          help = "Recompile model from source code when resuming training. " +
                                                        "If False, loading modules created when the experiment first started", default = None, action = "store_true")
-    parser.add_argument("--last_snapshots",     help = "Number of last snapshots to save. -1 for all (default: 8)", default = None, type = int)
+    parser.add_argument("--last-snapshots",     help = "Number of last snapshots to save. -1 for all (default: 8)", default = None, type = int)
 
     ## Dataset
     parser.add_argument("--data-dir",           help = "Datasets root directory", required = True)
@@ -334,10 +341,10 @@ def main():
     ## Logging and evaluation
     parser.add_argument("--result-dir",         help = "Root directory for experiments (default: %(default)s)", default = "results", metavar = "DIR")
     parser.add_argument("--metrics",            help = "Comma-separated list of metrics or none (default: %(default)s)", default = "fid", type = _parse_comma_sep)
-    parser.add_argument("--summarize",          help = "Create TensorBoard summaries (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool)
+    parser.add_argument("--summarize",          help = "Create TensorBoard summaries (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images " +
                                                        "(used only for visualizations, _not used_ in training or for computing metrics) (default: %(default)s)", default = 0.65, type = float)
-    parser.add_argument("--keep-samples",       help = "Keep all prior samples during training, or if False, just the most recent ones (default: False)", default = None, action = "store_true")
+    parser.add_argument("--keep-samples",       help = "Keep all prior samples during training, or if False, just the most recent ones (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--eval-images-num",    help = "Number of images to evaluate metrics on (default: 50,000)", default = None, type = int)
 
     ## Visualization
@@ -350,12 +357,12 @@ def main():
     parser.add_argument("--vis-style-mix",      help = "Create style mixing visualization", default = None, action = "store_true")
 
     parser.add_argument("--vis-grid",                    help = "Whether to save the samples in one large grid files (default: True in training)", default = None, action = "store_true")
-    parser.add_argument("--vis-num",                     help = "Image height/width ratio in the dataset", default = None, type = int)
+    parser.add_argument("--vis-num",                     help = "Number of images for which visualization will be created (default: grid-size/100 in train/eval)", default = None, type = int)
     parser.add_argument("--vis-rich-num",                help = "Number of samples for which richer visualizations will be created (default: 5)", default = None, type = int)
     parser.add_argument("--vis-section-size",            help = "Visualization section size to process at one (section-size <= vis-num) for memory footprint (default: 100)", default = None, type = int)
     parser.add_argument("--blending-alpha",              help = "Proportion for generated images and attention maps blends (default: 0.3)", default = None, type = float)
     parser.add_argument("--interpolation-density",       help = "Number of samples in between two end points of an interpolation (default: 8)", default = None, type = int)
-    parser.add_argument("--interpolation-per-component", help = "Whether to perform interpolation along particular latent components when true, or all of them at once otherwise (default: False)", default = None, action = "store_true")
+    # parser.add_argument("--interpolation-per-component", help = "Whether to perform interpolation along particular latent components when true, or all of them at once otherwise (default: False)", default = None, action = "store_true")
 
     # Model
     # ------------------------------------------------------------------------------------------------------
@@ -373,12 +380,13 @@ def main():
     parser.add_argument("--mapping-shared-dim", help = "Perform one shared mapping to all latent components concatenated together using the set dimension (default: disabled)", default = None, type = int)
 
     # Loss
-    parser.add_argument("--pathreg",            help = "Use path regularization in generator training (default: False", default = None, metavar = "BOOL", type = _str_to_bool)
+    # parser.add_argument("--pathreg",            help = "Use path regularization in generator training (default: False)", default = None, action = "store_true")
     parser.add_argument("--g-loss",             help = "Generator loss type (default: %(default)s)", default = "logistic_ns", choices = ["logistic", "logistic_ns", "hinge", "wgan"], type = str)
     parser.add_argument("--g-reg-weight",       help = "Generator regularization weight (default: %(default)s)", default = 1.0, type = float)
 
     parser.add_argument("--d-loss",             help = "Discriminator loss type (default: %(default)s)", default = "logistic", choices = ["wgan", "logistic", "hinge"], type = str)
     parser.add_argument("--d-reg",              help = "Discriminator regularization type (default: %(default)s)", default = "r1", choices = ["non", "gp", "r1", "r2"], type = str)
+    # --gamma effectively functions as discriminator regularization weight
 
     # Mixing and dropout
     parser.add_argument("--style-mixing",       help = "Style mixing (layerwise) probability (default: %(default)s)", default = 0.9, type = float)
@@ -387,11 +395,11 @@ def main():
     parser.add_argument("--attention-dropout",  help = "Attention dropout (default: 0.12)", default = None, type = float)
 
     # StyleGAN additions
-    parser.add_argument("--style",              help = "Global style modulation (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool)
+    parser.add_argument("--style",              help = "Global style modulation (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--latent-stem",        help = "Input latent through the generator stem grid (default: False)", default = None, action = "store_true")
-    parser.add_argument("--fused-modconv",      help = "Fuse modulation and convolution operations (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool)
-    parser.add_argument("--local-noise",        help = "Add stochastic local noise each layer (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool)
-    parser.add_argument("--minibatch-std-size", help = "Add minibatch standard deviation layer in the discriminator (default: %(default)s)", default = 4, type = int)
+    parser.add_argument("--fused-modconv",      help = "Fuse modulation and convolution operations (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
+    parser.add_argument("--local-noise",        help = "Add stochastic local noise each layer (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
+    parser.add_argument("--minibatch-std-size", help = "Add minibatch standard deviation layer in the discriminator, 0 to disable (default: %(default)s)", default = 4, type = int)
 
     ## GANsformer
     parser.add_argument("--transformer",        help = "Add transformer layers to the generator: top-down latents-to-image (default: False)", default = None, action = "store_true")
@@ -429,14 +437,14 @@ def main():
     parser.add_argument("--g-img2ltnt",         help = "Add image to latents attention (bottom-up) (default: %(default)s)", default = None, action = "store_true")
     # g-ltnt2img: default information flow direction when using --transformer
 
-    parser.add_argument("--d-ltnt2img",         help = "Add latents to image attention (top-down) (default: %(default)s)", default = None, action = "store_true")
+    # parser.add_argument("--d-ltnt2img",       help = "Add latents to image attention (top-down) (default: %(default)s)", default = None, action = "store_true")
     parser.add_argument("--d-ltnt2ltnt",        help = "Add self-attention over latents in the discriminator (default: False)", default = None, action = "store_true")
     parser.add_argument("--d-img2img",          help = "Add self-attention over images positions in that layer of the discriminator (SAGAN) (default: disabled)", default = 0, type = int)
     # d-img2ltnt: default information flow direction when using --d-transformer
 
     # Local attention operations (replacing convolution)
-    parser.add_argument("--g-local-attention",  help = "Local attention operations in the generation up to this layer (default: disabled)", default = None, type = int)
-    parser.add_argument("--d-local-attention",  help = "Local attention operations in the discriminator up to this layer (default: disabled)", default = None, type = int)
+    # parser.add_argument("--g-local-attention",  help = "Local attention operations in the generation up to this layer (default: disabled)", default = None, type = int)
+    # parser.add_argument("--d-local-attention",  help = "Local attention operations in the discriminator up to this layer (default: disabled)", default = None, type = int)
 
     # Positional encoding
     parser.add_argument("--use-pos",            help = "Use positional encoding (default: False)", default = None, action = "store_true")
@@ -448,7 +456,7 @@ def main():
     ## k-GAN
     parser.add_argument("--kgan",               help = "Generate components-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true")
     parser.add_argument("--merge-layer",        help = "Merge layer, where images get combined through alpha-composition (default: %(default)s)", default = -1, type = int)
-    parser.add_argument("--merge-type",         help = "Merge type (default: additive)", default = None, choices = ["sum", "softmax", "max", "leaves"], type = str)
+    parser.add_argument("--merge-type",         help = "Merge type (default: sum)", default = None, choices = ["sum", "softmax", "max", "leaves"], type = str)
     parser.add_argument("--merge-same",         help = "Merge images with same alpha weights across all spatial positions (default: %(default)s)", default = None, action = "store_true")
 
     args = parser.parse_args()

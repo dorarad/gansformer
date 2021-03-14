@@ -23,7 +23,8 @@ class TFRecordDataset:
         shuffle_mb      = 2048,     # Shuffle data within specified window (megabytes), 0 = disable shuffling
         prefetch_mb     = 512,      # Amount of data to prefetch (megabytes), 0 = disable prefetching
         buffer_mb       = 256,      # Read buffer size (megabytes)
-        num_threads     = 4):       # Number of concurrent threads for input processing
+        num_threads     = 4,        # Number of concurrent threads for input processing
+        **kwargs):       
 
         self.tfrecord_dir       = tfrecord_dir
         self.resolution         = None
@@ -51,11 +52,13 @@ class TFRecordDataset:
         # If max_imgs is not None, take a subset of images out of the 1st file. Otherwise take all files.
         if max_imgs is None:
             tfr_file_lists = [sorted(glob.glob(re.sub("1of.*", "*", f))) for f in tfr_file_lists]
+        else:
+            tfr_file_lists = [[f] for f in tfr_file_lists]
 
         assert len(tfr_file_lists) >= 1
         tfr_shapes = []
         for tfr_files in tfr_file_lists:
-            tfr_opt = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.NONE)
+            tfr_opt = tf.io.TFRecordOptions("")
             for record in tf.python_io.tf_record_iterator(tfr_files[0], tfr_opt):
                 tfr_shapes.append(self.parse_tfrecord_np(record).shape)
                 break

@@ -23,7 +23,7 @@ class FID(metric_base.MetricBase):
 
     def compute_fid(self, mu_real, sigma_real, mu_fake, sigma_fake):
         m = np.square(mu_fake - mu_real).sum()
-        s, _ = scipy.linalg.sqrtm(np.dot(sigma_fake, sigma_real), disp = False) # pylint: disable = no-member
+        s, _ = scipy.linalg.sqrtm(np.dot(sigma_fake, sigma_real), disp = False)
         fid = np.real(m + np.trace(sigma_fake + sigma_real - 2*s))
         return fid
 

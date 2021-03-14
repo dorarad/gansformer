@@ -8,6 +8,7 @@ import glob
 import os
 import seaborn as sns
 from termcolor import colored
+from tqdm import tqdm
 
 # Colorful prints
 # ----------------------------------------------------------------------------
@@ -36,7 +37,7 @@ def cond_bcolored(num, maxval, color):
 
 def open_file_or_url(file_or_url):
     if dnnlib.util.is_url(file_or_url):
-        return dnnlib.util.open_url(file_or_url, cache_dir = ".stylegan2-cache")
+        return dnnlib.util.open_url(file_or_url, cache_dir = ".GANsformer-cache")
     return open(file_or_url, "rb")
 
 def load_pkl(file_or_url):
@@ -60,9 +61,11 @@ def save_npy(mat, filename):
         np.save(f, mat)
 
 # Saves a list of numpy arrays with ordering and according to a path template
-def save_npys(npys, path, offset = 0):
-    npys = list(npys)
-    for i, npy in tqdm(enumerate(npys), total = len(npys)):
+def save_npys(npys, path, verbose = False, offset = 0):
+    npys = enumerate(npys)
+    if verbose:
+        npys = tqdm(list(npys))
+    for i, npy in npys:
         save_npy(npy, dnnlib.make_run_dir_path(path % (offset + i)))
 
 # Delete a list of files
@@ -163,7 +166,6 @@ def adjust_dynamic_range(data, drange_in, drange_out, hsv = False):
         data = adjust_dynamic_range_aux(data, drange_in, [0.0, 1.0])
 
         axis = -1
-        # print(list(data.shape))
         for i, x in enumerate(list(data.shape)):
             if x == 3:
                 axis = i
@@ -179,7 +181,7 @@ def adjust_dynamic_range(data, drange_in, drange_out, hsv = False):
         elif drange_out == [0, 255]:
             data = tf.image.hsv_to_rgb(data) if tf.is_tensor(data) else hsv_to_rgb(data)
         else:
-            print("error in adjustment", drange_in, drange_out)
+            print("Error: image adjustment", drange_in, drange_out)
             exit()
 
         if axis != -1:
@@ -317,7 +319,7 @@ def save_gif(imgs, filename, duration = 50):
 def save_images_builder(drange, grid_size, grid = False, verbose = False):
     def save_images(imgs, path, offset = 0):
         if grid:
-            save_img_grid(imgs, dnnlib.make_run_dir_path(path % offset), grid_size)
+            save_img_grid(imgs, dnnlib.make_run_dir_path(path % offset), drange, grid_size)
         else:
             imgs = enumerate(imgs)
             if verbose:
@@ -335,7 +337,7 @@ def save_blends_builder(drange, grid_size, grid = False, verbose = False, alpha 
             blend = PIL.Image.blend(img_a, img_b, alpha = alpha)
             blend.save(dnnlib.make_run_dir_path(path % offset))
         else:
-            img_pairs = zip(imgs_a, listimgs_b)
+            img_pairs = zip(imgs_a, imgs_b)
             img_pairs = enumerate(img_pairs)
             if verbose:
                 img_pairs = tqdm(list(img_pairs))            

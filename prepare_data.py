@@ -96,14 +96,15 @@ def task(task, name, size, dir, redownload, download = None, prepare = lambda: N
 
 def prepare(tasks, data_dir, redownload, shards_num = None, max_images = None):
     mkdir(data_dir)
+    for task in tasks:
+        mkdir("{}/{}".format(data_dir, task))
+
     if "ffhq" in tasks:
-        mkdir("{}/ffhq".format(data_dir))
         task("ffhq", "FFHQ", 13, data_dir, redownload,
             download = lambda: download_file(urls["ffhq"]["url"], data_dir, drive = True,
                 path = urls["ffhq"]["path"], md5 = urls["ffhq"]["md5"]))
     if "clevr" in tasks:
         shards_num = shards_num or 5
-        mkdir("{}/clevr".format(data_dir))
         task("clevr", "CLEVR", 18, data_dir, redownload, 
             download = lambda: download_file(urls["clevr"], "{}/clevr".format(data_dir), unzip = True),
             prepare = lambda: dataset_tool.create_from_imgs("{}/clevr".format(data_dir), "{}/clevr/CLEVR_v1.0/images".format(data_dir), 

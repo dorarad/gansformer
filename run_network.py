@@ -1,6 +1,3 @@
-####################################################################################################################################################
-# The code is still going through some refactoring and clean-up. Will be ready in couple days!
-####################################################################################################################################################
 import argparse
 import copy
 import glob
@@ -67,14 +64,14 @@ def run(**args):
     # Dataset configuration
     ratios = {
         "clevr": 0.75,
-        "lsun-bedrooms": 0.72,
+        "bedrooms": 188/256,
         "cityscapes": 0.5,
         "ffhq": 1.0
     }
     args.ratio = ratios.get(args.dataset, args.ratio)
-    dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.train_images_num, ratio = args.ratio,
+    dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.train_images_num, 
         num_threads = args.num_threads)
-    for arg in ["data_dir", "mirror_augment", "total_kimg"]:
+    for arg in ["data_dir", "mirror_augment", "total_kimg", "ratio"]:
         cset(train, arg, args[arg])
 
     # Training and Optimizations configuration
@@ -103,7 +100,8 @@ def run(**args):
     metrics = [metric_defaults[x] for x in args.metrics]
 
     cset(cG.args, "truncation_psi", args.truncation_psi)
-    cset(vis, "keep_samples", args.keep_samples)
+    for arg in ["keep_samples", "num_heads"]:
+        cset(vis, arg, args[arg])
     for arg in ["summarize", "eval_images_num"]:
         cset(train, arg, args[arg])
 
@@ -157,7 +155,7 @@ def run(**args):
     cset(cD.args, "transformer", args.d_transformer)
 
     args.norm = args.normalize
-    for arg in ["norm", "integration", "ltnt_gate", "img_gate", "kmeans",
+    for arg in ["norm", "integration", "ltnt_gate", "img_gate", "iterative", "kmeans", 
                 "kmeans_iters", "mapping_ltnt2ltnt"]:
         cset(cG.args, arg, args[arg])
 
@@ -262,7 +260,8 @@ def run(**args):
 
     kwargs = EasyDict(train)
     kwargs.update(cG = cG, cD = cD)
-    kwargs.update(dataset_args = dataset_args, vis_args = vis, sched_args = sched, grid_args = grid, metric_arg_list = metrics, tf_config = tf_config)
+    kwargs.update(dataset_args = dataset_args, vis_args = vis, sched_args = sched, 
+        grid_args = grid, metric_arg_list = metrics, tf_config = tf_config)
     kwargs.submit_config = copy.deepcopy(sc)
     kwargs.resume = resume
     kwargs.load_config = args.reload
@@ -319,7 +318,7 @@ def main():
                                                        "If False, uses the command line arguments when resuming training (default: %(default)s)", default = False, action = "store_true")
     parser.add_argument("--recompile",          help = "Recompile model from source code when resuming training. " +
                                                        "If False, loading modules created when the experiment first started", default = None, action = "store_true")
-    parser.add_argument("--last-snapshots",     help = "Number of last snapshots to save. -1 for all (default: 8)", default = None, type = int)
+    parser.add_argument("--last-snapshots",     help = "Number of last snapshots to save. -1 for all (default: 10)", default = None, type = int)
 
     ## Dataset
     parser.add_argument("--data-dir",           help = "Datasets root directory", required = True)
@@ -427,6 +426,7 @@ def main():
                                                        "or receive information when gate value is low (default: False)", default = None, action = "store_true")
     parser.add_argument("--kmeans",             help = "Track and update image-to-latents assignment centroids, used in the duplex attention (default: False)", default = None, action = "store_true")
     parser.add_argument("--kmeans-iters",       help = "Number of K-means iterations per transformer layer. Note that centroids are carried from layer to layer (default: %(default)s)", default = 1, type = int) # -per-layer
+    parser.add_argument("--iterative",          help = "Whether to carry over attention assignments across transformer layers of different resolutions (default: False)", default = None, action = "store_true")
 
     # Attention directions
     # format is A2B: Elements _from_ B attend _to_ elements in A, and B elements get updated accordingly.

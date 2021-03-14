@@ -128,8 +128,8 @@ def run_cmdline(argv):
     parser.add_argument("--bedrooms",       help = "Prepare the LSUN-bedrooms dataset (43 GB)", dest = "tasks", action = "append_const", const = "bedrooms")
     parser.add_argument("--data-dir",       help = "Path to download dataset", default = "datasets", type = str)
     parser.add_argument("--redownload",     help = "Download even if exists",  default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
-    parser.add_argument("--shards_num",     help = "Number of shards to split each dataset to (optional)", default = None, type = int)
-    parser.add_argument("--max_images",     help = "Maximum number of images to have in the dataset (optional)", default = None, type = int)
+    parser.add_argument("--shards-num",     help = "Number of shards to split each dataset to (optional)", default = None, type = int)
+    parser.add_argument("--max-images",     help = "Maximum number of images to have in the dataset (optional)", default = None, type = int)
 
     args = parser.parse_args()
     if not args.tasks:

@@ -27,7 +27,7 @@ class FID(metric_base.MetricBase):
         fid = np.real(m + np.trace(sigma_fake + sigma_real - 2*s))
         return fid
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None, **kwargs):
         minibatch_size = num_gpus * self.minibatch_per_gpu
         inception = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/inception_v3_features.pkl")
 

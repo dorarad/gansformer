@@ -461,8 +461,8 @@ def att2d_layer(x, dim, kernel, grid, up = False, down = False, resample_kernel 
         "to_pos": grid
     }
 
-    # Perform local attention between each image position and its local neighborhood
-    x_flat = transformer_layer(from_tensor = x_flat, to_tensor = x_patches, dim = dim, name = "att2d", **kwargs)[0] # [N * H * W, 1, C]
+    # Perform local attention between each image position and its local neighborhood, [N * H * W, 1, C]
+    x_flat = transformer_layer(from_tensor = x_flat, to_tensor = x_patches, dim = dim, name = "att2d", **kwargs)[0] 
     x = tf.transpose(tf.reshape(x_flat, get_shape(x)), [0, 3, 1, 2]) # [N, C, H, W]
 
     if up:
@@ -584,7 +584,7 @@ def compute_assignments(att_probs):
 # Some of the code here meant to be backward compatible with the pretrained networks
 # and may improve in further versions of the repository.
 def compute_centroids(_queries, queries, to_from, to_len, from_len, batch_size, num_heads, 
-        size_head, init_parametric = True):
+        size_head, parametric):
     
     dim = 2 * size_head
     from_elements = tf.concat([_queries, queries - _queries], axis = -1)
@@ -612,8 +612,8 @@ def compute_centroids(_queries, queries, to_from, to_len, from_len, batch_size, 
         to_centroids = tf.matmul(to_from, from_elements)
 
     # Centroids initialization
-    if to_from is None or init_parametric:
-        if init_parametric:
+    if to_from is None or parametric:
+        if parametric:
             to_centroids = tf.tile(tf.get_variable("toasgn_init", shape = [1, num_heads, to_len, dim],
                 initializer = tf.initializers.random_normal()), [batch_size, 1, 1, 1])
         else:
@@ -663,6 +663,8 @@ def transformer_layer(
         kmeans = False,                       # Track and update image-to-latents assignment centroids (in duplex)
         kmeans_iters = 1,                     # Number of K-means iterations per layer
         att_vars = {},                        # K-means variables carried over from layer to layer (only when --kmeans)
+        iterative = False,                    # Whether to carry over attention assignments across transformer 
+                                              # layers of different resolutions
         name = ""):                           # Layer variable_scope suffix
 
     # Validate input shapes and map them to 2d
@@ -687,7 +689,7 @@ def transformer_layer(
 
         if kmeans:
             from_elements, to_centroids = compute_centroids(_queries, queries, to_from,
-                to_len, from_len, batch_size, num_heads, size_head)
+                to_len, from_len, batch_size, num_heads, size_head, parametric = not iterative)
 
         # Reshape queries, keys and values, and then compute att_scores
         values = transpose_for_scores(values, batch_size, num_heads, to_len, size_head)     # [B, N, T, H]
@@ -886,13 +888,15 @@ def G_GANsformer(
     component_mask = tf.expand_dims(component_mask, axis = 1)
 
     # Setup variables
-    dlatent_avg = tf.get_variable("dlatent_avg", shape = [dlatent_size], initializer = tf.initializers.zeros(), trainable = False)
+    dlatent_avg = tf.get_variable("dlatent_avg", shape = [dlatent_size], 
+        initializer = tf.initializers.zeros(), trainable = False)
 
     if take_dlatents:
         dlatents = latents_in
     else:
         # Evaluate mapping network
-        dlatents = components.mapping.get_output_for(latents_in, labels_in, latent_pos, component_mask, is_training = is_training, **kwargs)
+        dlatents = components.mapping.get_output_for(latents_in, labels_in, latent_pos, 
+            component_mask, is_training = is_training, **kwargs)
         dlatents = tf.cast(dlatents, tf.float32)
 
     # Update moving average of W latent space
@@ -914,7 +918,8 @@ def G_GANsformer(
 
         with tf.variable_scope("StyleMix"):
             latents2 = tf.random_normal(get_shape(latents_in))
-            dlatents2 = components.mapping.get_output_for(latents2, labels_in, latent_pos, component_mask, is_training = is_training, **kwargs)
+            dlatents2 = components.mapping.get_output_for(latents2, labels_in, latent_pos, 
+                component_mask, is_training = is_training, **kwargs)
             dlatents2 = tf.cast(dlatents2, tf.float32)
             mixing_cutoff = tf.cond(
                 tf.random_uniform([], 0.0, 1.0) < prob,
@@ -1143,7 +1148,8 @@ def G_synthesis(
     # Extra attention options, related to key-value duplex attention
     kmeans              = False,        # Track and update image-to-latents assignment centroids, used in the duplex attention
     kmeans_iters        = 1,            # Number of K-means iterations per transformer layer
-                                        # Note that centroids are carried from layer to layer
+    iterative           = False,        # Carry over attention assignments across transformer layers of different resolutions
+                                        # If True, centroids are carried from layer to layer
     # Attention directions and layers:
     # image->latents, latents->image, image->image (SAGAN), resolution to be applied at
     start_res           = 0,            # Transformer minimum resolution layer to be used at
@@ -1288,6 +1294,8 @@ def G_synthesis(
                 "kmeans": kmeans,               # Track and update image-to-latents assignment centroids (in duplex)
                 "kmeans_iters": kmeans_iters,   # Number of K-means iterations per layer
                 "att_vars": att_vars,           # K-means variables carried over from layer to layer (only when --kmeans)
+                "iterative": iterative          # Whether to carry over attention assignments across transformer 
+                                                # layers of different resolutions
             }
             # Perform attention from image to latents, meaning that information will flow
             # latents -> image (from/to naming matches with Google BERT repository)

@@ -14,10 +14,12 @@ class IS(metric_base.MetricBase):
         self.num_splits = num_splits
         self.minibatch_per_gpu = minibatch_per_gpu
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None, ratio = 1.0, **kwargs):
         minibatch_size = num_gpus * self.minibatch_per_gpu
         inception = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/inception_v3_softmax.pkl")
-        inception_func = lambda imgs: inception.run(imgs[:end-begin], num_gpus = num_gpus, assume_frozen = True)
+
+        def inception_func(imgs): 
+            return inception.run(misc.crop_np(imgs[:end-begin], ratio), num_gpus = num_gpus, assume_frozen = True)
 
         if paths is not None:
             # Extract features for local sample image files (paths)
@@ -31,7 +33,7 @@ class IS(metric_base.MetricBase):
         for i in range(self.num_splits):
             part = feats[i * num_imgs // self.num_splits : (i + 1) * num_imgs // self.num_splits]
             kl = part * (np.log(part) - np.log(np.expand_dims(np.mean(part, 0), 0)))
-            kl = np.mean(np.sum(kl, 1))
+            kl = np.mean(np.sum(kl, axis = 1))
             scores.append(np.exp(kl))
         self._report_result(np.mean(scores), suffix = "_mean")
         self._report_result(np.std(scores), suffix = "_std")

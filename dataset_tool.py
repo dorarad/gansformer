@@ -14,6 +14,7 @@ import PIL.Image
 import cv2
 import io
 from tqdm import tqdm, trange
+from training import misc 
 
 def error(msg):
     print("Error: " + msg)
@@ -639,31 +640,6 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
 
 # ----------------------------------------------------------------------------
 
-# Crop center rectangle of size (cw, ch)
-def crop_center(img, cw, ch):
-    w, h = img.size
-    return img.crop(((w - cw) // 2, (h - ch) // 2, (w + cw) // 2, (h + ch) // 2))
-
-# Crop max rectangle of size (s, ratio * s) where s = min(w,h)
-# If ratio is None, keep same image
-def crop_max_rectangle(img, ratio):
-    if ratio is None:
-        return img
-    s = min(img.size)
-    return crop_center(img, s, ratio * s)
-
-# Pad image to smallest square (max(w,h), max(w,h))
-def pad_min_square(img):
-    w, h = img.size
-    if w == h:
-        return img
-    s = max(w, h)
-    result = PIL.Image.new(img.mode, (s, s))
-    offset_x = max(0, (h - w) // 2)
-    offset_y = max(0, (w - h) // 2)
-    result.paste(img, (offset_x, offset_y))
-    return result
-
 # Creates TF records for images in a directory. Images are:
 # 1. Cropped to rectangle of size (s, ratio * s) (Optional)
 # 2. Padded to a square
@@ -697,8 +673,8 @@ def create_from_imgs(tfrecord_dir, img_dir, shuffle = False, ratio = None, max_i
         for idx in trange(max_imgs):
             img = PIL.Image.open(img_filenames[order[idx]]).convert("RGB")
 
-            img = crop_max_rectangle(img, ratio)
-            img = pad_min_square(img)
+            img = misc.crop_max_rectangle(img, ratio)
+            img = misc.pad_min_square(img)
 
             pow2size = 2 ** int(np.round(np.log2(img.size[0])))
             img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
@@ -719,8 +695,8 @@ def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, shards_num = 64):
         for ex in tqdm(tfds.as_numpy(ds)):
             img = PIL.Image.fromarray(ex["image"])
 
-            img = crop_max_rectangle(img, ratio)
-            img = pad_min_square(img)
+            img = misc.crop_max_rectangle(img, ratio)
+            img = misc.pad_min_square(img)
 
             pow2size = 2 ** int(np.round(np.log2(img.size[0])))
             img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
@@ -732,29 +708,33 @@ def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, shards_num = 64):
 def create_from_lmdb(tfrecord_dir, lmdb_dir, ratio = None, max_imgs = None, shards_num = 64):
     import lmdb
     print("Loading dataset %s" % lmdb_dir)
-
+    bad_imgs = 0
     with lmdb.open(lmdb_dir, readonly = True).begin(write = False) as txn:
         if max_imgs is None:
             max_imgs = txn.stat()["entries"]
-            
+
         with TFRecordExporter(tfrecord_dir, max_imgs, verbose = False, shards_num = shards_num) as tfr:
             for idx, (_key, value) in tqdm(enumerate(txn.cursor()), total = max_imgs):
-                # try:
-                img = PIL.Image.open(io.BytesIO(value))
+                try:
+                    img = PIL.Image.open(io.BytesIO(value))
 
-                img = crop_max_rectangle(img, ratio)
-                img = pad_min_square(img)
+                    img = misc.crop_max_rectangle(img, ratio)
+                    img = misc.pad_min_square(img)
 
-                pow2size = 2 ** int(np.round(np.log2(img.size[0])))
-                img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
+                    pow2size = 2 ** int(np.round(np.log2(img.size[0])))
+                    img = img.resize((pow2size, pow2size), PIL.Image.ANTIALIAS)
 
-                img = np.asarray(img)
-                img = img.transpose([2, 0, 1]) # HWC => CHW
-                tfr.add_img(img)
-                # except:
-                #     print(sys.exc_info()[1])
+                    img = np.asarray(img)
+                    img = img.transpose([2, 0, 1]) # HWC => CHW
+                    tfr.add_img(img)
+                except:
+                    bad_imgs += 1
+                    pass
                 if tfr.curr_imgnum == max_imgs:
                     break
+
+    if bad_imgs > 0:
+        print("Couldn't read {} out of {} images".format(bad_imgs, max_imgs))
 
 def create_from_npy(tfrecord_dir, npy_filename, shuffle):
     print("Loading NPY archive from %s" % npy_filename)

@@ -56,10 +56,12 @@ def eval(G,
     training            = False,      # Training mode
     latents             = None,       # Source latents to generate images from
     labels              = None,       # Source labels to generate images from (0 if no labels are used)
+    ratio               = 1.0,        # Image height/width ratio in the dataset
     # Model settings
     components_num      = 1,          # Number of components the model has
     drange_net          = [-1,1],     # Model image output range
     attention           = False,      # Whereas the model produces attention maps (for visualization)
+    num_heads           = 1,          # Number of attention heads
     # Visualization settings
     vis_types           = None,       # Visualization types to be created
     num                 = 100,        # Number of produced samples
@@ -86,6 +88,8 @@ def eval(G,
     vis = vis_types
     if training:
         vis = {"imgs", "maps"}
+        if num_heads == 1:
+            vis.append("layer_maps")
         section_size = num = len(latents)
     else:
         if vis is None:
@@ -103,8 +107,8 @@ def eval(G,
         num = np.prod(grid_size)
 
     # build image functions
-    save_images = misc.save_images_builder(drange_net, grid_size, grid, verbose)
-    save_blends = misc.save_blends_builder(drange_net, grid_size, grid, verbose, alpha)
+    save_images = misc.save_images_builder(drange_net, ratio, grid_size, grid, verbose)
+    save_blends = misc.save_blends_builder(drange_net, ratio, grid_size, grid, verbose, alpha)
     crange = trange if verbose else range
 
     # Set up logging

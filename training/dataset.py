@@ -18,7 +18,6 @@ class TFRecordDataset:
         label_file      = None,     # Relative path of the labels file, None = autodetect
         max_label_size  = 0,        # 0 = no labels, "full" = full labels, <int> = N first label components
         max_imgs        = None,     # Maximum number of images to use, None = use all images
-        ratio           = 1.0,
         repeat          = True,     # Repeat dataset indefinitely?
         shuffle_mb      = 2048,     # Shuffle data within specified window (megabytes), 0 = disable shuffling
         prefetch_mb     = 512,      # Amount of data to prefetch (megabytes), 0 = disable prefetching
@@ -110,7 +109,8 @@ class TFRecordDataset:
                 if tfr_lod < 0:
                     continue
                 # Load dataset
-                dset = tf.data.TFRecordDataset(tfr_file, compression_type = "", buffer_size = buffer_mb<<20, num_parallel_reads = None)
+                dset = tf.data.TFRecordDataset(tfr_file, compression_type = "", 
+                    buffer_size = buffer_mb<<20, num_parallel_reads = None)
 
                 # If max_imgs is set, take a subset of the data
                 if max_imgs is not None:
@@ -136,8 +136,10 @@ class TFRecordDataset:
                 self._tf_datasets[tfr_lod] = dset
 
             # Initialize data iterator
-            self._tf_iterator = tf.data.Iterator.from_structure(self._tf_datasets[0].output_types, self._tf_datasets[0].output_shapes)
-            self._tf_init_ops = {lod: self._tf_iterator.make_initializer(dset) for lod, dset in self._tf_datasets.items()}
+            self._tf_iterator = tf.data.Iterator.from_structure(self._tf_datasets[0].output_types, 
+                self._tf_datasets[0].output_shapes)
+            self._tf_init_ops = {lod: self._tf_iterator.make_initializer(dset) \
+                for lod, dset in self._tf_datasets.items()}
 
     def close(self):
         pass
@@ -168,7 +170,8 @@ class TFRecordDataset:
         with tf.name_scope("Dataset"):
             if self.label_size > 0:
                 with tf.device("/cpu:0"):
-                    return tf.gather(self._tf_labels_var, tf.random_uniform([minibatch_size], 0, self._np_labels.shape[0], dtype = tf.int32))
+                    return tf.gather(self._tf_labels_var, tf.random_uniform([minibatch_size], 
+                        0, self._np_labels.shape[0], dtype = tf.int32))
             return tf.zeros([minibatch_size, 0], self.label_dtype)
 
     # Get random labels as NumPy array

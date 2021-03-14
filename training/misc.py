@@ -4,8 +4,10 @@ import numpy as np
 import PIL.Image
 import pickle
 import dnnlib
+import math
 import glob
 import os
+
 import seaborn as sns
 from termcolor import colored
 from tqdm import tqdm
@@ -94,12 +96,34 @@ def float2uint_np(imgs):
     imgs = np.rint(imgs).clip(0, 255).astype(np.uint8)
     return imgs
 
+# Cut image center (to avoid computing inception score on the padding margins)
+def crop_np(imgs, ratio = 1.0): 
+    if ratio == 1.0:
+        return imgs
+    width = imgs.shape[2]
+    start = int(math.floor(((1 - ratio) * width / 2)))
+    end = int(math.ceil((1 + ratio) * width / 2))
+    imgs = imgs[:,start:end + 1]
+    return imgs
+
+# Crop center rectangle of size (cw, ch)
+def crop_center(img, cw, ch):
+    w, h = img.size
+    return img.crop(((w - cw) // 2, (h - ch) // 2, (w + cw) // 2, (h + ch) // 2))
+
+# Crop max rectangle of size (s, ratio * s) where s = min(w,h)
+# If ratio is None, keep same image
+def crop_max_rectangle(img, ratio = 1.0):
+    if ratio is None:
+        return img
+    s = min(img.size)
+    return crop_center(img, s, ratio * s)
+
 # Pad an image of dimension w,h to the smallest containing square (max(w,h), max(w,h))
 def pad_min_square(img, pad_color = (0, 0, 0)):
     w, h = img.size
     if w == h:
         return img
-
     s = max(w, h)
     result = PIL.Image.new(img.mode, (s, s), pad_color)
     offset_x = max(0, (h - w) // 2)
@@ -191,7 +215,8 @@ def adjust_dynamic_range(data, drange_in, drange_out, hsv = False):
 
 def adjust_dynamic_range_aux(data, drange_in, drange_out):
     if drange_in != drange_out:
-        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / (np.float32(drange_in[1]) - np.float32(drange_in[0]))
+        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / 
+            (np.float32(drange_in[1]) - np.float32(drange_in[0]))
         bias = (np.float32(drange_out[0]) - np.float32(drange_in[0]) * scale)
         data = data * scale + bias
     return data
@@ -316,7 +341,7 @@ def save_gif(imgs, filename, duration = 50):
     imgs[0].save(filename, save_all = True, append_images = imgs[1:], duration = duration, loop = 0)
 
 # Save a list of images with ordering and according to a path template
-def save_images_builder(drange, grid_size, grid = False, verbose = False):
+def save_images_builder(drange, ratio, grid_size, grid = False, verbose = False):
     def save_images(imgs, path, offset = 0):
         if grid:
             save_img_grid(imgs, dnnlib.make_run_dir_path(path % offset), drange, grid_size)
@@ -325,11 +350,13 @@ def save_images_builder(drange, grid_size, grid = False, verbose = False):
             if verbose:
                 imgs = tqdm(list(imgs))
             for i, img in imgs:
-                to_pil(img, drange = drange).save(dnnlib.make_run_dir_path(path % (offset + i)))
+                img = to_pil(img, drange = drange)
+                img = crop_max_rectangle(img, ratio)
+                img.save(dnnlib.make_run_dir_path(path % (offset + i)))
     return save_images
 
 # Save a list of blended two-layer images with ordering and according to a path template
-def save_blends_builder(drange, grid_size, grid = False, verbose = False, alpha = 0.3):
+def save_blends_builder(drange, ratio, grid_size, grid = False, verbose = False, alpha = 0.3):
     def save_blends(imgs_a, imgs_b, path, offset = 0):
         if grid:
             img_a = to_pil(create_img_grid(imgs_a, grid_size), drange)
@@ -345,5 +372,6 @@ def save_blends_builder(drange, grid_size, grid = False, verbose = False, alpha 
                 img_a = to_pil(img_a, drange = drange)
                 img_b = to_pil(img_b, drange = drange)
                 blend = PIL.Image.blend(img_a, img_b, alpha = alpha)
+                blend = crop_max_rectangle(blend, ratio)
                 blend.save(dnnlib.make_run_dir_path(path % (offset + i)))
     return save_blends

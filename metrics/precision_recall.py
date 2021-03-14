@@ -156,7 +156,7 @@ class PR(metric_base.MetricBase):
         self.row_batch_size = row_batch_size
         self.col_batch_size = col_batch_size
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None, **kwargs):
         minibatch_size = num_gpus * self.minibatch_per_gpu
         feature_net = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/vgg16.pkl")
 

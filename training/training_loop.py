@@ -157,15 +157,16 @@ def training_loop(
     clip                    = None,     # Clip gradients threshold
     # Resumption
     resume_pkl              = None,     # Network pickle to resume training from, None = train from scratch.
-    resume_kimg             = 0.0,      # Assumed training progress at the beginning. Affects reporting and training schedule.
-    resume_time             = 0.0,      # Assumed wallclock time at the beginning. Affects reporting.
+    resume_kimg             = 0.0,      # Assumed training progress at the beginning
+                                        # Affects reporting and training schedule
+    resume_time             = 0.0,      # Assumed wallclock time at the beginning, affects reporting
     recompile               = False,    # Recompile network from source code (otherwise loads from snapshot)
     # Logging
     summarize               = True,     # Create TensorBoard summaries
     save_tf_graph           = False,    # Include full TensorFlow computation graph in the tfevents file?
     save_weight_histograms  = False,    # Include weight histograms in the tfevents file?
-    img_snapshot_ticks      = 3,        # How often to save image snapshots? None = only save "reals.png" and "fakes-init.png".
-    network_snapshot_ticks  = 3,        # How often to save network snapshots? None = only save "networks-final.pkl".
+    img_snapshot_ticks      = 3,        # How often to save image snapshots? None = disable
+    network_snapshot_ticks  = 3,        # How often to save network snapshots? None = only save networks-final.pkl
     last_snapshots          = 10,       # Maximal number of prior snapshots to save
     eval_images_num         = 50000,    # Sample size for the metrics
     printname               = "",       # Experiment name for logging
@@ -187,8 +188,10 @@ def training_loop(
         G, D, Gs = None, None, None
         if resume_pkl is None or recompile:
             print(misc.bcolored("Constructing networks...", "white"))
-            G = tflib.Network("G", num_channels = dataset.shape[0], resolution = dataset.shape[1], label_size = dataset.label_size, **cG.args)
-            D = tflib.Network("D", num_channels = dataset.shape[0], resolution = dataset.shape[1], label_size = dataset.label_size, **cD.args)
+            G = tflib.Network("G", num_channels = dataset.shape[0], resolution = dataset.shape[1], 
+                label_size = dataset.label_size, **cG.args)
+            D = tflib.Network("D", num_channels = dataset.shape[0], resolution = dataset.shape[1], 
+                label_size = dataset.label_size, **cD.args)
             Gs = G.clone("Gs")
         if resume_pkl is not None:
             G, D, Gs = load_nets(resume_pkl, G, D, Gs, recompile)
@@ -203,7 +206,7 @@ def training_loop(
     grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
 
     if eval: visualize.eval(G, dataset, batch_size = sched.minibatch_gpu,
-        drange_net = drange_net, **vis_args)
+        drange_net = drange_net, ratio = ratio, **vis_args)
     if not train:
         dataset.close()
         exit()
@@ -211,13 +214,14 @@ def training_loop(
     # Setup training inputs
     print(misc.bcolored("Building TensorFlow graph...", "white"))
     with tf.name_scope("Inputs"), tf.device("/cpu:0"):
-        lrate_in_g             = tf.placeholder(tf.float32, name = "lrate_in_g", shape = [])
-        lrate_in_d             = tf.placeholder(tf.float32, name = "lrate_in_d", shape = [])
+        lrate_in_g           = tf.placeholder(tf.float32, name = "lrate_in_g", shape = [])
+        lrate_in_d           = tf.placeholder(tf.float32, name = "lrate_in_d", shape = [])
         step                 = tf.placeholder(tf.int32, name = "step", shape = [])
         minibatch_size_in    = tf.placeholder(tf.int32, name = "minibatch_size_in", shape=[])
         minibatch_gpu_in     = tf.placeholder(tf.int32, name = "minibatch_gpu_in", shape=[])
         minibatch_multiplier = minibatch_size_in // (minibatch_gpu_in * num_gpus)
-        beta                 = 0.5 ** tf.div(tf.cast(minibatch_size_in, tf.float32), smoothing_kimg * 1000.0) if smoothing_kimg > 0.0 else 0.0
+        beta                 = 0.5 ** tf.div(tf.cast(minibatch_size_in, tf.float32), 
+                                smoothing_kimg * 1000.0) if smoothing_kimg > 0.0 else 0.0
 
     # Set optimizers
     for cN, lr in [(cG, lrate_in_g), (cD, lrate_in_d)]:
@@ -352,7 +356,8 @@ def training_loop(
             total_time = dnnlib.RunContext.get().get_time_since_start() + resume_time
 
             # Report progress
-            print("tick %s kimg %s loss/reg: G (%s %s) D (%s %s), grad norms: G (%s %s) D (%s %s) time %s sec/tick %s sec/kimg %s maintenance %ss peak GPUmem %sGB %s" % (
+            print(("tick %s kimg %s loss/reg: G (%s %s) D (%s %s), grad norms: G (%s %s) D (%s %s) " + 
+                   "time %s sec/tick %s sec/kimg %s maintenance %ss peak GPUmem %sGB %s") % (
                 misc.bold("%-5d" % autosummary("Progress/tick", cur_tick)),
                 misc.bcolored("%-8.1f" % autosummary("Progress/kimg", cur_nimg / 1000.0), "red"),
                 misc.bcolored("%.3f" % (cG.lossvals_agg["loss"] or 0), "blue"),
@@ -377,7 +382,7 @@ def training_loop(
             if img_snapshot_ticks is not None and (cur_tick % img_snapshot_ticks == 0 or done):
                 visualize.eval(G, dataset, batch_size = sched.minibatch_gpu, training = True,
                     step = cur_nimg // 1000, grid_size = grid_size, latents = grid_latents, 
-                    labels = grid_labels, drange_net = drange_net, **vis_args)
+                    labels = grid_labels, drange_net = drange_net, ratio = ratio, **vis_args)
 
             if network_snapshot_ticks is not None and (cur_tick % network_snapshot_ticks == 0 or done):
                 pkl = dnnlib.make_run_dir_path("network-snapshot-%06d.pkl" % (cur_nimg // 1000))
@@ -385,7 +390,8 @@ def training_loop(
 
                 if cur_tick % network_snapshot_ticks == 0 or done:
                     metric = metrics.run(pkl, num_imgs = eval_images_num, run_dir = dnnlib.make_run_dir_path(),
-                        data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, tf_config = tf_config)
+                        data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = ratio, 
+                        tf_config = tf_config)
 
                 if last_snapshots > 0:
                     misc.rm(sorted(glob.glob(dnnlib.make_run_dir_path("network*.pkl")))[:-last_snapshots])

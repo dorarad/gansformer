@@ -128,7 +128,8 @@ class MetricBase:
         if self._progress_lo is None or self._progress_hi is None or self._progress_max is None:
             return
         t = time.time()
-        if self._progress_sec is not None and self._progress_time is not None and t < self._progress_time + self._progress_sec:
+        if self._progress_sec is not None and self._progress_time is not None and \
+                t < self._progress_time + self._progress_sec:
             return
         self._progress_time = t
         val = self._progress_lo + (pcur / pmax) * (self._progress_hi - self._progress_lo)
@@ -141,7 +142,8 @@ class MetricBase:
         md5 = hashlib.md5(repr(sorted(all_args.items())).encode("utf-8"))
         dataset_name = self._dataset_args.get("tfrecord_dir", None) or self._dataset_args.get("h5_file", None)
         dataset_name = os.path.splitext(os.path.basename(dataset_name))[0]
-        return os.path.join(".GANsformer-cache", "%s-%s-%s-%s.%s" % (md5.hexdigest(), self.name, dataset_name, num_imgs, extension))
+        return os.path.join(".GANsformer-cache", "%s-%s-%s-%s.%s" % (md5.hexdigest(), 
+            self.name, dataset_name, num_imgs, extension))
 
     def _get_dataset_obj(self):
         if self._dataset_obj is None:
@@ -167,7 +169,8 @@ class MetricBase:
         while True:
             latents = np.random.randn(minibatch_size, *Gs.input_shape[1:])
             fmt = dict(func = tflib.convert_imgs_to_uint8, nchw_to_nhwc = True)
-            imgs = Gs.run(latents, None, output_transform = fmt, is_validation = True, num_gpus = num_gpus, assume_frozen = True)[0]
+            imgs = Gs.run(latents, None, output_transform = fmt, is_validation = True, 
+                num_gpus = num_gpus, assume_frozen = True)[0]
             yield imgs
 
     def _get_random_labels_tf(self, minibatch_size):

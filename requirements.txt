@@ -1,0 +1,12 @@
+tensorflow-gpu==1.14.0
+numpy
+Pillow
+opencv-python
+lmdb
+h5py
+requests
+gdown
+easydict
+tqdm
+termcolor
+seaborn

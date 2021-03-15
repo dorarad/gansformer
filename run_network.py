@@ -232,9 +232,12 @@ def run(**args):
     # Load a particular snapshot is specified
     if args.pretrained_pkl:
         # Soft links support
-        snapshot = glob.glob(args.pretrained_pkl)[0]
-        if os.path.islink(snapshot):
-            snapshot = os.readlink(snapshot)
+        if args.pretrained_pkl.startswith("gdrive"):
+            snapshot = args.pretrained_pkl
+        else: 
+            snapshot = glob.glob(args.pretrained_pkl)[0]
+            if os.path.islink(snapshot):
+                snapshot = os.readlink(snapshot)
 
         # Extract training step from the snapshot if specified
         try:
@@ -327,10 +330,10 @@ def main():
 
     ## Dataset
     parser.add_argument("--data-dir",           help = "Datasets root directory", required = True)
-    parser.add_argument("--dataset",            help = "Training dataset name (subdirectory of data-dir).", required = True)
+    parser.add_argument("--dataset",            help = "Training dataset name (subdirectory of data-dir)", required = True)
     parser.add_argument("--ratio",              help = "Image height/width ratio in the dataset", default = 1.0, type = float)
-    parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 4, type = int)
-    parser.add_argument("--mirror-augment",     help = "Perform horizontal flip augmentation for the data (default: %(default)s)", default = False)
+    parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 2, type = int)
+    parser.add_argument("--mirror-augment",     help = "Perform horizontal flip augmentation for the data (default: %(default)s)", default = None, action = "store_true")
     parser.add_argument("--train-images-num",   help = "Maximum number of images to train on. If not specified, train on the whole dataset.", default = None, type = int)
 
     ## Training

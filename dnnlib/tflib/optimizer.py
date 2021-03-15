@@ -146,7 +146,7 @@ class Optimizer:
             grad_list = zip(grads, varnames)
 
             # Ignore corrupted gradients that contain NaNs/Infs
-            def is_bad(grad): return tf.logical_or(tf.math,is_nan(grad), tf.math.is_inf(grad))
+            def is_bad(grad): return tf.logical_or(tf.math.is_nan(grad), tf.math.is_inf(grad))
             def fix_grad(grad): return tf.where(is_bad(grad), tf.zeros_like(grad), grad) if grad is not None else None
             grad_list = [(fix_grad(grad), varname) for grad, varname in grad_list]
 

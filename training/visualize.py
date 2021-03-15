@@ -89,7 +89,7 @@ def eval(G,
     if training:
         vis = {"imgs", "maps"}
         if num_heads == 1:
-            vis.append("layer_maps")
+            vis.add("layer_maps")
         section_size = num = len(latents)
     else:
         if vis is None:
@@ -145,9 +145,10 @@ def eval(G,
         if verbose:
             print("Running network...")
 
-        images, attmaps_all_layers, wlatents_all_layers = G.run(latents, labels, randomize_noise = False,
-            minibatch_size = batch_size, return_dlatents = True) # is_visualization = True
+        ret = G.run(latents, labels, randomize_noise = False, minibatch_size = batch_size, 
+            return_dlatents = True) # is_visualization = True
         # For memory efficiency, save full information only for a small amount of images
+        images, attmaps_all_layers, wlatents_all_layers = ret[0], ret[-2], ret[-1]
         soft_maps = attmaps_all_layers[:,:,-1,0]
         attmaps_all_layers = attmaps_all_layers[:rich_num]
         wlatents = wlatents_all_layers[:,:,0]
@@ -198,7 +199,7 @@ def eval(G,
                     print("Saving layer maps...")
                     all_maps = tqdm(all_maps)
                 for i in crange(rich_num):
-                    stepdir = "" if step is None else ("/" + step)
+                    stepdir = "" if step is None else ("/{}".format(step))
                     misc.mkdir(dnnlib.make_run_dir_path("eval/layer_maps/%06d" % i + stepdir))
                 for maps, name in all_maps:
                     pattern = "eval/layer_maps/%06d/{}{}.png".format(stepdir, name)

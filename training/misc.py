@@ -27,7 +27,7 @@ def bcolored(txt, color):
 # maxval = 0 turns functionality off.
 def cond_bcolored(num, maxval, color):
     num = num or -1
-    txt = "%.3f" % num
+    txt = "%-2.3f" % num
     if maxval > 0 and num > maxval:
         return bcolored(txt, color)
     return txt

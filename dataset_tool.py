@@ -83,9 +83,6 @@ class TFRecordExporter:
         assert img.shape == self.shape
 
         for lod, tfr_writers in enumerate(self.tfr_writers):
-            if lod > 0:
-                break
-
             if lod:
                 img = img.astype(np.float32)
                 img = (img[:, 0::2, 0::2] + img[:, 0::2, 1::2] + img[:, 1::2, 0::2] + img[:, 1::2, 1::2]) * 0.25
@@ -655,7 +652,7 @@ def create_from_imgs(tfrecord_dir, img_dir, shuffle = False, ratio = None, max_i
     if len(img_filenames) == 0:
         error("No input images found")
     if max_imgs is None:
-        max_imgs =len(img_filenames)
+        max_imgs = len(img_filenames)
 
     # Check image shape
     img = np.asarray(PIL.Image.open(img_filenames[0]).convert("RGB"))

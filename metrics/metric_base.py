@@ -14,7 +14,7 @@ from training import dataset
 
 # Base class for metrics
 class MetricBase:
-    def __init__(self, name, dataset = None):
+    def __init__(self, name):
         self.name = name
         self._dataset_obj = None
         self._progress_lo = None
@@ -254,8 +254,8 @@ class MetricBase:
 
 # Group of multiple metrics
 class MetricGroup:
-    def __init__(self, metric_kwarg_list, dataset = None):
-        self.metrics = [dnnlib.util.call_func_by_name(**kwargs, dataset = None) for kwargs in metric_kwarg_list]
+    def __init__(self, metric_kwarg_list):
+        self.metrics = [dnnlib.util.call_func_by_name(**kwargs) for kwargs in metric_kwarg_list]
 
     def run(self, *args, **kwargs):
         ret = 0.0

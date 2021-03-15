@@ -18,6 +18,7 @@ from training import dataset as data
 from training import misc
 from training import visualize
 from metrics import metric_base
+import pretrained_networks
 import glob
 
 # Data processing
@@ -118,7 +119,8 @@ def emaAvg(avg, value, alpha = 0.995):
 # Load networks from snapshot
 def load_nets(resume_pkl, lG, lD, lGs, recompile):
     print(misc.bcolored("Loading networks from %s..." % resume_pkl, "white"))
-    rG, rD, rGs = misc.load_pkl(resume_pkl)[:3]
+    rG, rD, rGs = pretrained_networks.load_networks(resume_pkl)
+    
     if recompile:
         print(misc.bold("Copying nets..."));
         lG.copy_vars_from(rG); lD.copy_vars_from(rD); lGs.copy_vars_from(rGs)
@@ -150,6 +152,7 @@ def training_loop(
     total_kimg              = 25000,    # Total length of the training, measured in thousands of real images
     mirror_augment          = False,    # Enable mirror augmentation?
     drange_net              = [-1,1],   # Dynamic range used when feeding image data to the networks
+    ratio                   = 1.0,      # Image height/width ratio in the dataset
     # Optimization
     minibatch_repeats       = 4,        # Number of minibatches to run before adjusting training parameters
     lazy_regularization     = True,     # Perform regularization as a separate training step?
@@ -178,9 +181,10 @@ def training_loop(
     num_gpus = dnnlib.submit_config.num_gpus
     cG.name, cD.name = "g", "d"
 
-    # Load dataset and configure training scheduler
+    # Load dataset, configure training scheduler and metrics object
     dataset = data.load_dataset(data_dir = dnnlib.convert_path(data_dir), verbose = True, **dataset_args)
     sched = training_schedule(sched_args, cur_nimg = total_kimg * 1000, dataset = dataset)
+    metrics = metric_base.MetricGroup(metric_arg_list)
 
     # Construct or load networks
     with tf.device("/gpu:0"):
@@ -205,8 +209,20 @@ def training_loop(
     misc.save_img_grid(grid_reals, dnnlib.make_run_dir_path("reals.png"), drange = dataset.dynamic_range, grid_size = grid_size)
     grid_latents = np.random.randn(np.prod(grid_size), *G.input_shape[1:])
 
-    if eval: visualize.eval(G, dataset, batch_size = sched.minibatch_gpu,
-        drange_net = drange_net, ratio = ratio, **vis_args)
+    if eval:
+        # Save a snapshot of the current network to evaluate
+        pkl = dnnlib.make_run_dir_path("network-eval-snapshot-%06d.pkl" % resume_kimg)
+        misc.save_pkl((G, D, Gs), pkl, remove = False)
+
+        # Quantitative evaluation
+        metric = metrics.run(pkl, num_imgs = eval_images_num, run_dir = dnnlib.make_run_dir_path(),
+            data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = ratio, 
+            tf_config = tf_config, mirror_augment = mirror_augment)  
+
+        # Qualitative evaluation
+        visualize.eval(G, dataset, batch_size = sched.minibatch_gpu,
+            drange_net = drange_net, ratio = ratio, **vis_args)
+
     if not train:
         dataset.close()
         exit()
@@ -283,8 +299,6 @@ def training_loop(
         if save_weight_histograms:
             G.setup_weight_histograms(); D.setup_weight_histograms()
 
-    metrics = metric_base.MetricGroup(metric_arg_list, dataset = dataset)
-
     # Initialize training
     print(misc.bcolored("Training for %d kimg..." % total_kimg, "white"))
     dnnlib.RunContext.get().update("", cur_epoch = resume_kimg, max_epoch = total_kimg)
@@ -357,22 +371,20 @@ def training_loop(
 
             # Report progress
             print(("tick %s kimg %s loss/reg: G (%s %s) D (%s %s), grad norms: G (%s %s) D (%s %s) " + 
-                   "time %s sec/tick %s sec/kimg %s maintenance %ss peak GPUmem %sGB %s") % (
+                   "time %s sec/kimg %s maxGPU %sGB %s") % (
                 misc.bold("%-5d" % autosummary("Progress/tick", cur_tick)),
                 misc.bcolored("%-8.1f" % autosummary("Progress/kimg", cur_nimg / 1000.0), "red"),
-                misc.bcolored("%.3f" % (cG.lossvals_agg["loss"] or 0), "blue"),
+                misc.bcolored("%-2.3f" % (cG.lossvals_agg["loss"] or 0), "blue"),
                 misc.bold("%.3f" % (cG.lossvals_agg["reg"] or 0)),
-                misc.bcolored("%.3f" % (cD.lossvals_agg["loss"] or 0), "blue"),
+                misc.bcolored("%-2.3f" % (cD.lossvals_agg["loss"] or 0), "blue"),
                 misc.bold("%.3f" % (cD.lossvals_agg["reg"] or 0)),
                 misc.cond_bcolored(cG.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cG.lossvals_agg["reg_norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["reg_norm"], 20.0, "red"),
                 misc.bold("%-6s" % dnnlib.util.format_time(autosummary("Timing/total_sec", total_time))),
-                "%-6.1f" % autosummary("Timing/sec_per_tick", tick_time),
-                "%-7.2f" % autosummary("Timing/sec_per_kimg", tick_time / tick_kimg),
-                "%2.1f" % autosummary("Timing/maintenance_sec", maintenance_time),
-                "%2.1f" % autosummary("Resources/peak_gpu_mem_gb", peak_gpu_mem_op.eval() / 2**30),                
+                "%-5.2f" % autosummary("Timing/sec_per_kimg", tick_time / tick_kimg),
+                "%-2.1f" % autosummary("Resources/peak_gpu_mem_gb", peak_gpu_mem_op.eval() / 2**30),                
                 printname))
 
             autosummary("Timing/total_hours", total_time / (60.0 * 60.0))
@@ -391,7 +403,7 @@ def training_loop(
                 if cur_tick % network_snapshot_ticks == 0 or done:
                     metric = metrics.run(pkl, num_imgs = eval_images_num, run_dir = dnnlib.make_run_dir_path(),
                         data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = ratio, 
-                        tf_config = tf_config)
+                        tf_config = tf_config, mirror_augment = mirror_augment)
 
                 if last_snapshots > 0:
                     misc.rm(sorted(glob.glob(dnnlib.make_run_dir_path("network*.pkl")))[:-last_snapshots])

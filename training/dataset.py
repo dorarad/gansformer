@@ -22,7 +22,7 @@ class TFRecordDataset:
         shuffle_mb      = 2048,     # Shuffle data within specified window (megabytes), 0 = disable shuffling
         prefetch_mb     = 512,      # Amount of data to prefetch (megabytes), 0 = disable prefetching
         buffer_mb       = 256,      # Read buffer size (megabytes)
-        num_threads     = 4,        # Number of concurrent threads for input processing
+        num_threads     = 2,        # Number of concurrent threads for input processing
         **kwargs):       
 
         self.tfrecord_dir       = tfrecord_dir
@@ -95,7 +95,7 @@ class TFRecordDataset:
         if max_imgs is not None and self._np_labels.shape[0] > max_imgs:
             self._np_labels = self._np_labels[:max_imgs]
         if max_imgs is not None and self._np_labels.shape[0] < max_imgs:
-            print("Too many images. increase number.")
+            print(misc.bcolored("Too many images. increase number.", "red"))
             exit()
         self.label_size = self._np_labels.shape[1]
         self.label_dtype = self._np_labels.dtype.name

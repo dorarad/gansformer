@@ -161,7 +161,7 @@ In the following we list some of the most useful model options.
 * `--integration`: Integration of information in the transformer layer, e.g. `add` or `mul` (default: `mul`)
 
 #### Model (others)
-* `--g-start-res` and `---g-end-res`: Start and end resolution for the transformer layers (default: all layers up to resolution 2<sup>8</sup>) 
+* `--g-start-res` and `--g-end-res`: Start and end resolution for the transformer layers (default: all layers up to resolution 2<sup>8</sup>) 
 * `--kmeans`: Track and update image-to-latents assignment centroids, used in the duplex attention
 * `--mapping-ltnt2ltnt`: Perform self-attention over latents in the mapping network
 * `--use-pos`: Use trainable positional encodings for the latents.

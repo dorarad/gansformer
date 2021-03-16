@@ -30,12 +30,12 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 
 ### Update: All code is now ready!
 
-- :white_check_mark: Uploading initial code and readme
-- :white_check_mark: Image sampling and visualization script
-- :white_check_mark: Code clean-up and refacotiring, adding documentation
-- :white_check_mark: Training and data-prepreation intructions
-- :white_check_mark: Pretrained networks for all datasets
-- :white_check_mark: Extra visualizations and evaluations <!--Extra visualizations/animations and evaluation-->
+:white_check_mark: Uploading initial code and readme
+:white_check_mark: Image sampling and visualization script
+:white_check_mark: Code clean-up and refacotiring, adding documentation
+:white_check_mark: Training and data-prepreation intructions
+:white_check_mark: Pretrained networks for all datasets
+:white_check_mark: Extra visualizations and evaluations <!--Extra visualizations/animations and evaluation-->
 
 ## Bibtex
 ```bibtex

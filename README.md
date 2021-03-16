@@ -12,7 +12,7 @@
   <b>Drew A. Hudson* & C. Lawrence Zitnick</b></span>
 </p>
 
-*I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for the kind financial support that allowed this work to happen!
+*_I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for the kind financial support that allowed this work to happen!_ :sunflower:
 
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/image1.png" style="float:left" width="340px">
@@ -26,15 +26,16 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 
 **Paper**: [https://arxiv.org/pdf/2103.01209](https://arxiv.org/pdf/2103.01209)  
 **Contact**: dorarad@stanford.edu
+**Implementation**: [`network.py`](training/network.py)
 
 ### Update: All code is now ready!
 
-- [x] Uploading initial code and readme
-- [x] Image sampling and visualization script
-- [x] Code clean-up and refacotiring, adding documentation
-- [x] Training and data-prepreation intructions
-- [x] Pretrained networks for all datasets
-- [x] Extra visualizations and evaluation <!--Extra visualizations/animations and evaluation-->
+- :white_check_mark: Uploading initial code and readme
+- :white_check_mark: Image sampling and visualization script
+- :white_check_mark: Code clean-up and refacotiring, adding documentation
+- :white_check_mark: Training and data-prepreation intructions
+- :white_check_mark: Pretrained networks for all datasets
+- :white_check_mark: Extra visualizations and evaluations <!--Extra visualizations/animations and evaluation-->
 
 ## Bibtex
 ```bibtex
@@ -53,9 +54,14 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 - We have performed experiments on Titan V GPU. We assume 12GB of GPU memory (more memory can expedite training).
 - See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
 
-<!-- ## Quickstart -->
+## Quickstart and Overview
+
+
+We can both train, evaluate the model quantitatively and qualitative by running the The [`run_netowrk.py`](run_network.py).  
+The model architecutre can be found at [`network.py`](training/network.py). The training loop is implemented at [`training_loop.py`](training/training_loop.py).
+
 ## Data preparation
-We explored the GANsformer model on 4 datasets for images and scenes: [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/), [LSUN-Bedrooms](https://www.yf.io/p/lsun),[Cityscapes](https://www.cityscapes-dataset.com/) and [FFHQ](https://github.com/NVlabs/ffhq-dataset). The model can be trained on other datasets as well.
+We explored the GANsformer model on 4 datasets for images and scenes: [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/), [LSUN-Bedrooms](https://www.yf.io/p/lsun), [Cityscapes](https://www.cityscapes-dataset.com/) and [FFHQ](https://github.com/NVlabs/ffhq-dataset). The model can be trained on other datasets as well.
 We trained the model on `256x256` resolution. Higher resolutions are supported too. The model will automatically adapt to the resolution of the images in the dataset.
 
 The [`prepare_data.py`](prepare_data.py) can either prepare the datasets from our catalog or create new datasets.
@@ -77,7 +83,7 @@ This can be particularly useful to save space in case of large datasets, such as
 ### Custom Datasets
 You can also use the script to create new custom datasets. For instance:
 ```python
-python prepare_data.py --task <data-name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards_num 5
+python prepare_data.py --task <dataset-name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards-num 5
 ```
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
@@ -126,14 +132,14 @@ python run_network.py --train --gpus=0 --baseline GAN --expname clevr-gan --data
 ## Evaluation
 To evalute a model, use the `--eval` option:
 ```python
-python run_network.py --eval --gpus=0 --expname clevr-exp --dataset clevr
+python run_network.py --eval --gpus 0 --expname clevr-exp --dataset clevr
 ```
 Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
 
 ## Visualization
 The code supports producing qualitative results and visualizations. For instance, to create attention maps for each layer:
 ```python
-python run_network.py --gpus=0 --eval --expname clevr-exp --dataset clevr --vis-layer-maps
+python run_network.py --gpus 0 --eval --expname clevr-exp --dataset clevr --vis-layer-maps
 ```
 
 ## Command-line Options
@@ -155,7 +161,7 @@ In the following we list some of the most useful model options.
 * `--integration`: Integration of information in the transformer layer, e.g. `add` or `mul` (default: `mul`)
 
 #### Model (others)
-* `--g-start-res` / `---g-end-res`: Start and end resolution for the transformer layers (default: all layers up to resolution 2<sup>8</sup>) 
+* `--g-start-res` and `---g-end-res`: Start and end resolution for the transformer layers (default: all layers up to resolution 2<sup>8</sup>) 
 * `--kmeans`: Track and update image-to-latents assignment centroids, used in the duplex attention
 * `--mapping-ltnt2ltnt`: Perform self-attention over latents in the mapping network
 * `--use-pos`: Use trainable positional encodings for the latents.
@@ -175,6 +181,8 @@ In the following we list some of the most useful model options.
 * **Others**
   * `--vis-noise-var`: Create noise variation visualization
   * `--vis-style-mix`: Create style mixing visualization
+
+Run `python run_network.py -h` for the full options list.
 
 ## CUDA / Installation
 The model relies on custom TensorFlow ops that are compiled on the fly using [NVCC](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html). 

@@ -77,7 +77,7 @@ This can be particularly useful to save space in case of large datasets, such as
 ### Custom Datasets
 You can also use the script to create new custom datasets. For instance:
 ```python
-python prepare_data.py --task <dataset-name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards_num 5
+python prepare_data.py --task <data-name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards_num 5
 ```
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
@@ -126,7 +126,7 @@ python run_network.py --train --gpus=0 --baseline GAN --expname clevr-gan --data
 ## Evaluation
 To evalute a model, use the `--eval` option:
 ```python
-python run_network.py --eval --gpus=0 --expname clevr-exp --dataset clevr --data-dir=datasets --result-dir results 
+python run_network.py --eval --gpus=0 --expname clevr-exp --dataset clevr
 ```
 Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
 

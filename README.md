@@ -54,9 +54,8 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 - We have performed experiments on Titan V GPU. We assume 12GB of GPU memory (more memory can expedite training).
 - See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
 
-## Quickstart and Overview
-
-
+<!-- ## Quickstart and Overview -->
+## Overview
 We can both train, evaluate the model quantitatively and qualitative by running the The [`run_netowrk.py`](run_network.py).  
 The model architecutre can be found at [`network.py`](training/network.py). The training loop is implemented at [`training_loop.py`](training/training_loop.py).
 
@@ -83,7 +82,7 @@ This can be particularly useful to save space in case of large datasets, such as
 ### Custom Datasets
 You can also use the script to create new custom datasets. For instance:
 ```python
-python prepare_data.py --task <dataset-name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards-num 5
+python prepare_data.py --task <name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards-num 5
 ```
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
@@ -105,7 +104,8 @@ python run_network.py --train --gpus=0 --gansformer-default --expname clevr-pret
 
 To train a GANsformer in its default configuration form scratch:
 ```python
-python run_network.py --pretrained-pkl None --train --gpus=0 --gansformer-default --expname clevr-scr --dataset clevr 
+python run_network.py --train --gpus=0 --gansformer-default --expname clevr-scratch --dataset clevr \
+  --pretrained-pkl None
 ```
 
 By defualt, models training is resumed from the latest snapshot. Use `--restart` to strat a new experiment, or `--pretrained-pkl` to select a particular snapshot to load.

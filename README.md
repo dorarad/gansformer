@@ -77,7 +77,7 @@ This can be particularly useful to save space in case of large datasets, such as
 ### Custom Datasets
 You can also use the script to create new custom datasets. For instance:
 ```python
-python prepare_data.py --task <new-dataset-name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards_num 5
+python prepare_data.py --task <dataset-name> --images-dir <source-dir> --images-format png --ratio 0.75 --shards_num 5
 ```
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
@@ -92,22 +92,21 @@ The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lm
 Use `--max-images` to limit the size of the `tfrecord` files.
 
 ## Training
-Models are trained by using the `--train` option.  
-To fine-tune a pretrained GANsformer model:
+Models are trained by using the `--train` option. To fine-tune a pretrained GANsformer model:
 ```python
-python run_network.py --gansformer-default --expname clevr-pretrained \
-  --dataset clevr --train --gpus=0 --data-dir=datasets --result-dir results 
+python run_network.py --train --gpus=0 --gansformer-default --expname clevr-pretrained --dataset clevr  
 ```
 
 To train a GANsformer in its default configuration form scratch:
 ```python
-python run_network.py --gansformer-default --expname clevr-scratch --pretrained-pkl None \
-  --dataset clevr --train --gpus=0 --data-dir=datasets --result-dir results 
+python run_network.py --pretrained-pkl None --train --gpus=0 --gansformer-default --expname clevr-scr --dataset clevr 
 ```
 
 By defualt, models training is resumed from the latest snapshot. Use `--restart` to strat a new experiment, or `--pretrained-pkl` to select a particular snapshot to load.
 
 For comparing to state-of-the-art, we compute metric scores using 50,000 sample imaegs. To expedite training though, we recommend settings `--eval-images-num` to a lower number. Note though that this can impact the precision of the metrics, so we recommend using a lower value during training, and increasing it back up in the final evaluation.
+
+We support a large variety of command-line options to adjust the model, training, and evaluation. Run `python run_network.py -h` for the full list of options!
 
 ### Logging
 * During training, sample images and attention maps will be generated and stored at results/<expname>-<run-id> (`--keep-samples`).
@@ -117,14 +116,27 @@ For comparing to state-of-the-art, we compute metric scores using 50,000 sample 
 ### Baseline models
 The codebase suppors multiple baselines in addition to the GANsformer. For instance, to run a vanilla GAN model:
 ```python
-python run_network.py --baseline GAN --expname clevr-gan --dataset clevr --train --gpus=0 --data-dir=datasets --result-dir results 
+python run_network.py --train --gpus=0 --baseline GAN --expname clevr-gan --dataset clevr 
 ```
 * **Vanialla GAN**: `--baseline GAN`, a standard GAN without style modulation.
 * **[StyleGAN2](https://arxiv.org/abs/1912.04958)**: `--baseline StyleGAN`, with one global latent that modulates the image features.
 * **[k-GAN](https://arxiv.org/abs/1810.10340)**: `--baseline kGAN`, which generates multiple image layers independetly and then merge them into one shared image.
 * **[SAGAN]()**: `--baseline SAGAN`, which performs self-attention between all image features in low-resolution layer (e.g. `32x32`).
 
-### Command-line Options
+## Evaluation
+To evalute a model, use the `--eval` option:
+```python
+python run_network.py --eval --gpus=0 --expname clevr-exp --dataset clevr --data-dir=datasets --result-dir results 
+```
+Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
+
+## Visualization
+The code supports producing qualitative results and visualizations. For instance, to create attention maps for each layer:
+```python
+python run_network.py --gpus=0 --eval --expname clevr-exp --dataset clevr --vis-layer-maps
+```
+
+## Command-line Options
 In the following we list some of the most useful model options. 
 
 #### Training
@@ -133,7 +145,8 @@ In the following we list some of the most useful model options.
 * `--eval-images-num`: Number of images to compute metrics over. We recommend selecting a lower number to expedite training (default: `50,000`)
 * `--restart`: To restart training from sracth instead of resuming from the latest snapshot
 * `--pretrained-pkl`: To load a pretrained model, either a local one or from drive `gdrive:<dataset>-snapshot.pkl` for the datasets in the catalog.
-* 
+* `--data-dir` and `--result-dir`: Directory names for the datasets (`tfrecords`) and logging/results.
+
 #### Model (most useful)
 * `--transformer`: To add transformer layers to the generator (GANsformer)
 * `--components-num`: Number of latent components, which will attend to the image. We recommend values in the range of `8-16` (default: `1`)
@@ -148,50 +161,20 @@ In the following we list some of the most useful model options.
 * `--use-pos`: Use trainable positional encodings for the latents.
 * `--style False`: To turn-off one-vector global style modulation (StyleGAN2).
 
-Run `python run_network.py -h` for a full list of options!
-
-## Evaluation
-Toe evalute a model, use the `--eval` option:
-```python
-python run_network.py --expname clevr-exp --dataset clevr --eval --gpus=0 --data-dir=datasets --result-dir results 
-```
-Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
-
-## Visualization
-The code supports producing qualitative results and visualizations. For instance, to create attention maps for each layer:
-```python
-python run_network.py --expname clevr-exp --dataset clevr --eval --gpus=0 --data-dir=datasets --result-dir results --vis-layer-maps
-```
-For sample imaegs:
-* `--vis-images`: Generate image samples 
-* `--vis-latents`: Save source latent vectors
-
-For attention maps:
-* `--vis-maps`: Visualize attention maps of last layer and first head
-* `--vis-layer-maps`: Visualize attention maps of all layer and heads
-* `--blending-alpha`: Alpha weight when visualizing a bledning of images and attention maps
-
-For image interpolations:
-* `--vis-interpolations`: Generative interplations between pairs of source latents
-* `--interpolation-density`: Number of samples in between two end points of an interpolation (default: `8`)
-
-Other visualizations:
-* `--vis-noise-var`: Create noise variation visualization
-* `--vis-style-mix`: Create style mixing visualization
-
-## Architecture overview
-The GANsformer consists of two networks:
-
-**Generator**: which produces the images (`x`) given randomly sampled latents (`z`). The latent z has a shape `[batch_size, component_num, latent_dim]`, where `component_num = 1` by default (Vanilla GAN, StyleGAN) but is > 1 for the GANsformer model. We can define the latent components by splitting `z` along the second dimension to obtain `z_1,...,z_k` latent components. The generator likewise consists of two parts:
-* **Mapping network**: converts sampled latents from a normal distribution (`z`) to the intermediate space (`w`). A series of Feed-forward layers. The k latent components either are mapped independently from the `z` space to the `w` space or interact with each other through self-attention (optional flag).
-* **Synthesis network**: the intermediate latents w are used to guide the generation of new images. Images features begin from a small constant/sampled grid of `4x4`, and then go through multiple layers of convolution and up-sampling until reaching the desirable resolution (e.g. `256x256`). After each convolution, the image features are modulated (meaning that their variance and bias are controlled) by the intermediate latent vectors `w`. While in the StyleGAN model there is one global w vectors that controls all the features equally. The GANsformer uses attention so that the k latent components specialize to control different regions in the image to create it cooperatively, and therefore perform better especially in generating images depicting multi-object scenes.
-* **Attention** can be used in several ways
-  * **Simplex Attention**: when attention is applied in one direction only from the latents to the image features (**top-down**).
-  * **Duplex Attention**: when attention is applied in the two directions: latents to image features (**top-down**) and then image features back to latents (**bottom-up**), so that each representation informs the other iteratively.
-  * **Self Attention between latents**: can also be used so to each direct interactions between the latents.
-  * **Self Attention between image features** (SAGAN model): prior approaches used attention directly between the image features, but this method does not scale well due to the quadratic number of features which becomes very high for high-resolutions.
-     
-**Discriminator**: Receives and image and has to predict whether it is real or fake – originating from the dataset or the generator. The model perform multiple layers of convolution and downsampling on the image, reducing the representation's resolution gradually until making final prediction. Optionally, attention can be incorporated into the discriminator as well where it has multiple (k) aggregator variables, that use attention to adaptively collect information from the image while being processed. We observe small improvements in model performance when attention is used in the discriminator, although note that most of the gain in using attention based on our observations arises from the generator.
+#### Visualization
+* **Sample imaegs**
+  * `--vis-images`: Generate image samples 
+  * `--vis-latents`: Save source latent vectors
+* **Attention maps**
+  * `--vis-maps`: Visualize attention maps of last layer and first head
+  * `--vis-layer-maps`: Visualize attention maps of all layer and heads
+  * `--blending-alpha`: Alpha weight when visualizing a bledning of images and attention maps
+* **Image interpolations**
+  * `--vis-interpolations`: Generative interplations between pairs of source latents
+  * `--interpolation-density`: Number of samples in between two end points of an interpolation (default: `8`)
+* **Others**
+  * `--vis-noise-var`: Create noise variation visualization
+  * `--vis-style-mix`: Create style mixing visualization
 
 ## CUDA / Installation
 The model relies on custom TensorFlow ops that are compiled on the fly using [NVCC](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html). 
@@ -208,6 +191,20 @@ nvcc test_nvcc.cu -o test_nvcc -run
 | CPU says hello.
 | GPU says hello.
 ```
+
+## Architecture overview
+The GANsformer consists of two networks:
+
+**Generator**: which produces the images (`x`) given randomly sampled latents (`z`). The latent z has a shape `[batch_size, component_num, latent_dim]`, where `component_num = 1` by default (Vanilla GAN, StyleGAN) but is > 1 for the GANsformer model. We can define the latent components by splitting `z` along the second dimension to obtain `z_1,...,z_k` latent components. The generator likewise consists of two parts:
+* **Mapping network**: converts sampled latents from a normal distribution (`z`) to the intermediate space (`w`). A series of Feed-forward layers. The k latent components either are mapped independently from the `z` space to the `w` space or interact with each other through self-attention (optional flag).
+* **Synthesis network**: the intermediate latents w are used to guide the generation of new images. Images features begin from a small constant/sampled grid of `4x4`, and then go through multiple layers of convolution and up-sampling until reaching the desirable resolution (e.g. `256x256`). After each convolution, the image features are modulated (meaning that their variance and bias are controlled) by the intermediate latent vectors `w`. While in the StyleGAN model there is one global w vectors that controls all the features equally. The GANsformer uses attention so that the k latent components specialize to control different regions in the image to create it cooperatively, and therefore perform better especially in generating images depicting multi-object scenes.
+* **Attention** can be used in several ways
+  * **Simplex Attention**: when attention is applied in one direction only from the latents to the image features (**top-down**).
+  * **Duplex Attention**: when attention is applied in the two directions: latents to image features (**top-down**) and then image features back to latents (**bottom-up**), so that each representation informs the other iteratively.
+  * **Self Attention between latents**: can also be used so to each direct interactions between the latents.
+  * **Self Attention between image features** (SAGAN model): prior approaches used attention directly between the image features, but this method does not scale well due to the quadratic number of features which becomes very high for high-resolutions.
+     
+**Discriminator**: Receives and image and has to predict whether it is real or fake – originating from the dataset or the generator. The model perform multiple layers of convolution and downsampling on the image, reducing the representation's resolution gradually until making final prediction. Optionally, attention can be incorporated into the discriminator as well where it has multiple (k) aggregator variables, that use attention to adaptively collect information from the image while being processed. We observe small improvements in model performance when attention is used in the discriminator, although note that most of the gain in using attention based on our observations arises from the generator.
 
 ## Codebase
 This codebase builds on top of and extends the great [StyleGAN2 repository](https://github.com/NVlabs/stylegan2) by Karras et al.  

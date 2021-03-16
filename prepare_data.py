@@ -68,12 +68,12 @@ catalog = {
 }
 
 formats_catalog = {
-    "png": lambda tfdir, imgdir, **kwargs: create_from_imgs(tfdir, imgdir, format = "png", **kwargs),
-    "jpg": lambda tfdir, imgdir, **kwargs: create_from_imgs(tfdir, imgdir, format = "jpg", **kwargs),
-    "npy": create_from_npy, 
-    "hdf5": create_from_hdf5, 
-    "tfds": reate_from_tfds, 
-    "lmdb": create_from_lmdb
+    "png": lambda tfdir, imgdir, **kwargs: dataset_tool.create_from_imgs(tfdir, imgdir, format = "png", **kwargs),
+    "jpg": lambda tfdir, imgdir, **kwargs: dataset_tool.create_from_imgs(tfdir, imgdir, format = "jpg", **kwargs),
+    "npy": dataset_tool.create_from_npy, 
+    "hdf5": dataset_tool.create_from_hdf5, 
+    "tfds": dataset_tool.create_from_tfds, 
+    "lmdb": dataset_tool.create_from_lmdb
 }
 
 def mkdir(d):
@@ -141,14 +141,13 @@ def prepare(tasks, data_dir, shards_num = 1, max_images = None,
             "name": task,
             "dir": images_dir,
             "ratio": ratio,
-            "process": formats_catalog[images_format]
+            "process": formats_catalog.get(images_format)
         })
 
         dirname = "{}/{}".format(data_dir, task)
         mkdir(dirname)
 
         try:
-            if c is not None:
             print(misc.bold("Preparing the {} dataset...".format(c.name)))
             fname = "{}/{}".format(dirname, c.filename)
             download = not ("local" in c or (os.path.exists(fname) and verify_md5(fname, c.md5)))

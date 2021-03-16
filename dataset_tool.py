@@ -713,7 +713,7 @@ def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, max_imgs = None, 
             img = np.asarray(img)
             img = img.transpose([2, 0, 1]) # HWC => CHW
             tfr.add_img(img)
-            if max_imgs is not None i > max_imgs:
+            if max_imgs is not None and i > max_imgs:
                 break
 
 def create_from_lmdb(tfrecord_dir, lmdb_dir, ratio = None, max_imgs = None, shards_num = 5):

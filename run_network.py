@@ -61,7 +61,7 @@ def run(**args):
     if not args.train and not args.eval:
         misc.log("Warning: Neither --train nor --eval are provided. Therefore, we only print network shapes", "red")
 
-    if args.default_config:
+    if args.gansformer_default:
         task = args.dataset
         pretrained = "gdrive:{}-snapshot.pkl".format(task)
         if pretrained not in pretrained_networks.gdrive_urls:
@@ -366,7 +366,7 @@ def main():
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
 
     ## Resumption
-    parser.add_argument("--default-config",     help = "Select a default GANsformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
+    parser.add_argument("--gansformer-default", help = "Select a default GANsformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
     parser.add_argument("--pretrained-pkl",     help = "Filename for a snapshot to resume (optional)", default = None, type = str)
     parser.add_argument("--restart",            help = "Restart training from scratch", default = False, action = "store_true")
     parser.add_argument("--reload",             help = "Reload options from the original experiment configuration file. " +
@@ -376,7 +376,7 @@ def main():
     parser.add_argument("--last-snapshots",     help = "Number of last snapshots to save. -1 for all (default: 10)", default = None, type = int)
 
     ## Dataset
-    parser.add_argument("--data-dir",           help = "Datasets root directory", required = True)
+    parser.add_argument("--data-dir",           help = "Datasets root directory (default: %(default)s)", default = "datasets", metavar = "DIR")
     parser.add_argument("--dataset",            help = "Training dataset name (subdirectory of data-dir)", required = True)
     parser.add_argument("--ratio",              help = "Image height/width ratio in the dataset", default = 1.0, type = float)
     parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 4, type = int)
@@ -521,7 +521,7 @@ def main():
         misc.error("Dataset root directory does not exist")
 
     if not os.path.exists("{}/{}".format(args.data_dir, args.dataset)):
-        misc.error("The dataset {} directory does not exist at {}/".format(args.dataset, args.data_dir))
+        misc.error("The dataset {}/{} directory does not exist".format(args.data_dir, args.dataset))
 
     for metric in args.metrics:
         if metric not in metric_defaults:

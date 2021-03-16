@@ -80,8 +80,9 @@ def eval(G,
                                       # or all of them at once (False)
     noise_samples_num   = 100,        # Number of samples used to compute noise variation visualization
     section_size        = 100):       # Visualization section size (section_size <= num) for reducing memory footprint
-
-    def pattern_of(dir, step, suffix): return "eval/{}/{}%06d.{}".format(dir, "" if step is None else "{}_".format(step), suffix)
+    
+    def prefix(step): return "" if step is None else "{:06d}_".format(step)
+    def pattern_of(dir, step, suffix): return "eval/{}/{}%06d.{}".format(dir, prefix(step), suffix)
 
     # For time efficiency, during training save only image and map samples
     # rather than richer visualizations
@@ -104,7 +105,7 @@ def eval(G,
         verbose = not training
     # If grid size is provided, set number of visualized images accordingly
     if grid_size is not None:
-        num = np.prod(grid_size)
+        rich_num = num = np.prod(grid_size)
 
     # build image functions
     save_images = misc.save_images_builder(drange_net, ratio, grid_size, grid, verbose)
@@ -198,11 +199,15 @@ def eval(G,
                 if verbose:
                     print("Saving layer maps...")
                     all_maps = tqdm(all_maps)
-                for i in crange(rich_num):
-                    stepdir = "" if step is None else ("/{}".format(step))
-                    misc.mkdir(dnnlib.make_run_dir_path("eval/layer_maps/%06d" % i + stepdir))
+                if grid:
+                    for i in crange(rich_num):
+                        stepdir = "" if step is None else ("/{:06d}".format(step))
+                        misc.mkdir(dnnlib.make_run_dir_path("eval/layer_maps/%06d" % i + stepdir))
                 for maps, name in all_maps:
-                    pattern = "eval/layer_maps/%06d/{}{}.png".format(stepdir, name)
+                    if grid:
+                        pattern = "eval/layer_maps/%06d/{}/{}.png".format(stepdir, name)
+                    else:
+                        pattern = "eval/layer_maps/{}%06d_{}.png".format(prefix(step), name)
                     save_images(maps, pattern, idx)
 
     # Produce interpolations between pairs or source latents
@@ -315,4 +320,4 @@ def eval(G,
             canvas.save(dnnlib.make_run_dir_path("eval/{}-mixing.png".format(name)))
 
     if verbose:
-        print(misc.bcolored("Visualizations Completed!", "blue"))
+        misc.log("Visualizations Completed!", "blue")

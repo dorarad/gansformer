@@ -1,7 +1,7 @@
 # import warnings filter
 from warnings import simplefilter
 # ignore all future warnings
-simplefilter(action='ignore', category=FutureWarning)
+simplefilter(action = "ignore", category = FutureWarning)
 
 import os
 import sys
@@ -12,25 +12,68 @@ import glob
 import gdown
 import urllib
 import zipfile
+import hashlib
 
 import argparse
 import numpy as np
 from training import misc 
+from dnnlib import EasyDict
 import dataset_tool
 
-urls = {
-   "ffhq": {
-        "url": "https://drive.google.com/uc?id=1Oo-43djEakn6AzeZidfmHWYFNfMen8ZP", 
-        "path": "ffhq-r08.tfrecords1of1", 
-        "size": 13766900000,  
-        "md5": "74de4f07dc7bfb07c0ad4471fdac5e67",
-    },
-    "clevr": "https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip",
-    "bedrooms": "http://dl.yf.io/lsun/scenes/bedroom_train_lmdb.zip",
-    "cityscapes": {
+catalog = {
+   "ffhq": EasyDict({
+        "name": "FFHQ", # Dataset name for logging 
+        "filename": "ffhq-r08.tfrecords1of1", # Local file name
+        "url": "https://drive.google.com/uc?id=1Oo-43djEakn6AzeZidfmHWYFNfMen8ZP", # download URL
+        "md5": "74de4f07dc7bfb07c0ad4471fdac5e67", # MD5 checksum to potentially skip download
+        "ratio": 1, # height/width ratio
+        "size": 13, # download size in GB
+        "shards": 1, # Number of tfrecord shards
+        "img_num": 70000 # Number of images
+    }),
+    "clevr": EasyDict({
+        "name": "CLEVR", # Dataset name for logging 
+        "filename": "CLEVR_v1.0.zip",
+        "url": "https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip",
+        "dir": "CLEVR_v1.0/images", # Image directory to process while turning into tfrecords
+        "md5": "b11922020e72d0cd9154779b2d3d07d2",
+        "ratio": 0.75,
+        "size": 18,
+        "shards": 5,
+        "img_num": 100000,
+        "process": dataset_tool.create_from_imgs # Function to convert download to tfrecords
+    }),
+    "bedrooms": EasyDict({
+        "name": "LSUN-Bedrooms", # Dataset name for logging 
+        "filename": "bedroom_train_lmdb.zip",
+        "url": "http://dl.yf.io/lsun/scenes/bedroom_train_lmdb.zip",
+        "md5": "f2c5d904a82a6295dbdccb322b4b0a99",
+        "dir": "bedroom_train_lmdb",
+        "ratio": 188/256,
+        "size": 43,
+        "shards": 64,
+        "img_num": 3033042,
+        "process": dataset_tool.create_from_lmdb # Function to convert download to tfrecords
+    }),
+    "cityscapes": EasyDict({
+        "name": "Cityscapes", # Dataset name for logging 
+        "filename": "cityscapes.zip",
         "url": "https://drive.google.com/uc?id=1t9Qhxm0iHFd3k-xTYEbKosSx_DkyoLLJ",
-        "path": "cityscapes.zip",
-    }
+        "md5": "953d231046275120dc1f73a5aebc9087",
+        "ratio": 0.5,        
+        "size": 2,
+        "shards": 16,
+        "img_num": 25000
+    })
+}
+
+formats_catalog = {
+    "png": lambda tfdir, imgdir, **kwargs: create_from_imgs(tfdir, imgdir, format = "png", **kwargs),
+    "jpg": lambda tfdir, imgdir, **kwargs: create_from_imgs(tfdir, imgdir, format = "jpg", **kwargs),
+    "npy": create_from_npy, 
+    "hdf5": create_from_hdf5, 
+    "tfds": reate_from_tfds, 
+    "lmdb": create_from_lmdb
 }
 
 def mkdir(d):
@@ -40,7 +83,18 @@ def mkdir(d):
         except:
             pass
 
-def unzip_fn(zip, path):
+def verify_md5(filename, md5):
+    print("Verify MD5 for {}...".format(filename))
+    with open(filename, "rb") as f:
+        new_md5 = hashlib.md5(f.read()).hexdigest()
+    result = md5 == new_md5
+    if result:
+        print(misc.bold("MD5 matches!"))
+    else:
+        print("MD5 doesn't match. Will redownload the file.")
+    return result
+
+def unzip(zip, path):
     with zipfile.ZipFile(zip) as zf:
         for member in tqdm.tqdm(zf.infolist(), desc = "Extracting "):
             try:
@@ -48,116 +102,93 @@ def unzip_fn(zip, path):
             except zipfile.error as e:
                 pass
 
-def download_file(url, dir = None, path = None, unzip = False, drive = False, md5 = None):
+def download_file(url, dir = None, path = None, unzip = False, md5 = None, block_sz = 8192):
     if path is None:
         path = url.split("/")[-1]
     if dir is not None:
         path = "{}/{}".format(dir, path)
 
-    if drive:
-        gdown.cached_download(url, path, md5 = md5)
+    if "drive.google.com" in url:
+        gdown.download(url, path)
     else:
         u = urllib.request.urlopen(url)
-        f = open(path, "wb")
-        meta = u.info()
-        file_size = int(meta.get_all("Content-Length")[0])
-        print("Downloading: %s Bytes: %s" % (path, file_size))
+        with open(path, "wb") as f:
+            fsize = int(u.info().get_all("Content-Length")[0])
+            print("Downloading: %s Bytes: %s" % (path, fsize))
 
-        file_size_dl = 0
-        block_sz = 8192
-        while True:
-            buffer = u.read(block_sz)
-            if not buffer:
-                break
+            curr = 0
+            while True:
+                buffer = u.read(block_sz)
+                if not buffer:
+                    break
+                curr += len(buffer)
+                f.write(buffer)
+                
+                status  = r"%10d  [%3.2f%%]" % (curr, curr * 100. / fsize)
+                status += chr(8) * (len(status) + 1)
+                print(status, end = "", flush = True)
 
-            file_size_dl += len(buffer)
-            f.write(buffer)
-            status = r"%10d  [%3.2f%%]" % (file_size_dl, file_size_dl * 100. / file_size)
-            status = status + chr(8)*(len(status) + 1)
-            print(status, end = "", flush = True)
+    if path.endswith(".zip"):
+        unzip(path, dir)
 
-        f.close()
-
-    if unzip:
-        unzip_fn(path, dir)
-
-def prepare_task(task, name, size, dir, redownload, download = None, prepare = lambda: None):
-    if task:
-        # try:
-        print(misc.bcolored("Preparing the {} dataset...".format(name), "blue"))
-        if download is not None and (redownload or not os.path.exists("{}/{}".format(dir, task))):
-            print(misc.bold("Downloading the data ({} GB)...".format(size)))
-            download()
-            print(misc.bold("Completed downloading {}".format(name)))
-        
-        prepare()
-        print(misc.bcolored("Completed preparations for {}!".format(name), "blue"))
-        # except:
-        #     print(misc.bcolored("Had an error in preparing the {} dataset. Will move on.".format(name), "red"))
-        #     print(sys.exc_info())
-        #     pass
-
-def prepare(tasks, data_dir, redownload, shards_num = None, max_images = None):
+def prepare(tasks, data_dir, shards_num = 1, max_images = None, 
+        ratio = 1.0, images_dir = None, images_format = None): # Options for custom dataset
     mkdir(data_dir)
     for task in tasks:
-        mkdir("{}/{}".format(data_dir, task))
+        # If task not in catalog, create custom task configuration
+        c = catalog.get(task, {
+            "local": True,
+            "name": task,
+            "dir": images_dir,
+            "ratio": ratio,
+            "process": formats_catalog[images_format]
+        })
 
-    def dir_name(task): return "{}/{}".format(data_dir, task)
+        dirname = "{}/{}".format(data_dir, task)
+        mkdir(dirname)
 
-    if "ffhq" in tasks:
-        prepare_task("ffhq", "FFHQ", 13, data_dir, redownload,
-            download = lambda: download_file(urls["ffhq"]["url"], dir_name("ffhq"), drive = True,
-                path = urls["ffhq"]["path"], md5 = urls["ffhq"]["md5"]))
+        try:
+            if c is not None:
+            print(misc.bold("Preparing the {} dataset...".format(c.name)))
+            fname = "{}/{}".format(dirname, c.filename)
+            download = not ("local" in c or (os.path.exists(fname) and verify_md5(fname, c.md5)))
 
-    if "cityscapes" in tasks:
-        prepare_task("cityscapes", "Cityscapes", 2, data_dir, redownload,
-            download = lambda: download_file(urls["cityscapes"]["url"], dir_name("cityscapes"), 
-                drive = True, unzip = True, path = urls["cityscapes"]["path"]))
+            if download:
+                print(misc.bold("Downloading the data ({} GB)...".format(c.size)))
+                download_file(c.url, dirname, path = c.filename, md5 = c.md5)
+                print(misc.bold("Completed downloading {}".format(c.name)))
+            
+            if "process" in c:
+                imgdir = images_dir if "local" in c else ("{}/{}".format(dirname, c.dir))
+                shards_num = c.shards if max_images is None else shards_num
+                c.process(dirname, imgdir, ratio = c.ratio, 
+                    shards_num = shards_num, max_imgs = max_images)
 
-    if "clevr" in tasks:
-        shards_num = shards_num or 5
-        prepare_task("clevr", "CLEVR", 18, data_dir, redownload, 
-            download = lambda: download_file(urls["clevr"], dir_name("clevr"), unzip = True),
-            prepare = lambda: dataset_tool.create_from_imgs(dir_name("clevr"), "{}/clevr/CLEVR_v1.0/images".format(data_dir), 
-                ratio = 0.75, shards_num = shards_num, max_imgs = max_images))
-
-    if "bedrooms" in tasks:
-        shards_num = shards_num or 32
-        prepare_task("bedrooms", "LSUN-Bedrooms", 43, data_dir, redownload, 
-            download = lambda: download_file(urls["bedrooms"], dir_name("bedrooms"), unzip = True),
-            prepare = lambda: dataset_tool.create_from_lmdb(dir_name("bedrooms"), 
-                 "{}/bedrooms/bedroom_train_lmdb".format(data_dir), ratio = 188/256, 
-                 shards_num = shards_num, max_imgs = max_images))
-
-def _str_to_bool(v):
-    if isinstance(v, bool):
-        return v
-    if v.lower() in ("yes", "true", "t", "y", "1", ""):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Boolean value expected")
+            print(misc.bcolored("Completed preparations for {}!".format(c.name), "blue"))
+        except:
+            print(misc.bcolored("Had an error in preparing the {} dataset. Will move on.".format(c.name), "red"))
+            print(sys.exc_info())
 
 def run_cmdline(argv):
     parser = argparse.ArgumentParser(prog = argv[0], description = "Download and prepare data for the GANsformer.")
-    parser.add_argument("--clevr",          help = "Prepare the CLEVR dataset (18 GB)", dest = "tasks", action = "append_const", const = "clevr")
-    parser.add_argument("--ffhq",           help = "Prepare the FFHQ dataset (13 GB)", dest = "tasks", action = "append_const", const = "ffhq")
-    parser.add_argument("--bedrooms",       help = "Prepare the LSUN-bedrooms dataset (43 GB)", dest = "tasks", action = "append_const", const = "bedrooms")
-    parser.add_argument("--cityscapes",     help = "Prepare the cityscapes dataset (2 GB)", dest = "tasks", action = "append_const", const = "cityscapes")
-    parser.add_argument("--data-dir",       help = "Path to download dataset", default = "datasets", type = str)
-    parser.add_argument("--redownload",     help = "Download even if exists",  default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
-    parser.add_argument("--shards-num",     help = "Number of shards to split each dataset to (optional)", default = None, type = int)
-    parser.add_argument("--max-images",     help = "Maximum number of images to have in the dataset (optional)", default = None, type = int)
+    parser.add_argument("--data-dir",       help = "Directory of created dataset", default = "datasets", type = str)
+    parser.add_argument("--shards-num",     help = "Number of shards to split each dataset to (optional)", default = 1, type = int)
+    parser.add_argument("--max-images",     help = "Maximum number of images to have in the dataset (optional). Use to reduce the produced tfrecords file size", default = None, type = int)
+    # Default tasks
+    parser.add_argument("--clevr",          help = "Prepare the CLEVR dataset (18GB download, up to 15.5GB tfrecords, 100k images)", dest = "tasks", action = "append_const", const = "clevr")
+    parser.add_argument("--bedrooms",       help = "Prepare the LSUN-bedrooms dataset (42.8GB, up to 480GB tfrecords, 3M images)", dest = "tasks", action = "append_const", const = "bedrooms")
+    parser.add_argument("--ffhq",           help = "Prepare the FFHQ dataset (13GB download, 13GB tfrecords, 70k images)", dest = "tasks", action = "append_const", const = "ffhq")
+    parser.add_argument("--cityscapes",     help = "Prepare the cityscapes dataset (1.8GB, 8GB tfrecords, 25k images)", dest = "tasks", action = "append_const", const = "cityscapes")
+    # Create a new task with custom images
+    parser.add_argument("--task",           help = "New dataset name", type = str, dest = "tasks", action = "append")
+    parser.add_argument("--images-dir",     help = "Provide source image directory to convert into tfrecords (will be searched recursively)", default = None, type = str)
+    parser.add_argument("--images-format",  help = "Images format", default = None, choices = ["png", "jpg", "npy", "hdf5", "tfds", "lmdb"], type = str)
+    parser.add_argument("--ratio",          help = "Images height/width", default = 1.0, type = float)
 
     args = parser.parse_args()
     if not args.tasks:
         print("No tasks specified. Please see '-h' for help.")
         exit(1)
-
-    # If the flag is specified without arguments (--redownload) set to True
-    if args.redownload is None:
-        args.redownload = True
 
     prepare(**vars(args))
 

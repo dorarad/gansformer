@@ -22,7 +22,7 @@ class TFRecordDataset:
         shuffle_mb      = 2048,     # Shuffle data within specified window (megabytes), 0 = disable shuffling
         prefetch_mb     = 512,      # Amount of data to prefetch (megabytes), 0 = disable prefetching
         buffer_mb       = 256,      # Read buffer size (megabytes)
-        num_threads     = 2,        # Number of concurrent threads for input processing
+        num_threads     = 4,        # Number of concurrent threads for input processing
         **kwargs):       
 
         self.tfrecord_dir       = tfrecord_dir
@@ -47,21 +47,21 @@ class TFRecordDataset:
 
         # List tfrecords files and inspect their shapes
         assert os.path.isdir(self.tfrecord_dir)
-        tfr_file_lists = sorted(glob.glob(os.path.join(self.tfrecord_dir, "*.tfrecords1of*")))
+        tfr_files = sorted(glob.glob(os.path.join(self.tfrecord_dir, "*.tfrecords1of*")))
         # If max_imgs is not None, take a subset of images out of the 1st file. Otherwise take all files.
         if max_imgs is None:
-            tfr_file_lists = [sorted(glob.glob(re.sub("1of.*", "*", f))) for f in tfr_file_lists]
+            tfr_files = [sorted(glob.glob(re.sub("1of.*", "*", f))) for f in tfr_files]
         else:
-            tfr_file_lists = [[f] for f in tfr_file_lists]
+            tfr_files = [[f] for f in tfr_files]
 
-        assert len(tfr_file_lists) >= 1
+        assert len(tfr_files) >= 1
         tfr_shapes = []
-        for tfr_files in tfr_file_lists:
+        for tfr_file in tfr_files:
             tfr_opt = tf.io.TFRecordOptions("")
-            for record in tf.python_io.tf_record_iterator(tfr_files[0], tfr_opt):
+            for record in tf.python_io.tf_record_iterator(tfr_file[0], tfr_opt):
                 tfr_shapes.append(self.parse_tfrecord_np(record).shape)
                 break
-            random.shuffle(tfr_files)
+            random.shuffle(tfr_file)
 
         # Autodetect label filename
         if self.label_file is None:
@@ -110,7 +110,7 @@ class TFRecordDataset:
                     continue
                 # Load dataset
                 dset = tf.data.TFRecordDataset(tfr_file, compression_type = "", 
-                    buffer_size = buffer_mb<<20, num_parallel_reads = None)
+                    buffer_size = buffer_mb<<20, num_parallel_reads = num_threads)
 
                 # If max_imgs is set, take a subset of the data
                 if max_imgs is not None:
@@ -188,6 +188,16 @@ class TFRecordDataset:
             "data": tf.FixedLenFeature([], tf.string)})
         data = tf.decode_raw(features["data"], tf.uint8)
         return tf.reshape(data, features["shape"])
+
+    @staticmethod
+    def parse_tfrecord_tf_seg(record):
+        features = tf.parse_single_example(record, features={
+            "shape": tf.FixedLenFeature([3], tf.int64),
+            "seg": tf.FixedLenFeature([], tf.string),
+            "data": tf.FixedLenFeature([], tf.string)})
+        data = tf.decode_raw(features["data"], tf.uint8)
+        seg = tf.decode_raw(features["seg"], tf.uint8)
+        return tf.reshape(data, features["shape"]), tf.reshape(seg, tf.concat([[2], features["shape"][1:]], axis = 0))
 
     # Parse an individual image from a tfrecords file into a NumPy array
     @staticmethod

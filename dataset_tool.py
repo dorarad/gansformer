@@ -74,7 +74,8 @@ class TFRecordExporter:
                 tfr_writers_lod = []
                 for shard in range(self.shards_num):
                     tfr_opt = tf.io.TFRecordOptions("")
-                    tfr_file = self.tfr_prefix + "-r%02d.tfrecords%dof%d" % (self.resolution_log2 - lod, shard + 1, self.shards_num)
+                    tfr_file = self.tfr_prefix + "-r%02d.tfrecords%dof%d" % (self.resolution_log2 - lod, 
+                        shard + 1, self.shards_num)
                     tfr_writers_lod.append(tf.io.TFRecordWriter(tfr_file, tfr_opt))
                 self.tfr_writers.append(tfr_writers_lod)
 
@@ -168,7 +169,8 @@ class ThreadPool(object):
     def __exit__(self, *excinfo):
         self.finish()
 
-    def process_items_concurrently(self, item_iterator, process_func = lambda x: x, pre_func = lambda x: x, post_func = lambda x: x, max_items_in_flight = None):
+    def process_items_concurrently(self, item_iterator, process_func = lambda x: x, pre_func = lambda x: x, 
+            post_func = lambda x: x, max_items_in_flight = None):
         if max_items_in_flight is None: max_items_in_flight = self.num_threads * 4
         assert max_items_in_flight >= 1
         results = []
@@ -420,7 +422,8 @@ def create_lsun(tfrecord_dir, lmdb_dir, resolution = 256, max_imgs = None):
                     except IOError:
                         img = np.asarray(PIL.Image.open(io.BytesIO(value)))
                     crop = np.min(img.shape[:2])
-                    img = img[(img.shape[0] - crop) // 2 : (img.shape[0] + crop) // 2, (img.shape[1] - crop) // 2 : (img.shape[1] + crop) // 2]
+                    img = img[(img.shape[0] - crop) // 2 : (img.shape[0] + crop) // 2, 
+                        (img.shape[1] - crop) // 2 : (img.shape[1] + crop) // 2]
                     img = PIL.Image.fromarray(img, "RGB")
                     img = img.resize((resolution, resolution), PIL.Image.ANTIALIAS)
                     img = np.asarray(img)
@@ -568,8 +571,10 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
 
         # Crop
         border = max(int(np.round(1024 * 0.1 / zoom)), 3)
-        crop = (int(np.floor(min(quad[:,0]))), int(np.floor(min(quad[:,1]))), int(np.ceil(max(quad[:,0]))), int(np.ceil(max(quad[:,1]))))
-        crop = (max(crop[0] - border, 0), max(crop[1] - border, 0), min(crop[2] + border, img.size[0]), min(crop[3] + border, img.size[1]))
+        crop = (int(np.floor(min(quad[:,0]))), int(np.floor(min(quad[:,1]))), int(np.ceil(max(quad[:,0]))), 
+            int(np.ceil(max(quad[:,1]))))
+        crop = (max(crop[0] - border, 0), max(crop[1] - border, 0), min(crop[2] + border, img.size[0]), 
+            min(crop[3] + border, img.size[1]))
         if crop[2] - crop[0] < img.size[0] or crop[3] - crop[1] < img.size[1]:
             img = img.crop(crop)
             quad -= crop[0:2]
@@ -582,14 +587,17 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
             zoom /= superres
 
         # Pad
-        pad = (int(np.floor(min(quad[:,0]))), int(np.floor(min(quad[:,1]))), int(np.ceil(max(quad[:,0]))), int(np.ceil(max(quad[:,1]))))
-        pad = (max(-pad[0] + border, 0), max(-pad[1] + border, 0), max(pad[2] - img.size[0] + border, 0), max(pad[3] - img.size[1] + border, 0))
+        pad = (int(np.floor(min(quad[:,0]))), int(np.floor(min(quad[:,1]))), int(np.ceil(max(quad[:,0]))), 
+            int(np.ceil(max(quad[:,1]))))
+        pad = (max(-pad[0] + border, 0), max(-pad[1] + border, 0), max(pad[2] - img.size[0] + border, 0), 
+            max(pad[3] - img.size[1] + border, 0))
         if max(pad) > border - 4:
             pad = np.maximum(pad, int(np.round(1024 * 0.3 / zoom)))
             img = np.pad(np.float32(img), ((pad[1], pad[3]), (pad[0], pad[2]), (0, 0)), "reflect")
             h, w, _ = img.shape
             y, x, _ = np.mgrid[:h, :w, :1]
-            mask = 1.0 - np.minimum(np.minimum(np.float32(x) / pad[0], np.float32(y) / pad[1]), np.minimum(np.float32(w-1-x) / pad[2], np.float32(h-1-y) / pad[3]))
+            mask = 1.0 - np.minimum(np.minimum(np.float32(x) / pad[0], np.float32(y) / pad[1]), 
+                np.minimum(np.float32(w-1-x) / pad[2], np.float32(h-1-y) / pad[3]))
             blur = 1024 * 0.02 / zoom
             img += (scipy.ndimage.gaussian_filter(img, [blur, blur, 0]) - img) * np.clip(mask * 3.0 + 1.0, 0.0, 1.0)
             img += (np.median(img, axis=(0,1)) - img) * np.clip(mask, 0.0, 1.0)
@@ -616,9 +624,11 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
         algorithm = cryptography.hazmat.primitives.hashes.SHA256()
         backend = cryptography.hazmat.backends.default_backend()
         salt = bytes(orig_file, "ascii")
-        kdf = cryptography.hazmat.primitives.kdf.pbkdf2.PBKDF2HMAC(algorithm = algorithm, length = 32, salt = salt, iterations = 100000, backend = backend)
+        kdf = cryptography.hazmat.primitives.kdf.pbkdf2.PBKDF2HMAC(algorithm = algorithm, length = 32, 
+            salt = salt, iterations = 100000, backend = backend)
         key = base64.urlsafe_b64encode(kdf.derive(orig_bytes))
-        delta = np.frombuffer(bz2.decompress(cryptography.fernet.Fernet(key).decrypt(delta_bytes)), dtype = np.uint8).reshape(3, 1024, 1024)
+        delta = np.frombuffer(bz2.decompress(cryptography.fernet.Fernet(key).decrypt(delta_bytes)), 
+            dtype = np.uint8).reshape(3, 1024, 1024)
 
         # Apply delta image
         img = img + delta
@@ -632,7 +642,8 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
     with TFRecordExporter(tfrecord_dir, indices.size) as tfr:
         order = tfr.choose_shuffled_order()
         with ThreadPool(num_threads) as pool:
-            for img in pool.process_items_concurrently(indices[order].tolist(), process_func = process_func, max_items_in_flight = num_tasks):
+            for img in pool.process_items_concurrently(indices[order].tolist(), process_func = process_func, 
+                    max_items_in_flight = num_tasks):
                 tfr.add_img(img)
 
 # ----------------------------------------------------------------------------
@@ -646,9 +657,10 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
 # - tfrecord_dir: the output directory
 # - img_dir: the input directory
 # - shuffle: whether to shuffle the dataset before saving
-def create_from_imgs(tfrecord_dir, img_dir, shuffle = False, ratio = None, max_imgs = None, shards_num = 5):
+def create_from_imgs(tfrecord_dir, img_dir, format = "png", shuffle = False, ratio = None, 
+        max_imgs = None, shards_num = 5):
     print("Loading images from %s" % img_dir)
-    img_filenames = sorted(glob.glob("{}/**/*.png".format(img_dir)))
+    img_filenames = sorted(glob.glob("{}/**/*.{}".format(img_dir, format), recursive = True))
     if len(img_filenames) == 0:
         error("No input images found")
     if max_imgs is None:
@@ -683,13 +695,13 @@ def create_from_imgs(tfrecord_dir, img_dir, shuffle = False, ratio = None, max_i
                 img = img.transpose([2, 0, 1]) # HWC => CHW
             tfr.add_img(img)
 
-def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, shards_num = 64):
+def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, max_imgs = None, shards_num = 5):
     import tensorflow_datasets as tfds
 
     print("Loading dataset %s" % dataset_name)
     ds = tfds.load(dataset_name, split = "train", data_dir = "{}/tfds".format(tfrecord_dir))
-    with TFRecordExporter(tfrecord_dir, len(img_filenames), shards_num = shards_num) as tfr:
-        for ex in tqdm(tfds.as_numpy(ds)):
+    with TFRecordExporter(tfrecord_dir, 0, shards_num = shards_num) as tfr:
+        for i, ex in tqdm(enumerate(tfds.as_numpy(ds))):
             img = PIL.Image.fromarray(ex["image"])
 
             img = misc.crop_max_rectangle(img, ratio)
@@ -701,8 +713,10 @@ def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, shards_num = 64):
             img = np.asarray(img)
             img = img.transpose([2, 0, 1]) # HWC => CHW
             tfr.add_img(img)
+            if max_imgs is not None i > max_imgs:
+                break
 
-def create_from_lmdb(tfrecord_dir, lmdb_dir, ratio = None, max_imgs = None, shards_num = 64):
+def create_from_lmdb(tfrecord_dir, lmdb_dir, ratio = None, max_imgs = None, shards_num = 5):
     import lmdb
     print("Loading dataset %s" % lmdb_dir)
     bad_imgs = 0
@@ -733,26 +747,33 @@ def create_from_lmdb(tfrecord_dir, lmdb_dir, ratio = None, max_imgs = None, shar
     if bad_imgs > 0:
         print("Couldn't read {} out of {} images".format(bad_imgs, max_imgs))
 
-def create_from_npy(tfrecord_dir, npy_filename, shuffle):
+def create_from_npy(tfrecord_dir, npy_filename, shuffle = False, max_imgs = None, shards_num = 5):
     print("Loading NPY archive from %s" % npy_filename)
+    if max_imgs is None:
+        max_imgs = npy_data.shape[0]
+
     with open(npy_filename, "rb") as npy_file:
         npy_data = np.load(npy_file)
-        with TFRecordExporter(tfrecord_dir, npy_data.shape[0]) as tfr:
+        with TFRecordExporter(tfrecord_dir, npy_data.shape[0], shards_num = shards_num) as tfr:
             order = tfr.choose_shuffled_order() if shuffle else np.arange(npy_data.shape[0])
-            for idx in range(order.size):
+            for idx in trange(max_imgs):
                 tfr.add_img(npy_data[order[idx]])
             npy_filename = os.path.splitext(npy_filename)[0] + "-labels.npy"
             if os.path.isfile(npy_filename):
                 tfr.add_labels(np.load(npy_filename)[order])
 
-def create_from_hdf5(tfrecord_dir, hdf5_filename, shuffle):
-    print("Loading HDF5 archive from %s" % hdf5_filename)
+def create_from_hdf5(tfrecord_dir, hdf5_filename, shuffle = False, max_imgs = None, shards_num = 5):
     import h5py # conda install h5py
+    print("Loading HDF5 archive from %s" % hdf5_filename)
+    if max_imgs is None:
+        max_imgs = npy_data.shape[0]
+
     with h5py.File(hdf5_filename, "r") as hdf5_file:
-        hdf5_data = max([value for key, value in hdf5_file.items() if key.startswith("data")], key = lambda lod: lod.shape[3])
-        with TFRecordExporter(tfrecord_dir, hdf5_data.shape[0]) as tfr:
+        hdf5_data = max([value for key, value in hdf5_file.items() if key.startswith("data")], 
+            key = lambda lod: lod.shape[3])
+        with TFRecordExporter(tfrecord_dir, hdf5_data.shape[0], shards_num = shards_num) as tfr:
             order = tfr.choose_shuffled_order() if shuffle else np.arange(hdf5_data.shape[0])
-            for idx in range(order.size):
+            for idx in trange(max_imgs):
                 tfr.add_img(hdf5_data[order[idx]])
             npy_filename = os.path.splitext(hdf5_filename)[0] + "-labels.npy"
             if os.path.isfile(npy_filename):

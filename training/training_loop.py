@@ -118,11 +118,11 @@ def emaAvg(avg, value, alpha = 0.995):
 
 # Load networks from snapshot
 def load_nets(resume_pkl, lG, lD, lGs, recompile):
-    print(misc.bcolored("Loading networks from %s..." % resume_pkl, "white"))
+    misc.log("Loading networks from %s..." % resume_pkl, "white")
     rG, rD, rGs = pretrained_networks.load_networks(resume_pkl)
     
     if recompile:
-        print(misc.bold("Copying nets..."));
+        misc.log("Copying nets...")
         lG.copy_vars_from(rG); lD.copy_vars_from(rD); lGs.copy_vars_from(rGs)
     else:
         lG, lD, lGs = rG, rD, rGs
@@ -191,7 +191,7 @@ def training_loop(
         no_op = tf.no_op()
         G, D, Gs = None, None, None
         if resume_pkl is None or recompile:
-            print(misc.bcolored("Constructing networks...", "white"))
+            misc.log("Constructing networks...", "white")
             G = tflib.Network("G", num_channels = dataset.shape[0], resolution = dataset.shape[1], 
                 label_size = dataset.label_size, **cG.args)
             D = tflib.Network("D", num_channels = dataset.shape[0], resolution = dataset.shape[1], 
@@ -228,7 +228,7 @@ def training_loop(
         exit()
 
     # Setup training inputs
-    print(misc.bcolored("Building TensorFlow graph...", "white"))
+    misc.log("Building TensorFlow graph...", "white")
     with tf.name_scope("Inputs"), tf.device("/cpu:0"):
         lrate_in_g           = tf.placeholder(tf.float32, name = "lrate_in_g", shape = [])
         lrate_in_d           = tf.placeholder(tf.float32, name = "lrate_in_d", shape = [])
@@ -292,7 +292,7 @@ def training_loop(
 
     # Tensorboard summaries
     if summarize:
-        print(misc.bcolored("Initializing logs...", "white"))
+        misc.log("Initializing logs...", "white")
         summary_log = tf.summary.FileWriter(dnnlib.make_run_dir_path())
         if save_tf_graph:
             summary_log.add_graph(tf.get_default_graph())
@@ -300,7 +300,7 @@ def training_loop(
             G.setup_weight_histograms(); D.setup_weight_histograms()
 
     # Initialize training
-    print(misc.bcolored("Training for %d kimg..." % total_kimg, "white"))
+    misc.log("Training for %d kimg..." % total_kimg, "white")
     dnnlib.RunContext.get().update("", cur_epoch = resume_kimg, max_epoch = total_kimg)
     maintenance_time = dnnlib.RunContext.get().get_last_update_interval()
 
@@ -370,21 +370,21 @@ def training_loop(
             total_time = dnnlib.RunContext.get().get_time_since_start() + resume_time
 
             # Report progress
-            print(("tick %s kimg %s loss/reg: G (%s %s) D (%s %s), grad norms: G (%s %s) D (%s %s) " + 
+            print(("tick %s kimg %s   loss/reg: G (%s %s) D (%s %s)   grad norms: G (%s %s) D (%s %s)   " + 
                    "time %s sec/kimg %s maxGPU %sGB %s") % (
                 misc.bold("%-5d" % autosummary("Progress/tick", cur_tick)),
-                misc.bcolored("%-8.1f" % autosummary("Progress/kimg", cur_nimg / 1000.0), "red"),
-                misc.bcolored("%-2.3f" % (cG.lossvals_agg["loss"] or 0), "blue"),
-                misc.bold("%.3f" % (cG.lossvals_agg["reg"] or 0)),
-                misc.bcolored("%-2.3f" % (cD.lossvals_agg["loss"] or 0), "blue"),
-                misc.bold("%.3f" % (cD.lossvals_agg["reg"] or 0)),
+                misc.bcolored("{:>8.1f}".format(autosummary("Progress/kimg", cur_nimg / 1000.0)), "red"),
+                misc.bcolored("{:>6.3f}".format(cG.lossvals_agg["loss"] or 0), "blue"),
+                misc.bold( "{:>6.3f}".format(cG.lossvals_agg["reg"] or 0)),
+                misc.bcolored("{:>6.3f}".format(cD.lossvals_agg["loss"] or 0), "blue"),
+                misc.bold("{:>6.3f}".format(cD.lossvals_agg["reg"] or 0)),
                 misc.cond_bcolored(cG.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cG.lossvals_agg["reg_norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["reg_norm"], 20.0, "red"),
-                misc.bold("%-6s" % dnnlib.util.format_time(autosummary("Timing/total_sec", total_time))),
-                "%-5.2f" % autosummary("Timing/sec_per_kimg", tick_time / tick_kimg),
-                "%-2.1f" % autosummary("Resources/peak_gpu_mem_gb", peak_gpu_mem_op.eval() / 2**30),                
+                misc.bold("%-10s" % dnnlib.util.format_time(autosummary("Timing/total_sec", total_time))),
+                "{:>7.2f}".format(autosummary("Timing/sec_per_kimg", tick_time / tick_kimg)),
+                "{:>4.1f}".format(autosummary("Resources/peak_gpu_mem_gb", peak_gpu_mem_op.eval() / 2**30)),
                 printname))
 
             autosummary("Timing/total_hours", total_time / (60.0 * 60.0))

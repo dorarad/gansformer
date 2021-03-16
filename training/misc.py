@@ -26,11 +26,18 @@ def bcolored(txt, color):
 # conditional coloring if num > maxval.
 # maxval = 0 turns functionality off.
 def cond_bcolored(num, maxval, color):
-    num = num or -1
-    txt = "%-2.3f" % num
+    num = num or 0
+    txt = "{:>6.3f}".format(num)
     if maxval > 0 and num > maxval:
         return bcolored(txt, color)
     return txt
+
+def error(txt):
+    print(bcolored("Error: {}".format(txt), "red"))
+    exit()
+
+def log(txt, color = None):
+    print(bcolored(txt, color) if color is not None else bold(txt))
 
 # File processing
 # ----------------------------------------------------------------------------
@@ -97,13 +104,28 @@ def float2uint_np(imgs):
     return imgs
 
 # Cut image center (to avoid computing inception score on the padding margins)
-def crop_np(imgs, ratio = 1.0): 
+def crop_tensor(imgs, ratio = 1.0): 
     if ratio == 1.0:
         return imgs
     width = imgs.shape[2]
     start = int(math.floor(((1 - ratio) * width / 2)))
     end = int(math.ceil((1 + ratio) * width / 2))
     imgs = imgs[:,start:end + 1]
+    return imgs
+
+def pad_tensor(imgs):
+    shape = tf.shape(imgs)
+    h, w = shape[-2], shape[-1]
+    if h > w:
+        l1 = tf.floor((h - w) / 2)
+        l2 = tf.ceil((h - w) / 2)
+        padding = ((0, 0), (l1, l2))
+    else:
+        l1 = tf.floor((w - h) / 2)
+        l2 = tf.ceil((w - h) / 2)        
+        padding = ((l1, l2), (0, 0))
+    padding = ((0, 0), (0, 0)) + padding
+    imgs = tf.pad(imgs, padding)
     return imgs
 
 # Crop center rectangle of size (cw, ch)
@@ -205,8 +227,7 @@ def adjust_dynamic_range(data, drange_in, drange_out, hsv = False):
         elif drange_out == [0, 255]:
             data = tf.image.hsv_to_rgb(data) if tf.is_tensor(data) else hsv_to_rgb(data)
         else:
-            print("Error: image adjustment", drange_in, drange_out)
-            exit()
+            error("Image adjustment invalid range: ", drange_in, drange_out)
 
         if axis != -1:
             data = tf.transpose(data, shape) if tf.is_tensor(data) else np.transpose(data, shape)
@@ -340,11 +361,14 @@ def get_colors(num):
 def save_gif(imgs, filename, duration = 50):
     imgs[0].save(filename, save_all = True, append_images = imgs[1:], duration = duration, loop = 0)
 
+def clean_filename(filename):
+    return filename.replace("_00000", "").replace("00000_", "")
+
 # Save a list of images with ordering and according to a path template
 def save_images_builder(drange, ratio, grid_size, grid = False, verbose = False):
     def save_images(imgs, path, offset = 0):
         if grid:
-            save_img_grid(imgs, dnnlib.make_run_dir_path(path % offset), drange, grid_size)
+            save_img_grid(imgs, dnnlib.make_run_dir_path(clean_filename(path % offset)), drange, grid_size)
         else:
             imgs = enumerate(imgs)
             if verbose:
@@ -362,7 +386,7 @@ def save_blends_builder(drange, ratio, grid_size, grid = False, verbose = False,
             img_a = to_pil(create_img_grid(imgs_a, grid_size), drange)
             img_b = to_pil(create_img_grid(imgs_b, grid_size), drange)
             blend = PIL.Image.blend(img_a, img_b, alpha = alpha)
-            blend.save(dnnlib.make_run_dir_path(path % offset))
+            blend.save(dnnlib.make_run_dir_path(clean_filename(path % offset)))
         else:
             img_pairs = zip(imgs_a, imgs_b)
             img_pairs = enumerate(img_pairs)

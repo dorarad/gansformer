@@ -479,14 +479,12 @@ def process_input(t, t_pos, t_len, name):
 
     # from/to_tensor should be either 2 or 3 dimensions. If it's 3, then t_len should be specified.
     if len(shape) > 3:
-        print(misc.bcolored("Error: Transformer {}_tensor has {} shape. should be up to 3 dims.".format(name, shape), "red"))
-        raise
+        misc.error("Transformer {}_tensor has {} shape. should be up to 3 dims.".format(name, shape))
     elif len(shape) == 3:
         batch_size, t_len, _ = shape
     else:
         if t_len is None:
-            print(misc.bcolored("Error: If {}_tensor has two dimensions, must specify {}_len.".format(name, name), "red"))
-            raise
+            misc.error("If {}_tensor has two dimensions, must specify {}_len.".format(name, name))
         # Infer batch size for the 2-dims case
         batch_size = tf.cast(shape[0] / t_len, tf.int32)
 

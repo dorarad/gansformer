@@ -1,18 +1,19 @@
 # import warnings filter
 from warnings import simplefilter
 # ignore all future warnings
-simplefilter(action='ignore', category=FutureWarning)
+simplefilter(action = "ignore", category = FutureWarning)
 
 import argparse
 import copy
 import glob
+import sys
 import os
 
 import dnnlib
 from dnnlib import EasyDict
 from metrics.metric_defaults import metric_defaults
 from training import misc
-
+import pretrained_networks
 # Suppress warnings
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
@@ -24,6 +25,16 @@ def cset(dicts, name, prop):
     if prop is not None:
         for d in dicts:
             d[name] = prop
+
+# Conditional set: if dict[name] is not populated from the command line, then assign dict[name] := prop
+def nset(args, name, prop):
+    if name not in sys.argv:
+        args[name] = prop
+
+# Conditional set: if dict[name] has its default value, then assign dict[name] := prop
+def dset(d, name, prop, default):
+    if d[name] == default:
+        d[name] = prop
 
 # Set network (generator or discriminator): model, loss and optimizer
 def set_net(net, reg_interval):
@@ -48,7 +59,39 @@ def run(**args):
             args[arg] = True
 
     if not args.train and not args.eval:
-        print(misc.bcolored("Warning: Neither --train nor --eval are provided. Therefore, we only print network shapes.", "red"))
+        misc.log("Warning: Neither --train nor --eval are provided. Therefore, we only print network shapes", "red")
+
+    if args.default_config:
+        task = args.dataset
+        pretrained = "gdrive:{}-snapshot.pkl".format(task)
+        if pretrained not in pretrained_networks.gdrive_urls:
+            pretrained = None
+
+        nset(args, "recompile", pretrained is not None)
+        nset(args, "pretrained_pkl", pretrained)
+        nset(args, "mirror_augment", task in ["cityscapes", "ffhq"])
+
+        nset(args, "transformer", True)
+        nset(args, "components_num", {"clevr": 8}.get(task, 16))
+        nset(args, "latent_size", {"clevr": 128}.get(task, 512))
+
+        nset(args, "normalize", "layer")
+        nset(args, "integration", "mul")
+        nset(args, "kmeans", True)
+        nset(args, "use_pos", True)
+        nset(args, "mapping_ltnt2ltnt", task != "clevr")
+        nset(args, "style", task != "clevr")
+
+        nset(args, "g_arch", "resnet")
+        nset(args, "mapping_resnet", True)
+
+        gammas = {
+            "ffhq": 10, 
+            "cities": 20, 
+            "clevr": 40, 
+            "bedrooms": 100
+        }
+        nset(args, "gamma", gammas.get(task, 10))        
 
     # Environment configuration
     tf_config = {
@@ -67,9 +110,11 @@ def run(**args):
     cD = set_net("D", reg_interval = 16)
 
     # Dataset configuration
+    # For bedrooms, we choose the most common ratio in the 
+    # dataset and crop the other images into that ratio.
     ratios = {
         "clevr": 0.75,
-        "bedrooms": 188/256,
+        "bedrooms": 188/256, 
         "cityscapes": 0.5,
         "ffhq": 1.0
     }
@@ -88,8 +133,7 @@ def run(**args):
     args.minibatch_std_size -= args.minibatch_std_size % args.minibatch_size
     args.latent_size -= args.latent_size % args.components_num
     if args.latent_size == 0:
-        print(misc.bcolored("Error: latent-size is too small. Must best a multiply of components-num.", "red"))
-        exit()
+        misc.error("--latent-size is too small. Must best a multiply of components-num")
 
     sched_args = {
         "G_lrate": "g_lr",
@@ -138,9 +182,9 @@ def run(**args):
     # Latent sizes
     if args.components_num > 1:
         if not (args.transformer or args.kgan):
-            print(misc.bcolored("Error: components-num > 1 but the model is not using components.", "red"))
-            print(misc.bcolored("Either add --transformer for GANsformer or --kgan for k-GAN).", "red"))
-            exit()
+            misc.error("--components-num > 1 but the model is not using components. " + 
+                "Either add --transformer for GANsformer or --kgan for k-GAN.")
+
         args.latent_size = int(args.latent_size / args.components_num)
     cD.args.latent_size = cG.args.latent_size = cG.args.dlatent_size = args.latent_size
     cset([cG.args, cD.args, vis], "components_num", args.components_num)
@@ -179,8 +223,7 @@ def run(**args):
     cset([cG.args, train], "merge", args.kgan)
 
     if args.kgan and args.transformer:
-        print(misc.bcolored("Error: either have --transformer for GANsformer or --kgan for k-GAN, not both.", "red"))
-        exit()
+        misc.error("Either have --transformer for GANsformer or --kgan for k-GAN, not both")
 
     # Attention
     for arg in ["start_res", "end_res", "ltnt2ltnt", "img2img"]: # , "local_attention"
@@ -230,9 +273,12 @@ def run(**args):
     snapshot, kimg, resume = None, 0, False
     pkls = sorted(glob.glob("{}/{}/network*.pkl".format(args.result_dir, run_name)))
     # Load a particular snapshot is specified
-    if args.pretrained_pkl:
+    if args.pretrained_pkl is not None and args.pretrained_pkl != "None":
         # Soft links support
         if args.pretrained_pkl.startswith("gdrive"):
+            if args.pretrained_pkl not in pretrained_networks.gdrive_urls:
+                misc.error("--pretrained_pkl {} not available in the catalog (see pretrained_networks.py)")
+
             snapshot = args.pretrained_pkl
         else: 
             snapshot = glob.glob(args.pretrained_pkl)[0]
@@ -252,11 +298,11 @@ def run(**args):
         resume = True
 
     if snapshot:
-        print(misc.bcolored("Resuming {}, from {}, kimg {}".format(run_name, snapshot, kimg), "white"))
+        misc.log("Resuming {}, from {}, kimg {}".format(run_name, snapshot, kimg), "white")
         train.resume_pkl = snapshot
         train.resume_kimg = kimg
     else:
-        print(misc.bcolored("Start model training from scratch.", "white"))
+        misc.log("Start model training from scratch", "white")
 
     # Run environment configuration
     sc.run_dir_root = args.result_dir
@@ -286,7 +332,7 @@ def _str_to_bool(v):
     elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError("Boolean value expected.")
+        raise argparse.ArgumentTypeError("Error: Boolean value expected")
 
 def _parse_comma_sep(s):
     if s is None or s.lower() == "none" or s == "":
@@ -320,6 +366,7 @@ def main():
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
 
     ## Resumption
+    parser.add_argument("--default-config",     help = "Select a default GANsformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
     parser.add_argument("--pretrained-pkl",     help = "Filename for a snapshot to resume (optional)", default = None, type = str)
     parser.add_argument("--restart",            help = "Restart training from scratch", default = False, action = "store_true")
     parser.add_argument("--reload",             help = "Reload options from the original experiment configuration file. " +
@@ -332,7 +379,7 @@ def main():
     parser.add_argument("--data-dir",           help = "Datasets root directory", required = True)
     parser.add_argument("--dataset",            help = "Training dataset name (subdirectory of data-dir)", required = True)
     parser.add_argument("--ratio",              help = "Image height/width ratio in the dataset", default = 1.0, type = float)
-    parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 2, type = int)
+    parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 4, type = int)
     parser.add_argument("--mirror-augment",     help = "Perform horizontal flip augmentation for the data (default: %(default)s)", default = None, action = "store_true")
     parser.add_argument("--train-images-num",   help = "Maximum number of images to train on. If not specified, train on the whole dataset.", default = None, type = int)
 
@@ -401,6 +448,7 @@ def main():
     parser.add_argument("--component-dropout",  help = "Component dropout (default: %(default)s)", default = 0.0, type = float)
     parser.add_argument("--attention-dropout",  help = "Attention dropout (default: 0.12)", default = None, type = float)
 
+
     # StyleGAN additions
     parser.add_argument("--style",              help = "Global style modulation (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--latent-stem",        help = "Input latent through the generator stem grid (default: False)", default = None, action = "store_true")
@@ -414,18 +462,18 @@ def main():
     parser.add_argument("--components-num",     help = "Components number. Each component has latent dimension of 'latent-size / components-num'. " +
                                                        "1 for StyleGAN since it has one global latent vector (default: %(default)s)", default = 1, type = int)
     parser.add_argument("--num-heads",          help = "Number of attention heads (default: %(default)s)", default = 1, type = int)
-    parser.add_argument("--normalize",          help = "Feature normalization type (optional)", default = None, choices = ["batch", "instance", "layer"])
+    parser.add_argument("--normalize",          help = "Feature normalization type (optional)", default = None, choices = ["batch", "instance", "layer"], type = str)
     parser.add_argument("--integration",        help = "Feature integration type: additive, multiplicative or both (default: %(default)s)", default = "add", choices = ["add", "mul", "both"], type = str)
 
     # Generator attention layers
     # Transformer resolution layers
     parser.add_argument("--g-start-res",        help = "Transformer minimum generator resolution (logarithmic): first layer in which transformer will be applied (default: %(default)s)", default = 0, type = int)
-    parser.add_argument("--g-end-res",          help = "Transformer maximum generator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 7, type = int)
+    parser.add_argument("--g-end-res",          help = "Transformer maximum generator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 8, type = int)
 
     # Discriminator attention layers
     parser.add_argument("--d-transformer",      help = "Add transformer layers to the discriminator (bottom-up image-to-latents) (default: False)", default = None, action = "store_true")
     parser.add_argument("--d-start-res",        help = "Transformer minimum discriminator resolution (logarithmic): first layer in which transformer will be applied (default: %(default)s)", default = 0, type = int)
-    parser.add_argument("--d-end-res",          help = "Transformer maximum discriminator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 7, type = int)
+    parser.add_argument("--d-end-res",          help = "Transformer maximum discriminator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 8, type = int)
 
     # Attention
     parser.add_argument("--ltnt-gate",          help = "Gate attention from latents, such that components may not send information " +
@@ -470,13 +518,14 @@ def main():
     args = parser.parse_args()
 
     if not os.path.exists(args.data_dir):
-        print(misc.bcolored("Error: dataset root directory does not exist.", "red"))
-        exit()
+        misc.error("Dataset root directory does not exist")
+
+    if not os.path.exists("{}/{}".format(args.data_dir, args.dataset)):
+        misc.error("The dataset {} directory does not exist at {}/".format(args.dataset, args.data_dir))
 
     for metric in args.metrics:
         if metric not in metric_defaults:
-            print(misc.bcolored("Error: unknown metric \"%s\"" % metric, "red"))
-            exit()
+            misc.error("Unknown metric: {}".format(metric))
 
     run(**vars(args))
 

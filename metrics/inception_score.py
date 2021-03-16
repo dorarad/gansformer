@@ -19,7 +19,7 @@ class IS(metric_base.MetricBase):
         inception = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/inception_v3_softmax.pkl")
 
         def inception_func(imgs): 
-            return inception.run(misc.crop_np(imgs[:end-begin], ratio), num_gpus = num_gpus, assume_frozen = True)
+            return inception.run(misc.crop_tensor(imgs[:end-begin], ratio), num_gpus = num_gpus, assume_frozen = True)
 
         if paths is not None:
             # Extract features for local sample image files (paths)

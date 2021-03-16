@@ -34,7 +34,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 - [x] Code clean-up and refacotiring, adding documentation
 - [x] Training and data-prepreation intructions
 - [x] Pretrained networks for all datasets
-- [ ] Extra visualizations/animations and evaluation (coming soon!)
+- [x] Extra visualizations and evaluation <!--Extra visualizations/animations and evaluation-->
 
 ## Bibtex
 ```bibtex

@@ -37,7 +37,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Pretrained networks for all datasets  
 :white_check_mark: Extra visualizations and evaluations <!--Extra visualizations/animations and evaluation-->
 
-If you experience any issues or have suggestions for improvements or extensions, feed free to contact me either thourgh the issues page or at dorarad@stanford.edu. 
+If you experience any issues or have suggestions for improvements or extensions, feel free to contact me either thourgh the issues page or at dorarad@stanford.edu. 
 
 ## Bibtex
 ```bibtex

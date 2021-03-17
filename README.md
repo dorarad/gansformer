@@ -59,7 +59,7 @@ If you experience any issues or have suggestions for improvements or extensions,
 ## Quickstart & Overview
 A minimal example of using a pre-trained GANsformer can be found at [`generate.py`](generate.py). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
 ```python
-python generate.py --gpus 0 --model gdrive:bedroom-snapshot.pkl --output_dir images --images-num 10
+python generate.py --gpus=0 --model=gdrive:bedroom-snapshot.pkl --output-dir=images --images-num 10
 ```
 You can use `--truncation-psi` to control the generated images quality/diversity trade-off.
 
@@ -75,7 +75,7 @@ The [`prepare_data.py`](prepare_data.py) can either prepare the datasets from ou
 ### Default Datasets 
 To prepare the datasets from the catalog, run the following command:
 ```python
-python prepare_data.py --ffhq --cityscapes --clevr --bedroom --max-images 100000
+python prepare_data.py --ffhq --cityscapes --clevr --bedroom --max-images=100000
 ```
 
 See table below for details about the datasets in the catalog.
@@ -106,7 +106,7 @@ Use `--max-images` to reduce the size of the `tfrecord` files.
 ## Training
 Models are trained by using the `--train` option. To fine-tune a pretrained GANsformer model:
 ```python
-python run_network.py --train --gpus 0 --gansformer-default --expname clevr-pretrained --dataset clevr  
+python run_network.py --train --gpus=0 --gansformer-default --expname=clevr-pretrained --dataset=clevr  
 ```
 
 To train a GANsformer in its default configuration form scratch:

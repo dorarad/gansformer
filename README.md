@@ -236,7 +236,7 @@ nvcc test_nvcc.cu -o test_nvcc -run
 | GPU says hello.
 ```
 
-## Architecture overview
+## Architecture Overview
 The GANsformer consists of two networks:
 
 **Generator**: which produces the images (`x`) given randomly sampled latents (`z`). The latent z has a shape `[batch_size, component_num, latent_dim]`, where `component_num = 1` by default (Vanilla GAN, StyleGAN) but is > 1 for the GANsformer model. We can define the latent components by splitting `z` along the second dimension to obtain `z_1,...,z_k` latent components. The generator likewise consists of two parts:

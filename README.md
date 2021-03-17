@@ -37,6 +37,8 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Pretrained networks for all datasets  
 :white_check_mark: Extra visualizations and evaluations <!--Extra visualizations/animations and evaluation-->
 
+If you experience any issues or have suggestions for improvements or extensions, feed free to contact me either thourgh the issues page or at dorarad@stanford.edu. 
+
 ## Bibtex
 ```bibtex
 @article{hudson2021gansformer,
@@ -54,10 +56,15 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 - We have performed experiments on Titan V GPU. We assume 12GB of GPU memory (more memory can expedite training).
 - See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
 
-<!-- ## Quickstart and Overview -->
-## Overview
-We can both train, evaluate the model quantitatively and qualitative by running the The [`run_netowrk.py`](run_network.py).  
-The model architecutre can be found at [`network.py`](training/network.py). The training loop is implemented at [`training_loop.py`](training/training_loop.py).
+## Quickstart & Overview
+A minimal example of using a pre-trained GANsformer can be found at [`generate.py`](generate.py). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
+```python
+python generate.py --gpus 0 --model gdrive:bedroom-snapshot.pkl --output_dir images --images-num 10
+```
+You can use `--truncation-psi` to control the generated images quality/diversity trade-off.
+
+We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py).  
+The model architecutre can be found at [`network.py`](training/network.py). The training procedure is implemented at [`training_loop.py`](training/training_loop.py).
 
 ## Data preparation
 We explored the GANsformer model on 4 datasets for images and scenes: [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/), [LSUN-Bedrooms](https://www.yf.io/p/lsun), [Cityscapes](https://www.cityscapes-dataset.com/) and [FFHQ](https://github.com/NVlabs/ffhq-dataset). The model can be trained on other datasets as well.
@@ -82,29 +89,29 @@ This can be particularly useful to save space in case of large datasets, such as
 ### Custom Datasets
 You can also use the script to create new custom datasets. For instance:
 ```python
-python prepare_data.py --task <name> --images-dir <source-dir> --images-format png --ratio 0.7 --shards-num 5
+python prepare_data.py --task <dataset-name> --images-dir <source-dir> --format png --ratio 0.7 --shards-num 5
 ```
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
 ### Dataset Catalog
-| Dataset       | # Images  | Resolution    | Dowhnload Size | `tfrecords` Size | Gamma | 
-| :-----------: | :-------: | :-----------: | :------------: | :--------------: | :---: |
-| FFHQ          | 70,000    | 256&times;256 | 13GB           | 13GB             | 10    |
-| CLEVR         | 100,000   | 256&times;256 | 18GB           | 15.5GB           | 40    |
-| Cityscapes    | 25,000    | 256&times;256 | 1.8GB          | 8GB              | 20    |
-| LSUN-Bedrooms | 3,000,000 | 256&times;256 | 42.8G          | Up to 480GB      | 100   |
+| Dataset           | # Images  | Resolution    | Dowhnload Size | `tfrecords` Size | Gamma | 
+| :---------------: | :-------: | :-----------: | :------------: | :--------------: | :---: |
+| **FFHQ**          | 70,000    | 256&times;256 | 13GB           | 13GB             | 10    |
+| **CLEVR**         | 100,015   | 256&times;256 | 18GB           | 15.5GB           | 40    |
+| **Cityscapes**    | 24,998    | 256&times;256 | 1.8GB          | 8GB              | 20    |
+| **LSUN-Bedrooms** | 3,033,042 | 256&times;256 | 42.8G          | Up to 480GB      | 100   |
 
 Use `--max-images` to limit the size of the `tfrecord` files.
 
 ## Training
 Models are trained by using the `--train` option. To fine-tune a pretrained GANsformer model:
 ```python
-python run_network.py --train --gpus=0 --gansformer-default --expname clevr-pretrained --dataset clevr  
+python run_network.py --train --gpus 0 --gansformer-default --expname clevr-pretrained --dataset clevr  
 ```
 
 To train a GANsformer in its default configuration form scratch:
 ```python
-python run_network.py --train --gpus=0 --gansformer-default --expname clevr-scratch --dataset clevr \
+python run_network.py --train --gpus 0 --gansformer-default --expname clevr-scratch --dataset clevr \
   --pretrained-pkl None
 ```
 
@@ -125,7 +132,7 @@ The codebase suppors multiple baselines in addition to the GANsformer. For insta
 python run_network.py --train --gpus=0 --baseline GAN --expname clevr-gan --dataset clevr 
 ```
 * **Vanialla GAN**: `--baseline GAN`, a standard GAN without style modulation.
-* **[StyleGAN2](https://arxiv.org/abs/1912.04958)**: `--baseline StyleGAN`, with one global latent that modulates the image features.
+* **[StyleGAN2](https://arxiv.org/abs/1912.04958)**: `--baseline StyleGAN2`, with one global latent that modulates the image features.
 * **[k-GAN](https://arxiv.org/abs/1810.10340)**: `--baseline kGAN`, which generates multiple image layers independetly and then merge them into one shared image.
 * **[SAGAN]()**: `--baseline SAGAN`, which performs self-attention between all image features in low-resolution layer (e.g. `32x32`).
 
@@ -136,16 +143,38 @@ python run_network.py --eval --gpus 0 --expname clevr-exp --dataset clevr
 ```
 Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
 
+Below we provide the FID-50k scores for the GANsformer (using the pretrained checkpoints above) as well as baseline models.
+
+| Model          | CLEVR        | LSUN-Bedroom | FFHQ      | Cityscapes |
+| :------------: | :----------: | :----------: | :-------: | :--------: |
+| **GAN**        | 25.02        | 12.16        | 13.18     | 11.57      |
+| **kGAN**       | 28.28        | 69.9         | 61.14     | 51.08      |
+| **SAGAN**      | 26.04        | 14.06        | 16.21     | 12.81      |
+| **StyleGAN2**  | 16.05        | 11.53        | 16.21     | 8.35       |
+| **VQGAN**      | 32.60        | 59.63        | 63.12     | 173.80     |
+| **GANsformer** | **9.24**     | **6.15**     | **7.42**  | **5.23**   |
+
+<div align="center">
+  <img src="https://cs.stanford.edu/people/dorarad/plot1.png" style="float:left" width="390px">
+  <img src="https://cs.stanford.edu/people/dorarad/plot2.png" style="float:right" width="390px">
+</div>
+
 ## Visualization
 The code supports producing qualitative results and visualizations. For instance, to create attention maps for each layer:
 ```python
 python run_network.py --gpus 0 --eval --expname clevr-exp --dataset clevr --vis-layer-maps
 ```
 
+Below you can see sample images and attention maps produced by the GANsformer:
+
+<div align="center">
+  <img src="https://cs.stanford.edu/people/dorarad/atts.png" style="float:left" width="800px">
+</div>
+
 ## Command-line Options
 In the following we list some of the most useful model options. 
 
-#### Training
+### Training
 * `--gamma`: We recommend explore different values for the chosen dataset (default: `10`)
 * `--truncation-psi`: Controls the image quality/diversity trade-off. (default: `0.65`)
 * `--eval-images-num`: Number of images to compute metrics over. We recommend selecting a lower number to expedite training (default: `50,000`)
@@ -153,21 +182,21 @@ In the following we list some of the most useful model options.
 * `--pretrained-pkl`: To load a pretrained model, either a local one or from drive `gdrive:<dataset>-snapshot.pkl` for the datasets in the catalog.
 * `--data-dir` and `--result-dir`: Directory names for the datasets (`tfrecords`) and logging/results.
 
-#### Model (most useful)
+### Model (most useful)
 * `--transformer`: To add transformer layers to the generator (GANsformer)
 * `--components-num`: Number of latent components, which will attend to the image. We recommend values in the range of `8-16` (default: `1`)
 * `--latent-size`: Overall latent size (default: `512`). The size of each latent component will then be `latent_size/components_num`
 * `--num-heads`: Number of attention heads (default: `1`)
 * `--integration`: Integration of information in the transformer layer, e.g. `add` or `mul` (default: `mul`)
 
-#### Model (others)
+### Model (others)
 * `--g-start-res` and `--g-end-res`: Start and end resolution for the transformer layers (default: all layers up to resolution 2<sup>8</sup>) 
 * `--kmeans`: Track and update image-to-latents assignment centroids, used in the duplex attention
 * `--mapping-ltnt2ltnt`: Perform self-attention over latents in the mapping network
 * `--use-pos`: Use trainable positional encodings for the latents.
 * `--style False`: To turn-off one-vector global style modulation (StyleGAN2).
 
-#### Visualization
+### Visualization
 * **Sample imaegs**
   * `--vis-images`: Generate image samples 
   * `--vis-latents`: Save source latent vectors
@@ -183,6 +212,12 @@ In the following we list some of the most useful model options.
   * `--vis-style-mix`: Create style mixing visualization
 
 Run `python run_network.py -h` for the full options list.
+
+## Sample images
+<div align="center">
+  <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" style="float:left" width="420px">
+  <img src="https://cs.stanford.edu/people/dorarad/clevr.png" style="float:right" width="411px">
+</div>
 
 ## CUDA / Installation
 The model relies on custom TensorFlow ops that are compiled on the fly using [NVCC](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html). 
@@ -219,4 +254,4 @@ This codebase builds on top of and extends the great [StyleGAN2 repository](http
 
 The GANsformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANsformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
 
-If you have any questions, comments or feedback, please feel free to contact me either through the issues page or at dorarad@stanford.edu, Thank you! :)
+If you have any questions, comments or feedback, please feel free to contact me at dorarad@stanford.edu, Thank you! :)

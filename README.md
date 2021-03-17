@@ -154,9 +154,9 @@ Below we provide the FID-50k scores for the GANsformer (using the pretrained che
 | **VQGAN**      | 32.60        | 59.63        | 63.12     | 173.80     |
 | **GANsformer** | **9.24**     | **6.15**     | **7.42**  | **5.23**   |
 
-<div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/plot1.png" width="370px">
-  <img src="https://cs.stanford.edu/people/dorarad/plot2.png" width="370px">
+<div>
+  <img src="https://cs.stanford.edu/people/dorarad/plot1.png" width="340px">
+  <img src="https://cs.stanford.edu/people/dorarad/plot2.png" width="340px">
 </div>
 
 ## Visualization
@@ -168,7 +168,7 @@ python run_network.py --gpus 0 --eval --expname clevr-exp --dataset clevr --vis-
 Below you can see sample images and attention maps produced by the GANsformer:
 
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/atts.png" style="float:left" width="800px">
+  <img src="https://cs.stanford.edu/people/dorarad/atts.png" style="float:left" width="831px">
 </div>
 
 ## Command-line Options

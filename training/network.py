@@ -4,7 +4,6 @@
 # See readme for architecture overview.
 import numpy as np
 import tensorflow as tf
-import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d, upsample_conv_2d, conv_downsample_2d
 from dnnlib.tflib.ops.fused_bias_act import fused_bias_act

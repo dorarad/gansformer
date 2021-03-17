@@ -1,6 +1,5 @@
-# import warnings filter
+# Ignore all future warnings
 from warnings import simplefilter
-# ignore all future warnings
 simplefilter(action = "ignore", category = FutureWarning)
 
 import argparse
@@ -92,6 +91,21 @@ def run(**args):
             "bedrooms": 100
         }
         nset(args, "gamma", gammas.get(task, 10))        
+
+    if args.baseline == "GAN":
+        nset(args, "style", False)
+        nset(args, "latent_stem", True)
+
+    if args.baseline == "SAGAN":
+        nset(args, "style", False)
+        nset(args, "latent_stem", True)
+        nset(args, "g_img2img", 5)
+
+    if args.baseline == "kGAN":
+        nset(args, "kgan", True)
+        nset(args, "merge_layer", 5)
+        nset(args, "merge_type", "softmax")
+        nset(args, "components_num", 8)
 
     # Environment configuration
     tf_config = {
@@ -339,34 +353,21 @@ def _parse_comma_sep(s):
         return []
     return s.split(",")
 
-_examples = """examples:
-
-  # Train the GANsformer model on CLEVR
-  python %(prog)s --num-gpus = 4 --data-dir=~/datasets --dataset = clevr
-
-valid metrics:
-
-  """ + ", ".join(sorted([x for x in metric_defaults.keys()])) + """
-
-"""
-
 def main():
-    parser = argparse.ArgumentParser(
-        description = "Train the GANsformer",
-        epilog = _examples,
-        formatter_class = argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(description = "Train the GANsformer")
 
     # Framework
     # ------------------------------------------------------------------------------------------------------
-
     parser.add_argument("--expname",            help = "Experiment name", default = "exp", type = str)
     parser.add_argument("--eval",               help = "Evaluation mode (default: False)", default = None, action = "store_true")
     parser.add_argument("--train",              help = "Train mode (default: False)", default = None, action = "store_true")
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
 
-    ## Resumption
+    ## Default configurations
     parser.add_argument("--gansformer-default", help = "Select a default GANsformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
+    parser.add_argument("--baseline",           help = "Use a baseline model configuration", default = None, choices = ["GAN", "StyleGAN2", "kGAN", "SAGAN"], type = str)
+
+    ## Resumption
     parser.add_argument("--pretrained-pkl",     help = "Filename for a snapshot to resume (optional)", default = None, type = str)
     parser.add_argument("--restart",            help = "Restart training from scratch", default = False, action = "store_true")
     parser.add_argument("--reload",             help = "Reload options from the original experiment configuration file. " +

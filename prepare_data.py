@@ -94,20 +94,28 @@ def verify_md5(filename, md5):
         print("MD5 doesn't match. Will redownload the file.")
     return result
 
-def unzip(zip, path):
+def is_unzipped(zip, dir):
+    with zipfile.ZipFile(zip) as zf:
+        archive = zf.namelist()
+    all_exist = all(os.path.exists("{}/{}".format(dir, file)) for file in archive)
+    return all_exist
+
+def unzip(zip, dir):
     with zipfile.ZipFile(zip) as zf:
         for member in tqdm.tqdm(zf.infolist(), desc = "Extracting "):
             try:
-                zf.extract(member, path)
+                zf.extract(member, dir)
             except zipfile.error as e:
                 pass
 
-def download_file(url, dir = None, path = None, unzip = False, md5 = None, block_sz = 8192):
+def get_path(url, dir = None, path = None):
     if path is None:
         path = url.split("/")[-1]
     if dir is not None:
         path = "{}/{}".format(dir, path)
+    return path
 
+def download_file(url, path, block_sz = 8192):
     if "drive.google.com" in url:
         gdown.download(url, path)
     else:
@@ -128,11 +136,8 @@ def download_file(url, dir = None, path = None, unzip = False, md5 = None, block
                 status += chr(8) * (len(status) + 1)
                 print(status, end = "", flush = True)
 
-    if path.endswith(".zip"):
-        unzip(path, dir)
-
 def prepare(tasks, data_dir, shards_num = 1, max_images = None, 
-        ratio = 1.0, images_dir = None, images_format = None): # Options for custom dataset
+        ratio = 1.0, images_dir = None, format = None): # Options for custom dataset
     mkdir(data_dir)
     for task in tasks:
         # If task not in catalog, create custom task configuration
@@ -141,32 +146,41 @@ def prepare(tasks, data_dir, shards_num = 1, max_images = None,
             "name": task,
             "dir": images_dir,
             "ratio": ratio,
-            "process": formats_catalog.get(images_format)
+            "process": formats_catalog.get(format)
         })
 
         dirname = "{}/{}".format(data_dir, task)
         mkdir(dirname)
 
-        try:
-            print(misc.bold("Preparing the {} dataset...".format(c.name)))
-            fname = "{}/{}".format(dirname, c.filename)
-            download = not ("local" in c or (os.path.exists(fname) and verify_md5(fname, c.md5)))
+        # try:
+        print(misc.bold("Preparing the {} dataset...".format(c.name)))
+        fname = "{}/{}".format(dirname, c.filename)
+
+        if "local" not in c:
+            download = not ((os.path.exists(fname) and verify_md5(fname, c.md5)))
+            path = get_path(c.url, dirname, path = c.filename)
 
             if download:
                 print(misc.bold("Downloading the data ({} GB)...".format(c.size)))
-                download_file(c.url, dirname, path = c.filename, md5 = c.md5)
-                print(misc.bold("Completed downloading {}".format(c.name)))
+                download_file(c.url, path)
+                # print(misc.bold("Completed downloading {}".format(c.name)))
             
-            if "process" in c:
-                imgdir = images_dir if "local" in c else ("{}/{}".format(dirname, c.dir))
-                shards_num = c.shards if max_images is None else shards_num
-                c.process(dirname, imgdir, ratio = c.ratio, 
-                    shards_num = shards_num, max_imgs = max_images)
+            if path.endswith(".zip"):
+                if not is_unzipped(path, dirname):
+                    print(misc.bold("Unzipping {}...".format(path)))
+                    unzip(path, dirname)
+                    # print(misc.bold("Completed unzipping {}".format(path)))
 
-            print(misc.bcolored("Completed preparations for {}!".format(c.name), "blue"))
-        except:
-            print(misc.bcolored("Had an error in preparing the {} dataset. Will move on.".format(c.name), "red"))
-            print(sys.exc_info())
+        if "process" in c:
+            imgdir = images_dir if "local" in c else ("{}/{}".format(dirname, c.dir))
+            shards_num = c.shards if max_images is None else shards_num
+            c.process(dirname, imgdir, ratio = c.ratio, 
+                shards_num = shards_num, max_imgs = max_images)
+
+        print(misc.bcolored("Completed preparations for {}!".format(c.name), "blue"))
+        # except:
+        #     print(misc.bcolored("Had an error in preparing the {} dataset. Will move on.".format(c.name), "red"))
+        #     print(sys.exc_info())
 
 def run_cmdline(argv):
     parser = argparse.ArgumentParser(prog = argv[0], description = "Download and prepare data for the GANsformer.")
@@ -181,7 +195,7 @@ def run_cmdline(argv):
     # Create a new task with custom images
     parser.add_argument("--task",           help = "New dataset name", type = str, dest = "tasks", action = "append")
     parser.add_argument("--images-dir",     help = "Provide source image directory to convert into tfrecords (will be searched recursively)", default = None, type = str)
-    parser.add_argument("--images-format",  help = "Images format", default = None, choices = ["png", "jpg", "npy", "hdf5", "tfds", "lmdb"], type = str)
+    parser.add_argument("--format",         help = "Images format", default = None, choices = ["png", "jpg", "npy", "hdf5", "tfds", "lmdb"], type = str)
     parser.add_argument("--ratio",          help = "Images height/width", default = 1.0, type = float)
 
     args = parser.parse_args()

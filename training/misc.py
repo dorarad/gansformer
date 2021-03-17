@@ -84,11 +84,7 @@ def rm(files):
 
 # Make directory
 def mkdir(d):
-    if not os.path.exists(d):
-        try:
-            os.makedirs(d)
-        except:
-            pass
+    os.makedirs(d, exist_ok = True)
 
 # Image utilities
 # ----------------------------------------------------------------------------
@@ -246,7 +242,7 @@ def adjust_dynamic_range_aux(data, drange_in, drange_out):
 # 1. Transpose channel from first to last dimension
 # 2. Adjust range from drange to uint [0,255]
 # 3. Convert format to Pillow
-def to_pil(img, drange = [0,1]):
+def to_pil(img, drange = [-1,1]):
     assert img.ndim == 2 or img.ndim == 3
     if img.ndim == 3:
         if img.shape[0] == 1:

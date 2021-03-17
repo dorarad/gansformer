@@ -6,10 +6,6 @@ import numpy as np
 import tensorflow as tf
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
-from dnnlib.tflib.ops.upfirdn_2d import upsample_2d, downsample_2d
-import math
-from training import misc
-import os
 
 def G_loss(G, D,
         dataset,                 # The dataset object for the real images

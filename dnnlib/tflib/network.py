@@ -12,6 +12,7 @@ import sys
 import numpy as np
 import tensorflow as tf
 from termcolor import colored
+from tqdm import trange 
 
 from collections import OrderedDict
 from typing import Any, List, Tuple, Union
@@ -394,6 +395,7 @@ class Network:
             minibatch_size: int = None,
             num_gpus: int = 1,
             assume_frozen: bool = False,
+            verbose: bool = False,
             **dynamic_kwargs) -> Union[np.ndarray, Tuple[np.ndarray, ...], List[np.ndarray]]:
         # Run this network for the given NumPy array(s), and return the output(s) as NumPy array(s).
         # Args:
@@ -414,7 +416,7 @@ class Network:
         if len(in_arrays) > self.num_inputs:
             in_arrays = in_arrays[:self.num_inputs]
         if len(in_arrays) < self.num_inputs:
-            in_arrays = in_arrays + (None, )
+            in_arrays = in_arrays + (None, ) * (self.num_inputs - len(in_arrays))
         assert len(in_arrays) == self.num_inputs
 
         assert not all(arr is None for arr in in_arrays)
@@ -471,7 +473,12 @@ class Network:
         in_expr, out_expr = self._run_cache[key]
         out_arrays = [np.empty([num_items] + expr.shape.as_list()[1:], expr.dtype.name) for expr in out_expr]
 
-        for mb_begin in range(0, num_items, minibatch_size):
+        range_fn = range
+        if verbose:
+            range_fn = lambda start, end, step: trange(start, end, step, unit_scale = minibatch_size, 
+                unit = "image ({} batches of {} images)".format(len(range(0, num_items, minibatch_size)), minibatch_size))
+
+        for mb_begin in range_fn(0, num_items, minibatch_size):
             if print_progress:
                 print("\r%d / %d" % (mb_begin, num_items), end="")
 

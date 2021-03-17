@@ -1,13 +1,11 @@
+import shutil
 import numpy as np
-import tensorflow as tf
+import PIL.Image
+
 import dnnlib
 import dnnlib.tflib as tflib
 from tqdm import tqdm, trange
 from training import misc
-
-import PIL.Image
-import shutil
-import glob
 
 # Compute the effective batch size given a total number of elements, the batch index, and the
 # batch size. For the last batch, its effective size might be smaller if the total_num is not
@@ -150,7 +148,7 @@ def eval(G,
             return_dlatents = True) # is_visualization = True
         # For memory efficiency, save full information only for a small amount of images
         images, attmaps_all_layers, wlatents_all_layers = ret[0], ret[-2], ret[-1]
-        soft_maps = attmaps_all_layers[:,:,-1,0]
+        soft_maps = attmaps_all_layers[:,:,-1,0] if attention else None
         attmaps_all_layers = attmaps_all_layers[:rich_num]
         wlatents = wlatents_all_layers[:,:,0]
 

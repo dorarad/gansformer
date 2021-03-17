@@ -8,18 +8,19 @@
 # It supports training over data in TF records as produced by dataset_tool.py.
 # Labels can optionally be provided although not essential
 # If provided, image will be generated conditioned on a chosen label
+import glob
 import numpy as np
 import tensorflow as tf
+
 import dnnlib
 import dnnlib.tflib as tflib
 from dnnlib.tflib.autosummary import autosummary
+import pretrained_networks
 
 from training import dataset as data
 from training import misc
 from training import visualize
 from metrics import metric_base
-import pretrained_networks
-import glob
 
 # Data processing
 # ----------------------------------------------------------------------------

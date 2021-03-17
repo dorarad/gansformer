@@ -83,7 +83,7 @@ See table below for details about the datasets in the catalog.
 **Useful options**:  
 * `--data-dir` the output data directory (default: `datasets`)  
 * `--shards-num` to select the number of shards for the data (default: adapted to each dataset)  
-* `--max-images` to store only a subset of the dataset, in order to limit the size of the stored `tfrecord` files (default: _max_).  
+* `--max-images` to store only a subset of the dataset, in order to reduce the size of the stored `tfrecord` files (default: _max_).  
 This can be particularly useful to save space in case of large datasets, such as LSUN-bedrooms (originaly contains 3M images)
 
 ### Custom Datasets
@@ -101,7 +101,7 @@ The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lm
 | **Cityscapes**    | 24,998    | 256&times;256 | 1.8GB          | 8GB              | 20    |
 | **LSUN-Bedrooms** | 3,033,042 | 256&times;256 | 42.8G          | Up to 480GB      | 100   |
 
-Use `--max-images` to limit the size of the `tfrecord` files.
+Use `--max-images` to reduce the size of the `tfrecord` files.
 
 ## Training
 Models are trained by using the `--train` option. To fine-tune a pretrained GANsformer model:
@@ -143,7 +143,8 @@ python run_network.py --eval --gpus 0 --expname clevr-exp --dataset clevr
 ```
 Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
 
-Below we provide the FID-50k scores for the GANsformer (using the pretrained checkpoints above) as well as baseline models.
+Below we provide the FID-50k scores for the GANsformer (_using the pretrained checkpoints above_) as well as baseline models.  
+Note that these scores are different than the scores reported in the StyleGAN2 paper since they run experiments for up to 7x more training steps (5k-15k kimg-steps in our experiments over all models, which takes about 3-4 days with 4 GPUs, vs 50-70k kimg-steps in their experiments, which take over 90 GPU-days).
 
 | Model          | CLEVR        | LSUN-Bedroom | FFHQ       | Cityscapes |
 | :------------: | :----------: | :----------: | :--------: | :--------: |

@@ -129,7 +129,7 @@ We support a large variety of command-line options to adjust the model, training
 ### Baseline models
 The codebase suppors multiple baselines in addition to the GANsformer. For instance, to run a vanilla GAN model:
 ```python
-python run_network.py --train --gpus=0 --baseline GAN --expname clevr-gan --dataset clevr 
+python run_network.py --train --gpus 0 --baseline GAN --expname clevr-gan --dataset clevr 
 ```
 * **[Vanialla GAN](https://arxiv.org/abs/1406.2661)**: `--baseline GAN`, a standard GAN without style modulation.
 * **[StyleGAN2](https://arxiv.org/abs/1912.04958)**: `--baseline StyleGAN2`, with one global latent that modulates the image features.

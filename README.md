@@ -155,8 +155,8 @@ Below we provide the FID-50k scores for the GANsformer (using the pretrained che
 | **GANsformer** | **9.24**     | **6.15**     | **7.42**  | **5.23**   |
 
 <div>
-  <img src="https://cs.stanford.edu/people/dorarad/plot1.png" width="340px">
-  <img src="https://cs.stanford.edu/people/dorarad/plot2.png" width="340px">
+  <img src="https://cs.stanford.edu/people/dorarad/plot1.png" width="350px">
+  <img src="https://cs.stanford.edu/people/dorarad/plot2.png" width="350px">
 </div>
 
 ## Visualization

@@ -215,8 +215,8 @@ Run `python run_network.py -h` for the full options list.
 
 ## Sample images
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" width="420px">
-  <img src="https://cs.stanford.edu/people/dorarad/clevr.png" width="411px">
+  <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" style="float:left" width="420px">
+  <img src="https://cs.stanford.edu/people/dorarad/clevr.png" style="float:left" width="411px">
 </div>
 
 ## CUDA / Installation

@@ -155,8 +155,8 @@ Below we provide the FID-50k scores for the GANsformer (using the pretrained che
 | **GANsformer** | **9.24**     | **6.15**     | **7.42**  | **5.23**   |
 
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/plot1.png" style="float:left" width="390px">
-  <img src="https://cs.stanford.edu/people/dorarad/plot2.png" style="float:right" width="390px">
+  <img src="https://cs.stanford.edu/people/dorarad/plot1.png" width="370px">
+  <img src="https://cs.stanford.edu/people/dorarad/plot2.png" width="370px">
 </div>
 
 ## Visualization
@@ -215,8 +215,8 @@ Run `python run_network.py -h` for the full options list.
 
 ## Sample images
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" style="float:left" width="420px">
-  <img src="https://cs.stanford.edu/people/dorarad/clevr.png" style="float:right" width="411px">
+  <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" width="420px">
+  <img src="https://cs.stanford.edu/people/dorarad/clevr.png" width="411px">
 </div>
 
 ## CUDA / Installation

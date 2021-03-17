@@ -145,14 +145,14 @@ Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained
 
 Below we provide the FID-50k scores for the GANsformer (using the pretrained checkpoints above) as well as baseline models.
 
-| Model          | CLEVR        | LSUN-Bedroom | FFHQ      | Cityscapes |
-| :------------: | :----------: | :----------: | :-------: | :--------: |
-| **GAN**        | 25.02        | 12.16        | 13.18     | 11.57      |
-| **kGAN**       | 28.28        | 69.9         | 61.14     | 51.08      |
-| **SAGAN**      | 26.04        | 14.06        | 16.21     | 12.81      |
-| **StyleGAN2**  | 16.05        | 11.53        | 16.21     | 8.35       |
-| **VQGAN**      | 32.60        | 59.63        | 63.12     | 173.80     |
-| **GANsformer** | **9.24**     | **6.15**     | **7.42**  | **5.23**   |
+| Model          | CLEVR        | LSUN-Bedroom | FFHQ       | Cityscapes |
+| :------------: | :----------: | :----------: | :--------: | :--------: |
+| **GAN**        | 25.02        | 12.16        | 13.18      | 11.57      |
+| **kGAN**       | 28.28        | 69.9         | 61.14      | 51.08      |
+| **SAGAN**      | 26.04        | 14.06        | 16.21      | 12.81      |
+| **StyleGAN2**  | 16.05        | 11.53        | 16.21      | 8.35       |
+| **VQGAN**      | 32.60        | 59.63        | 63.12      | 173.80     |
+| **GANsformer** | ***9.24***   | ***6.15***   | ***7.42*** | ***5.23*** |
 
 <div>
   <img src="https://cs.stanford.edu/people/dorarad/plot1.png" width="350px">

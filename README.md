@@ -94,7 +94,7 @@ python prepare_data.py --task <dataset-name> --images-dir <source-dir> --format 
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
 ### Dataset Catalog
-| Dataset           | # Images  | Resolution    | Dowhnload Size | `tfrecords` Size | Gamma | 
+| Dataset           | # Images  | Resolution    | Dowhnload Size | TFrecords Size   | Gamma | 
 | :---------------: | :-------: | :-----------: | :------------: | :--------------: | :---: |
 | **FFHQ**          | 70,000    | 256&times;256 | 13GB           | 13GB             | 10    |
 | **CLEVR**         | 100,015   | 256&times;256 | 18GB           | 15.5GB           | 40    |

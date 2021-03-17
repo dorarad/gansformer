@@ -131,7 +131,7 @@ The codebase suppors multiple baselines in addition to the GANsformer. For insta
 ```python
 python run_network.py --train --gpus=0 --baseline GAN --expname clevr-gan --dataset clevr 
 ```
-* **Vanialla GAN**: `--baseline GAN`, a standard GAN without style modulation.
+* **[Vanialla GAN](https://arxiv.org/abs/1406.2661)**: `--baseline GAN`, a standard GAN without style modulation.
 * **[StyleGAN2](https://arxiv.org/abs/1912.04958)**: `--baseline StyleGAN2`, with one global latent that modulates the image features.
 * **[k-GAN](https://arxiv.org/abs/1810.10340)**: `--baseline kGAN`, which generates multiple image layers independetly and then merge them into one shared image.
 * **[SAGAN]()**: `--baseline SAGAN`, which performs self-attention between all image features in low-resolution layer (e.g. `32x32`).

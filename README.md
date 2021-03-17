@@ -99,7 +99,7 @@ The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lm
 | **FFHQ**          | 70,000    | 256&times;256 | 13GB           | 13GB             | 10    |
 | **CLEVR**         | 100,015   | 256&times;256 | 18GB           | 15.5GB           | 40    |
 | **Cityscapes**    | 24,998    | 256&times;256 | 1.8GB          | 8GB              | 20    |
-| **LSUN-Bedrooms** | 3,033,042 | 256&times;256 | 42.8G          | Up to 480GB      | 100   |
+| **LSUN-Bedrooms** | 3,033,042 | 256&times;256 | 42.8GB         | Up to 480GB      | 100   |
 
 Use `--max-images` to reduce the size of the `tfrecord` files.
 

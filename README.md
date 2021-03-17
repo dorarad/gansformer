@@ -12,7 +12,7 @@
   <b>Drew A. Hudson* & C. Lawrence Zitnick</b></span>
 </p>
 
-*_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
+*_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area but also for vision, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/image1.png" style="float:left" width="340px">

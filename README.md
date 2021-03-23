@@ -259,4 +259,3 @@ This codebase builds on top of and extends the great [StyleGAN2 repository](http
 The GANsformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANsformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
 
 If you have questions, comments or feedback, please feel free to contact me at dorarad@stanford.edu, Thank you! :)
- 

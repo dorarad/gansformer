@@ -52,7 +52,7 @@ If you experience any issues or have suggestions for improvements or extensions,
 ```
 
 ## Requirements
-<img align="right" src="https://cs.stanford.edu/people/dorarad/dia.png" width="200px">
+<img align="right" src="https://cs.stanford.edu/people/dorarad/dia.png" width="190px">
 
 - Python 3.6 or 3.7 are supported.
 - We recommend TensorFlow 1.14 which was used for development, but TensorFlow 1.15 is also supported.

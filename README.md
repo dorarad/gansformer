@@ -52,6 +52,8 @@ If you experience any issues or have suggestions for improvements or extensions,
 ```
 
 ## Requirements
+<img align="right" src="https://cs.stanford.edu/people/dorarad/dia.png" width="200px">
+
 - Python 3.6 or 3.7 are supported.
 - We recommend TensorFlow 1.14 which was used for development, but TensorFlow 1.15 is also supported.
 - The code was tested with CUDA 10.0 toolkit and cuDNN 7.5.

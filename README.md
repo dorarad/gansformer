@@ -52,7 +52,7 @@ If you experience any issues or have suggestions for improvements or extensions,
 ```
 
 ## Sample Images
-Using the pre-trained models (generated after training for ***5-7x*** less steps than StyleGAN2 models! Training for longer will improve the quality further):
+Using the pre-trained models (generated after training for ***5-7x*** less steps than StyleGAN2 models! Training our models for longer will improve the image quality further):
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/samples.png" width="700px">
 </div>
@@ -75,6 +75,7 @@ python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir im
 You can use `--truncation-psi` to control the generated images quality/diversity trade-off.
 
 We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py).  
+We currently keep training the models and will release newer checkpoints soon!  
 The model architecutre can be found at [`network.py`](training/network.py). The training procedure is implemented at [`training_loop.py`](training/training_loop.py).
 
 ## Data preparation

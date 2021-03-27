@@ -51,7 +51,8 @@ If you experience any issues or have suggestions for improvements or extensions,
 }
 ```
 
-Sample images using the pre-trained models (after training for ***5-7x*** less steps than StyleGAN2 models):
+## Sample Images
+Using the pre-trained models (after training for ***5-7x*** less steps than StyleGAN2 models):
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/samples.png" width="700px">
 </div>
@@ -224,7 +225,7 @@ In the following we list some of the most useful model options.
 
 Run `python run_network.py -h` for the full options list.
 
-## Sample images
+## Sample images (more examples)
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" style="float:left" width="750px">
   <br>

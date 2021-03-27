@@ -70,7 +70,7 @@ Using the pre-trained models (generated after training for ***5-7x*** less steps
 
 A minimal example of using a pre-trained GANsformer can be found at [`generate.py`](generate.py). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
 ```python
-python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir images --images-num 8
+python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir images --images-num 32
 ```
 You can use `--truncation-psi` to control the generated images quality/diversity trade-off.
 

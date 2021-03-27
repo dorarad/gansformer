@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 from training import misc
-from misc import crop_max_rectangle as crop
+from training.misc import crop_max_rectangle as crop
 
 import dnnlib.tflib as tflib
 from pretrained_networks import load_networks # returns G, D, Gs

@@ -6,7 +6,7 @@ import dnnlib.tflib as tflib
 gdrive_urls = {
     "gdrive:clevr-snapshot.pkl": "https://drive.google.com/uc?id=1JNb9r2j0MKpygxn-FT-HGClfzZ0CV_dy",
     "gdrive:cityscapes-snapshot.pkl": "https://drive.google.com/uc?id=1SLImpJEw--fKe9ngM99-KKXOXmmoWw6g",
-    "gdrive:ffhq-snapshot.pkl": "https://drive.google.com/uc?id=1JSZLVmhxOhUsC4Ijh6PmVoSIVsJTwyR7",
+    "gdrive:ffhq-snapshot.pkl": "https://drive.google.com/uc?id=13rF5RXN4-FeEZX9Ph40jXnt7Bqw0PJDk",
     "gdrive:bedrooms-snapshot.pkl": "https://drive.google.com/uc?id=1-2L3iCBpP_cf6T2onf3zEQJFAAzxsQne"
 }
 

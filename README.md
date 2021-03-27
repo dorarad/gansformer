@@ -227,11 +227,11 @@ Run `python run_network.py -h` for the full options list.
 
 ## Sample images (more examples)
 <div align="center">
+  <img src="https://cs.stanford.edu/people/dorarad/faces.png" style="float:left" width="750px">
+  <br>
   <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" style="float:left" width="750px">
   <br>
   <img src="https://cs.stanford.edu/people/dorarad/clevr_new.png" style="float:left" width="750px">
-  <br>
-  <img src="https://cs.stanford.edu/people/dorarad/faces.png" style="float:left" width="750px">
   <br>
   <img src="https://cs.stanford.edu/people/dorarad/cities_small.png" style="float:left" width="750px">
 </div>

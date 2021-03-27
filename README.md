@@ -51,6 +51,11 @@ If you experience any issues or have suggestions for improvements or extensions,
 }
 ```
 
+Here are some sample images using the pre-trained models (after training for ***5-7x*** less steps than StyleGAN2 models):
+<div align="center">
+  <img src="https://cs.stanford.edu/people/dorarad/samples.png" width="650px">
+</div>
+
 ## Requirements
 <img align="right" src="https://cs.stanford.edu/people/dorarad/dia.png" width="190px">
 
@@ -221,8 +226,13 @@ Run `python run_network.py -h` for the full options list.
 
 ## Sample images
 <div align="center">
-  <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" style="float:left" width="420px">
-  <img src="https://cs.stanford.edu/people/dorarad/clevr_new.png" style="float:left" width="411px">
+  <img src="https://cs.stanford.edu/people/dorarad/bedroom.png" style="float:left" width="750px">
+  <br>
+  <img src="https://cs.stanford.edu/people/dorarad/clevr_new.png" style="float:left" width="750px">
+  <br>
+  <img src="https://cs.stanford.edu/people/dorarad/faces.png" style="float:left" width="750px">
+  <br>
+  <img src="https://cs.stanford.edu/people/dorarad/cities_small.png" style="float:left" width="750px">
 </div>
 
 ## CUDA / Installation

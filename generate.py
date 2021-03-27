@@ -18,11 +18,11 @@ def run(model, gpus, output_dir, images_num, truncation_psi, batch_size):
     os.environ["CUDA_VISIBLE_DEVICES"] = gpus                   # Set GPUs
     tflib.init_tf()                                             # Initialize TensorFlow
     G, D, Gs = load_networks(model)                             # Load pre-trained network
-    G.print_layers()                                            # Print network details
+    Gs.print_layers()                                           # Print network details
 
     print("Generate images...")
-    latents = np.random.randn(images_num, *G.input_shape[1:])   # Sample latent vectors
-    images = G.run(latents, truncation_psi = truncation_psi,    # Generate images
+    latents = np.random.randn(images_num, *Gs.input_shape[1:])  # Sample latent vectors
+    images = Gs.run(latents, truncation_psi = truncation_psi,   # Generate images
         minibatch_size = batch_size, verbose = True)[0]
 
     print("Saving images...")

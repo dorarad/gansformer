@@ -18,11 +18,11 @@ def run(model, gpus, output_dir, images_num, truncation_psi, batch_size):
     os.environ["CUDA_VISIBLE_DEVICES"] = gpus                   # Set GPUs
     tflib.init_tf()                                             # Initialize TensorFlow
     G, D, Gs = load_networks(model)                             # Load pre-trained network
-    Gs.print_layers()                                           # Print network details
+    G.print_layers()                                            # Print network details
 
     print("Generate images...")
-    latents = np.random.randn(images_num, *Gs.input_shape[1:])  # Sample latent vectors
-    images = Gs.run(latents, truncation_psi = truncation_psi,   # Generate images
+    latents = np.random.randn(images_num, *G.input_shape[1:])   # Sample latent vectors
+    images = G.run(latents, truncation_psi = truncation_psi,    # Generate images
         minibatch_size = batch_size, verbose = True)[0]
 
     print("Saving images...")
@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
     parser.add_argument("--output-dir",         help = "Root directory for experiments (default: %(default)s)", default = "images", metavar = "DIR")
     parser.add_argument("--images-num",         help = "Number of images to generate (default: %(default)s)", default = 10, type = int)
-    parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images (default: %(default)s)", default = 0.5, type = float)
+    parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images (default: %(default)s)", default = 0.7, type = float)
     parser.add_argument("--batch-size",         help = "Batch size for generating images (default: %(default)s)", default = 8, type = int)
     args = parser.parse_args()
     run(**vars(args))

@@ -51,7 +51,7 @@ If you experience any issues or have suggestions for improvements or extensions,
 }
 ```
 
-Here are some sample images using the pre-trained models (after training for ***5-7x*** less steps than StyleGAN2 models):
+Sample images using the pre-trained models (after training for ***5-7x*** less steps than StyleGAN2 models):
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/samples.png" width="650px">
 </div>

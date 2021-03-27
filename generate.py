@@ -9,11 +9,13 @@ import numpy as np
 from tqdm import tqdm
 
 from training import misc
+form misc import crop_max_rectangle as crop
+
 import dnnlib.tflib as tflib
 from pretrained_networks import load_networks # returns G, D, Gs
 # G: generator, D: discriminator, Gs: generator moving-average (higher quality images)
 
-def run(model, gpus, output_dir, images_num, truncation_psi, batch_size):
+def run(model, gpus, output_dir, images_num, truncation_psi, batch_size, ratio):
     print("Loading networks...")
     os.environ["CUDA_VISIBLE_DEVICES"] = gpus                   # Set GPUs
     tflib.init_tf()                                             # Initialize TensorFlow
@@ -29,7 +31,7 @@ def run(model, gpus, output_dir, images_num, truncation_psi, batch_size):
     os.makedirs(output_dir, exist_ok = True)                    # Make output directory
     pattern = "{}/Sample_{{:06d}}.png".format(output_dir)       # Output images pattern
     for i, image in tqdm(list(enumerate(images))):              # Save images
-        misc.to_pil(image).save(pattern.format(i))
+        crop(misc.to_pil(image), ratio).save(pattern.format(i))
 
 def main():
     parser = argparse.ArgumentParser(description = "Generate images with the GANsformer")
@@ -39,6 +41,7 @@ def main():
     parser.add_argument("--images-num",         help = "Number of images to generate (default: %(default)s)", default = 32, type = int)
     parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images (default: %(default)s)", default = 0.7, type = float)
     parser.add_argument("--batch-size",         help = "Batch size for generating images (default: %(default)s)", default = 8, type = int)
+    parser.add_argument("--ratio",              help = "Crop ratio for output images (default: %(default)s)", default = 1.0, type = float)
     args = parser.parse_args()
     run(**vars(args))
 

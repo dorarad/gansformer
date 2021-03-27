@@ -86,7 +86,7 @@ The [`prepare_data.py`](prepare_data.py) can either prepare the datasets from ou
 ### Default Datasets 
 To prepare the datasets from the catalog, run the following command:
 ```python
-python prepare_data.py --ffhq --cityscapes --clevr --bedroom --max-images 100000
+python prepare_data.py --ffhq --cityscapes --clevr --bedrooms --max-images 100000
 ```
 
 See table below for details about the datasets in the catalog.

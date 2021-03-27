@@ -36,7 +36,7 @@ def main():
     parser.add_argument("--model",              help = "Filename for a snapshot to resume (optional)", default = None, type = str)
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
     parser.add_argument("--output-dir",         help = "Root directory for experiments (default: %(default)s)", default = "images", metavar = "DIR")
-    parser.add_argument("--images-num",         help = "Number of images to generate (default: %(default)s)", default = 10, type = int)
+    parser.add_argument("--images-num",         help = "Number of images to generate (default: %(default)s)", default = 32, type = int)
     parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images (default: %(default)s)", default = 0.7, type = float)
     parser.add_argument("--batch-size",         help = "Batch size for generating images (default: %(default)s)", default = 8, type = int)
     args = parser.parse_args()

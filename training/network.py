@@ -810,7 +810,7 @@ def G_GANsformer(
     mapping_func            = "G_mapping",    # Function name of the mapping network
     synthesis_func          = "G_synthesis",  # Function name of the synthesis network
     # Truncation cutoff
-    truncation_psi          = 0.65,           # Style strength multiplier for the truncation trick. None = disable
+    truncation_psi          = 0.7,            # Style strength multiplier for the truncation trick. None = disable
     truncation_cutoff       = None,           # Number of layers for which to apply the truncation trick. None = disable
     truncation_psi_val      = None,           # Value for truncation_psi to use during validation
     truncation_cutoff_val   = None,           # Value for truncation_cutoff to use during validation

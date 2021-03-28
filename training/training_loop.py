@@ -221,7 +221,7 @@ def training_loop(
             tf_config = tf_config, mirror_augment = mirror_augment)  
 
         # Qualitative evaluation
-        visualize.eval(G, dataset, batch_size = sched.minibatch_gpu,
+        visualize.eval(Gs, dataset, batch_size = sched.minibatch_gpu,
             drange_net = drange_net, ratio = ratio, **vis_args)
 
     if not train:
@@ -393,7 +393,7 @@ def training_loop(
 
             # Save snapshots
             if img_snapshot_ticks is not None and (cur_tick % img_snapshot_ticks == 0 or done):
-                visualize.eval(G, dataset, batch_size = sched.minibatch_gpu, training = True,
+                visualize.eval(Gs, dataset, batch_size = sched.minibatch_gpu, training = True,
                     step = cur_nimg // 1000, grid_size = grid_size, latents = grid_latents, 
                     labels = grid_labels, drange_net = drange_net, ratio = ratio, **vis_args)
 

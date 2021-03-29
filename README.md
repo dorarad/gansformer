@@ -73,7 +73,7 @@ A minimal example of using a pre-trained GANsformer can be found at [`generate.p
 python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir images --images-num 32
 ```
 You can use `--truncation-psi` to control the generated images quality/diversity trade-off.
-
+We recommend setting it to values in the range of `0.6-1.0`.
 We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py).  
 We currently keep training the models and will release newer checkpoints soon!  
 The model architecutre can be found at [`network.py`](training/network.py). The training procedure is implemented at [`training_loop.py`](training/training_loop.py).

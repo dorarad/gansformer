@@ -24,7 +24,7 @@ catalog = {
    "ffhq": EasyDict({
         "name": "FFHQ", # Dataset name for logging 
         "filename": "ffhq-r08.tfrecords1of1", # Local file name
-        "url": "https://drive.google.com/uc?id=1Oo-43djEakn6AzeZidfmHWYFNfMen8ZP", # download URL
+        "url": "http://downloads.cs.stanford.edu/nlp/data/dorarad/ffhq-r08.tfrecords1of1", # download URL
         "md5": "74de4f07dc7bfb07c0ad4471fdac5e67", # MD5 checksum to potentially skip download
         "ratio": 1, # height/width ratio
         "size": 13, # download size in GB

@@ -173,6 +173,13 @@ Note that these scores are different than the scores reported in the StyleGAN2 p
   <img src="https://cs.stanford.edu/people/dorarad/plot2.png" width="350px">
 </div>
 
+### Model Change-log
+Compared to the original GANsformer depicted in the paper, this repository make several additional improvments that contributed to the performance:
+* Use `--mapping_ltnt2ltnt` so that the latents communicate with each other directly through self-attention inside the mapping network before starting to generate the image.
+* Add an additional global latent (`--style`) to the `k` latent components, such that first the global latent modulates all the image features uniformly, and then the `k` latents modulate different regions based on the bipartite transformer's attention.  
+The global latent is useful for coordinating holistic aspects of the image such as global lighting conditions, global style properties for e.g. faces, etc.
+* After making these changes, we observed no additional benefit from adding the transformer to the discriminator, and therefore for simplicity we disabled that.
+
 ## Visualization
 The code supports producing qualitative results and visualizations. For instance, to create attention maps for each layer:
 ```python

@@ -1,4 +1,4 @@
-# Precision/Recall (PR).
+# Precision/Recall (PR)
 import os
 import numpy as np
 import tensorflow as tf
@@ -120,7 +120,7 @@ class ManifoldEstimator():
         return batch_predictions
 
 def knn_precision_recall_features(ref_features, eval_features, feature_net, nhood_sizes,
-                                  row_batch_size, col_batch_size, num_gpus):
+                                  row_batch_size, col_batch_size, num_imgs, num_gpus):
     # Computes k-NN precision and recall for two sets of feature vectors
     state = dnnlib.EasyDict()
     num_features = feature_net.output_shape[1]
@@ -173,14 +173,14 @@ class PR(metric_base.MetricBase):
 
         if paths is not None:
             # Extract features for local sample image files (paths)
-            feats = self._paths_to_feats(paths, feat_func, minibatch_size, num_gpus, num_imgs)
+            eval_features = self._paths_to_feats(paths, feature_net, minibatch_size, num_gpus, num_imgs)
         else:
             # Extract features for newly generated fake imgs
-            feats = self._gen_feats(Gs, inception, minibatch_size, num_gpus, Gs_kwargs)
+            eval_features = self._gen_feats(Gs, feature_net, minibatch_size, num_imgs, num_gpus, Gs_kwargs)
 
         # Compute precision and recall
         state = knn_precision_recall_features(ref_features = ref_features, eval_features = eval_features,
             feature_net = feature_net, nhood_sizes = [self.nhood_size], row_batch_size = self.row_batch_size,
-            col_batch_size = self.row_batch_size, num_gpus = num_gpus)
+            col_batch_size = self.row_batch_size, num_imgs = num_imgs, num_gpus = num_gpus)
         self._report_result(state.knn_precision[0], suffix = "_precision")
         self._report_result(state.knn_recall[0], suffix = "_recall")

@@ -119,13 +119,14 @@ Use `--max-images` to reduce the size of the `tfrecord` files.
 ## Training
 Models are trained by using the `--train` option. To fine-tune a pretrained GANsformer model:
 ```python
-python run_network.py --train --gpus 0 --gansformer-default --expname clevr-pretrained --dataset clevr  
+python run_network.py --train --gpus 0 --gansformer-default --expname clevr-pretrained --dataset clevr \
+  --pretrained-pkl gdrive:clevr-snapshot.pkl
 ```
+We provide pretrained models for `bedrooms`, `cityscapes`, `clevr` and `ffhq`.
 
 To train a GANsformer in its default configuration form scratch:
 ```python
-python run_network.py --train --gpus 0 --gansformer-default --expname clevr-scratch --dataset clevr \
-  --pretrained-pkl None
+python run_network.py --train --gpus 0 --gansformer-default --expname clevr-scratch --dataset clevr
 ```
 
 By defualt, models training is resumed from the latest snapshot. Use `--restart` to strat a new experiment, or `--pretrained-pkl` to select a particular snapshot to load.

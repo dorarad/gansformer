@@ -62,12 +62,8 @@ def run(**args):
 
     if args.gansformer_default:
         task = args.dataset
-        pretrained = "gdrive:{}-snapshot.pkl".format(task)
-        if pretrained not in pretrained_networks.gdrive_urls:
-            pretrained = None
 
-        nset(args, "recompile", pretrained is not None)
-        nset(args, "pretrained_pkl", pretrained)
+        nset(args, "recompile", args.pretrained_pkl is not None)
         nset(args, "mirror_augment", task in ["cityscapes", "ffhq"])
 
         nset(args, "transformer", True)

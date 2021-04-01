@@ -249,7 +249,7 @@ Run `python run_network.py -h` for the full options list.
 ## CUDA / Installation
 The model relies on custom TensorFlow ops that are compiled on the fly using [NVCC](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html). 
 
-To set up the environment:
+To set up the environment e.g. for cuda-10.0:
 ```python
 export PATH=/usr/local/cuda-10.0/bin${PATH:+:${PATH}}
 export LD_LIBRARY_PATH=/usr/local/cuda10.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}

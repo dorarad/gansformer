@@ -27,7 +27,8 @@ def cset(dicts, name, prop):
 
 # Conditional set: if dict[name] is not populated from the command line, then assign dict[name] := prop
 def nset(args, name, prop):
-    if name not in sys.argv and name.replace("_", "-") not in sys.argv:
+    flag = "--{}".format(name.replace("_", "-"))
+    if flag in sys.argv:
         args[name] = prop
 
 # Conditional set: if dict[name] has its default value, then assign dict[name] := prop

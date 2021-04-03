@@ -9,7 +9,7 @@
 
 # GANsformer: Generative Adversarial Transformers
 <p align="center">
-  <b>Drew A. Hudson* & C. Lawrence Zitnick</b></span>
+  <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a>* & C. Lawrence Zitnick</b></span>
 </p>
 
 *_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area and also in the visual context, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:

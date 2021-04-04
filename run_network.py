@@ -83,7 +83,7 @@ def run(**args):
 
         gammas = {
             "ffhq": 10, 
-            "cities": 20, 
+            "cityscapes": 20, 
             "clevr": 40, 
             "bedrooms": 100
         }

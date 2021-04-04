@@ -136,6 +136,8 @@ For comparing to state-of-the-art, we compute metric scores using 50,000 sample 
 
 We support a large variety of command-line options to adjust the model, training, and evaluation. Run `python run_network.py -h` for the full list of options!
 
+we recommend exploring different values for `--gamma` when training on new datasets. If you train on resolution >= 512 and observe OOM issues, consider reducing `--minibatch-size` to a lower value.
+
 ### Logging
 * During training, sample images and attention maps will be generated and stored at results/<expname>-<run-id> (`--keep-samples`).
 * Metrics will also be regularly commputed and reported in a `metric-<name>.txt` file. `--metrics` can be set to `fid` for FID, `is` for Inception Score and `pr` for Precision/Recall.
@@ -198,8 +200,8 @@ Below you can see sample images and attention maps produced by the GANsformer:
 In the following we list some of the most useful model options. 
 
 ### Training
-* `--gamma`: We recommend explore different values for the chosen dataset (default: `10`)
-* `--truncation-psi`: Controls the image quality/diversity trade-off. (default: `0.65`)
+* `--gamma`: We recommend exploring different values for the chosen dataset (default: `10`)
+* `--truncation-psi`: Controls the image quality/diversity trade-off. (default: `0.7`)
 * `--eval-images-num`: Number of images to compute metrics over. We recommend selecting a lower number to expedite training (default: `50,000`)
 * `--restart`: To restart training from sracth instead of resuming from the latest snapshot
 * `--pretrained-pkl`: To load a pretrained model, either a local one or from drive `gdrive:<dataset>-snapshot.pkl` for the datasets in the catalog.

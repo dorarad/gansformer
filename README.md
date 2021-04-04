@@ -75,8 +75,9 @@ python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir im
 You can use `--truncation-psi` to control the generated images quality/diversity trade-off.  
 We recommend setting it to values in the range of `0.6-1.0`.
 
+We currently provide pretrained models for resolution 256&times;256 but keep training them and will release newer checkpoints as well as pretrained models for resolution 1024&times;1024 soon!
+
 We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py).  
-We currently keep training the models and will release newer checkpoints soon!  
 The model architecutre can be found at [`network.py`](training/network.py). The training procedure is implemented at [`training_loop.py`](training/training_loop.py).
 
 ## Data preparation

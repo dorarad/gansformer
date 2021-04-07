@@ -358,7 +358,7 @@ def save_gif(imgs, filename, duration = 50):
     imgs[0].save(filename, save_all = True, append_images = imgs[1:], duration = duration, loop = 0)
 
 def clean_filename(filename):
-    return filename.replace("_00000", "").replace("00000_", "")
+    return filename.replace("_000000", "").replace("000000_", "")
 
 # Save a list of images with ordering and according to a path template
 def save_images_builder(drange, ratio, grid_size, grid = False, verbose = False):

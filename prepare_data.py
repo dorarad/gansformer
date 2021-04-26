@@ -154,9 +154,9 @@ def prepare(tasks, data_dir, shards_num = 1, max_images = None,
 
         # try:
         print(misc.bold("Preparing the {} dataset...".format(c.name)))
-        fname = "{}/{}".format(dirname, c.filename)
-
+        
         if "local" not in c:
+            fname = "{}/{}".format(dirname, c.filename)
             download = not ((os.path.exists(fname) and verify_md5(fname, c.md5)))
             path = get_path(c.url, dirname, path = c.filename)
 

@@ -141,13 +141,13 @@ def prepare(tasks, data_dir, shards_num = 1, max_images = None,
     mkdir(data_dir)
     for task in tasks:
         # If task not in catalog, create custom task configuration
-        c = catalog.get(task, {
+        c = catalog.get(task, EasyDict({
             "local": True,
             "name": task,
             "dir": images_dir,
             "ratio": ratio,
             "process": formats_catalog.get(format)
-        })
+        }))
 
         dirname = "{}/{}".format(data_dir, task)
         mkdir(dirname)

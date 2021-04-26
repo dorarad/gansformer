@@ -158,7 +158,7 @@ To evalute a model, use the `--eval` option:
 ```python
 python run_network.py --eval --gpus 0 --expname clevr-exp --dataset clevr
 ```
-Add `--pretrained-network gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
+Add `--pretrained-pkl gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
 
 Below we provide the FID-50k scores for the GANsformer (_using the pretrained checkpoints above_) as well as baseline models.  
 Note that these scores are different than the scores reported in the StyleGAN2 paper since they run experiments for up to 7x more training steps (5k-15k kimg-steps in our experiments over all models, which takes about 3-4 days with 4 GPUs, vs 50-70k kimg-steps in their experiments, which take over 90 GPU-days).

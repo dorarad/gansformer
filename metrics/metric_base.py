@@ -11,6 +11,7 @@ import dnnlib.tflib as tflib
 
 from training import misc
 from training import dataset
+from tqdm import tqdm
 
 # Base class for metrics
 class MetricBase:
@@ -68,10 +69,11 @@ class MetricBase:
 
     def run(self, network_pkl, num_imgs, run_dir = None, data_dir = None, dataset_args = None,
             mirror_augment = None, num_gpus = 1, tf_config = None, log_results = True,
-            Gs_kwargs = dict(is_validation = True), **kwargs):
+            Gs_kwargs = dict(is_validation = True), eval_mod = False, **kwargs):
 
         self._reset(network_pkl = network_pkl, run_dir = run_dir, data_dir = data_dir,
             dataset_args = dataset_args, mirror_augment = mirror_augment)
+        self.eval_mod = eval_mod
 
         time_begin = time.time()
         with tf.Graph().as_default(), tflib.create_session(tf_config).as_default():
@@ -189,8 +191,10 @@ class MetricBase:
     # Returns the features [num_imgs, featurizer.output_shape[1]]
     def _get_feats(self, img_iter, featurizer, minibatch_size, num_gpus, num_imgs):
         feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
-
-        for idx, imgs in enumerate(img_iter):
+        itr = enumerate(img_iter)
+        if self.eval_mod:
+            itr = tqdm(list(itr), total = num_imgs / minibatch_size, unit_scale = minibatch_size)
+        for idx, imgs in itr:
             begin = idx * minibatch_size
             end = min(begin + minibatch_size, num_imgs)
 
@@ -225,8 +229,12 @@ class MetricBase:
                 result_expr.append(featurizer.clone().get_output_for(imgs))
 
         # Compute features for newly generated 'num_imgs' images
+        itr = range(0, num_imgs, minibatch_size)
+        if self.eval_mod:
+            itr = tqdm(list(itr), total = num_imgs / minibatch_size, unit_scale = minibatch_size)
+
         feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
-        for begin in range(0, num_imgs, minibatch_size):
+        for begin in itr:
             self._report_progress(begin, num_imgs)
             end = min(begin + minibatch_size, num_imgs)
             feats[begin:end] = np.concatenate(tflib.run(result_expr), axis = 0)[:end-begin]

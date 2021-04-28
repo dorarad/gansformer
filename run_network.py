@@ -131,7 +131,7 @@ def run(**args):
     }
     args.ratio = ratios.get(args.dataset, args.ratio)
     dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.train_images_num, 
-        num_threads = args.num_threads)
+        num_threads = args.num_threads, resolution = args.resolution)
     for arg in ["data_dir", "mirror_augment", "total_kimg", "ratio"]:
         cset(train, arg, args[arg])
 
@@ -377,6 +377,7 @@ def main():
     parser.add_argument("--data-dir",           help = "Datasets root directory (default: %(default)s)", default = "datasets", metavar = "DIR")
     parser.add_argument("--dataset",            help = "Training dataset name (subdirectory of data-dir)", required = True)
     parser.add_argument("--ratio",              help = "Image height/width ratio in the dataset", default = 1.0, type = float)
+    parser.add_argument("--resolution",         help = "Training resolution", default = 256, type = int)
     parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 4, type = int)
     parser.add_argument("--mirror-augment",     help = "Perform horizontal flip augmentation for the data (default: %(default)s)", default = None, action = "store_true")
     parser.add_argument("--train-images-num",   help = "Maximum number of images to train on. If not specified, train on the whole dataset.", default = None, type = int)

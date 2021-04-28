@@ -216,11 +216,13 @@ def training_loop(
         misc.save_pkl((G, D, Gs), pkl, remove = False)
 
         # Quantitative evaluation
+        misc.log("Run evaluation...")
         metric = metrics.run(pkl, num_imgs = eval_images_num, run_dir = dnnlib.make_run_dir_path(),
             data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = ratio, 
             tf_config = tf_config, mirror_augment = mirror_augment)  
 
         # Qualitative evaluation
+        misc.log("Produce visualizations...")
         visualize.eval(Gs, dataset, batch_size = sched.minibatch_gpu,
             drange_net = drange_net, ratio = ratio, **vis_args)
 

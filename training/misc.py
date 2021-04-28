@@ -134,11 +134,8 @@ def crop_center(img, cw, ch):
 def crop_max_rectangle(img, ratio = 1.0):
     if ratio is None:
         return img
-    if ratio * img.size[0] <= img.size[1]:
-        shape = (img.size[0], ratio * img.size[0])
-    else:
-        shape = (img.size[1] / ratio, img.size[1])
-    return crop_center(img, shape[0], shape[1])
+    s = min(img.shape[0], img.shape[1] / ratio)
+    return crop_center(img, s, ratio * s)
 
 # Pad an image of dimension w,h to the smallest containing square (max(w,h), max(w,h))
 def pad_min_square(img, pad_color = (0, 0, 0)):

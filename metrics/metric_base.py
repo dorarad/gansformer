@@ -193,7 +193,7 @@ class MetricBase:
         feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
         itr = enumerate(img_iter)
         if self.eval_mod:
-            itr = tqdm(list(itr), total = num_imgs / minibatch_size, unit_scale = minibatch_size)
+            itr = tqdm(itr, total = num_imgs / minibatch_size, unit_scale = minibatch_size)
         for idx, imgs in itr:
             begin = idx * minibatch_size
             end = min(begin + minibatch_size, num_imgs)
@@ -231,7 +231,7 @@ class MetricBase:
         # Compute features for newly generated 'num_imgs' images
         itr = range(0, num_imgs, minibatch_size)
         if self.eval_mod:
-            itr = tqdm(list(itr), total = num_imgs / minibatch_size, unit_scale = minibatch_size)
+            itr = tqdm(itr, total = num_imgs / minibatch_size, unit_scale = minibatch_size)
 
         feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
         for begin in itr:

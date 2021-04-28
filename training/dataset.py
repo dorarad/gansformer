@@ -76,13 +76,18 @@ class TFRecordDataset:
         # Determine shape and resolution
         max_shape = max(tfr_shapes, key = np.prod)
         self.resolution = resolution if resolution is not None else max_shape[1]
+        if resolution is not None:
+            assert resolution <= max_shape[1]
         self.resolution_log2 = int(np.log2(self.resolution))
+        file_indexes = [i for i, tfr_shape in enumerate(tfr_shapes) if tfr_shape[1] == self.resolution]
+        tfr_files = [tfr_files[i] for i in file_indexes]
+        tfr_shapes = [tfr_shapes[i] for i in file_indexes]
         self.shape = [max_shape[0], self.resolution, self.resolution]
         tfr_lods = [self.resolution_log2 - int(np.log2(shape[1])) for shape in tfr_shapes]
         assert all(shape[0] == max_shape[0] for shape in tfr_shapes)
         assert all(shape[1] == shape[2] for shape in tfr_shapes)
         assert all(shape[1] == self.resolution // (2**lod) for shape, lod in zip(tfr_shapes, tfr_lods))
-        assert all(lod in range(self.resolution_log2 - 1) for lod in tfr_lods)
+        #assert all(lod in range(self.resolution_log2 - 1) for lod in tfr_lods)
 
         # Load labels
         assert max_label_size == "full" or max_label_size >= 0

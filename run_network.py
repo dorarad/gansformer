@@ -124,7 +124,7 @@ def run(**args):
     # For bedrooms, we choose the most common ratio in the 
     # dataset and crop the other images into that ratio.
     ratios = {
-        "clevr": 2/3,
+        "clevr": 0.75,
         "bedrooms": 188/256, 
         "cityscapes": 0.5,
         "ffhq": 1.0

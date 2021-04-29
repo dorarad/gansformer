@@ -37,7 +37,7 @@ catalog = {
         "url": "https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip",
         "dir": "CLEVR_v1.0/images", # Image directory to process while turning into tfrecords
         "md5": "b11922020e72d0cd9154779b2d3d07d2",
-        "ratio": 2/3,
+        "ratio": 0.75,
         "size": 18,
         "shards": 5,
         "img_num": 100000,

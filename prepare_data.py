@@ -31,18 +31,6 @@ catalog = {
         "shards": 1, # Number of tfrecord shards
         "img_num": 70000 # Number of images
     }),
-    "clevr": EasyDict({
-        "name": "CLEVR", # Dataset name for logging 
-        "filename": "CLEVR_v1.0.zip",
-        "url": "https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip",
-        "dir": "CLEVR_v1.0/images", # Image directory to process while turning into tfrecords
-        "md5": "b11922020e72d0cd9154779b2d3d07d2",
-        "ratio": 0.75,
-        "size": 18,
-        "shards": 5,
-        "img_num": 100000,
-        "process": dataset_tool.create_from_imgs # Function to convert download to tfrecords
-    }),
     "bedrooms": EasyDict({
         "name": "LSUN-Bedrooms", # Dataset name for logging 
         "filename": "bedroom_train_lmdb.zip",
@@ -64,7 +52,26 @@ catalog = {
         "size": 2,
         "shards": 16,
         "img_num": 25000
-    })
+    }),
+    "clevr": EasyDict({
+        "name": "CLEVR", # Dataset name for logging 
+        "filename": "clevr.zip",
+        "url": "https://drive.google.com/uc?id=1lY4JE30yk26v0MWHNpXBOMzltufUcTXj",
+        "md5": "3040bb20a29cd2f0e1e9231aebddf2a1",
+        "size": 6,
+        "ratio": 0.75,
+        "shards": 5,
+        "img_num": 100000
+        ##########################################################################################
+        # Currently, we download preprocessed TFrecords of CLEVR images with image ratio 0.75.
+        # To process instead the dataset from scratch (with the original image ratio of 320/480), add the following:
+        # "filename": "CLEVR_v1.0.zip",
+        # "size": 18,
+        # "dir": "CLEVR_v1.0/images", # Image directory to process while turning into tfrecords
+        # "url": "https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip",
+        # "md5": "b11922020e72d0cd9154779b2d3d07d2",
+        # "process": dataset_tool.create_from_imgs # Function to convert download to tfrecords
+    })    
 }
 
 formats_catalog = {
@@ -188,10 +195,10 @@ def run_cmdline(argv):
     parser.add_argument("--shards-num",     help = "Number of shards to split each dataset to (optional)", default = 1, type = int)
     parser.add_argument("--max-images",     help = "Maximum number of images to have in the dataset (optional). Use to reduce the produced tfrecords file size", default = None, type = int)
     # Default tasks
-    parser.add_argument("--clevr",          help = "Prepare the CLEVR dataset (18GB download, up to 15.5GB tfrecords, 100k images)", dest = "tasks", action = "append_const", const = "clevr")
-    parser.add_argument("--bedrooms",       help = "Prepare the LSUN-bedrooms dataset (42.8GB, up to 480GB tfrecords, 3M images)", dest = "tasks", action = "append_const", const = "bedrooms")
+    parser.add_argument("--clevr",          help = "Prepare the CLEVR dataset (6.41GB download, 31GB tfrecords, 100k images)", dest = "tasks", action = "append_const", const = "clevr")
+    parser.add_argument("--bedrooms",       help = "Prepare the LSUN-bedrooms dataset (42.8GB download, up to 480GB tfrecords, 3M images)", dest = "tasks", action = "append_const", const = "bedrooms")
     parser.add_argument("--ffhq",           help = "Prepare the FFHQ dataset (13GB download, 13GB tfrecords, 70k images)", dest = "tasks", action = "append_const", const = "ffhq")
-    parser.add_argument("--cityscapes",     help = "Prepare the cityscapes dataset (1.8GB, 8GB tfrecords, 25k images)", dest = "tasks", action = "append_const", const = "cityscapes")
+    parser.add_argument("--cityscapes",     help = "Prepare the cityscapes dataset (1.8GB download, 8GB tfrecords, 25k images)", dest = "tasks", action = "append_const", const = "cityscapes")
     # Create a new task with custom images
     parser.add_argument("--task",           help = "New dataset name", type = str, dest = "tasks", action = "append")
     parser.add_argument("--images-dir",     help = "Provide source image directory to convert into tfrecords (will be searched recursively)", default = None, type = str)
@@ -201,7 +208,6 @@ def run_cmdline(argv):
     args = parser.parse_args()
     if not args.tasks:
         misc.error("No tasks specified. Please see '-h' for help.")
-    
     if args.max_images < 50000:
         misc.log("Warning: max-images is set to {}. We recommend setting it at least to 50,000 to allow statistically correct computation of the FID-50k metric.".format(args.max_images), "red")
 

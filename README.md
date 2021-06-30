@@ -36,8 +36,8 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Code clean-up and refacotiring, adding documentation  
 :white_check_mark: Training and data-prepreation intructions  
 :white_check_mark: Pretrained networks for all datasets  
-:white_check_mark: Extra visualizations and evaluations
-⬜️ Releasing Models trained for longer and for higher-resolutions (up to 1024 x 1024)
+:white_check_mark: Extra visualizations and evaluations  
+⬜️ Releasing Models trained for longer and for higher-resolutions (up to 1024 x 1024)  
 ⬜️ Releasing Pytorch version
 
 If you experience any issues or have suggestions for improvements or extensions, feel free to contact me either thourgh the issues page or at dorarad@stanford.edu. 

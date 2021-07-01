@@ -1,4 +1,4 @@
-# Minimal script for generating images using pre-trained the GANsformer
+# Minimal script for generating images using pre-trained the GANformer
 # Ignore all future warnings
 from warnings import simplefilter
 simplefilter(action = "ignore", category = FutureWarning)
@@ -34,7 +34,7 @@ def run(model, gpus, output_dir, images_num, truncation_psi, batch_size, ratio):
         crop(misc.to_pil(image), ratio).save(pattern.format(i))
 
 def main():
-    parser = argparse.ArgumentParser(description = "Generate images with the GANsformer")
+    parser = argparse.ArgumentParser(description = "Generate images with the GANformer")
     parser.add_argument("--model",              help = "Filename for a snapshot to resume (optional)", default = None, type = str)
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
     parser.add_argument("--output-dir",         help = "Root directory for experiments (default: %(default)s)", default = "images", metavar = "DIR")

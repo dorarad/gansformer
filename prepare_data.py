@@ -190,7 +190,7 @@ def prepare(tasks, data_dir, shards_num = 1, max_images = None,
         #     print(sys.exc_info())
 
 def run_cmdline(argv):
-    parser = argparse.ArgumentParser(prog = argv[0], description = "Download and prepare data for the GANsformer.")
+    parser = argparse.ArgumentParser(prog = argv[0], description = "Download and prepare data for the GANformer.")
     parser.add_argument("--data-dir",       help = "Directory of created dataset", default = "datasets", type = str)
     parser.add_argument("--shards-num",     help = "Number of shards to split each dataset to (optional)", default = 1, type = int)
     parser.add_argument("--max-images",     help = "Maximum number of images to have in the dataset (optional). Use to reduce the produced tfrecords file size", default = None, type = int)

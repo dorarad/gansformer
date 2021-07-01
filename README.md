@@ -45,10 +45,10 @@ If you experience any issues or have suggestions for improvements or extensions,
 
 ## Bibtex
 ```bibtex
-@article{hudson2021gansformer,
+@article{hudson2021ganformer,
   title={Generative Adversarial Transformers},
   author={Hudson, Drew A and Zitnick, C. Lawrence},
-  journal={arXiv preprint:2103.01209},
+  journal={Proceedings of the 38th International Conference on Machine Learning, {ICML} 2021},
   year={2021}
 }
 ```
@@ -70,7 +70,7 @@ Using the pre-trained models (generated after training for ***5-7x*** less steps
 
 ## Quickstart & Overview
 
-A minimal example of using a pre-trained GANsformer can be found at [`generate.py`](generate.py). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
+A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
 ```python
 python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir images --images-num 32
 ```
@@ -83,7 +83,7 @@ We can train and evaluate new or pretrained model both quantitatively and qualit
 The model architecutre can be found at [`network.py`](training/network.py). The training procedure is implemented at [`training_loop.py`](training/training_loop.py).
 
 ## Data preparation
-We explored the GANsformer model on 4 datasets for images and scenes: [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/), [LSUN-Bedrooms](https://www.yf.io/p/lsun), [Cityscapes](https://www.cityscapes-dataset.com/) and [FFHQ](https://github.com/NVlabs/ffhq-dataset). The model can be trained on other datasets as well.
+We explored the GANformer model on 4 datasets for images and scenes: [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/), [LSUN-Bedrooms](https://www.yf.io/p/lsun), [Cityscapes](https://www.cityscapes-dataset.com/) and [FFHQ](https://github.com/NVlabs/ffhq-dataset). The model can be trained on other datasets as well.
 We trained the model on `256x256` resolution. Higher resolutions are supported too. The model will automatically adapt to the resolution of the images in the dataset.
 
 The [`prepare_data.py`](prepare_data.py) can either prepare the datasets from our catalog or create new datasets.
@@ -120,16 +120,16 @@ The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lm
 Use `--max-images` to reduce the size of the `tfrecord` files.
 
 ## Training
-Models are trained by using the `--train` option. To fine-tune a pretrained GANsformer model:
+Models are trained by using the `--train` option. To fine-tune a pretrained GANformer model:
 ```python
-python run_network.py --train --gpus 0 --gansformer-default --expname clevr-pretrained --dataset clevr \
+python run_network.py --train --gpus 0 --ganformer-default --expname clevr-pretrained --dataset clevr \
   --pretrained-pkl gdrive:clevr-snapshot.pkl
 ```
 We provide pretrained models for `bedrooms`, `cityscapes`, `clevr` and `ffhq`.
 
-To train a GANsformer in its default configuration form scratch:
+To train a GANformer in its default configuration form scratch:
 ```python
-python run_network.py --train --gpus 0 --gansformer-default --expname clevr-scratch --dataset clevr
+python run_network.py --train --gpus 0 --ganformer-default --expname clevr-scratch --dataset clevr
 ```
 
 By defualt, models training is resumed from the latest snapshot. Use `--restart` to strat a new experiment, or `--pretrained-pkl` to select a particular snapshot to load.
@@ -146,7 +146,7 @@ we recommend exploring different values for `--gamma` when training on new datas
 * Tensorboard logs are also created (`--summarize`) that track the metrics, loss values for the generator and discriminator, and other useful statistics over the course of training.
 
 ### Baseline models
-The codebase suppors multiple baselines in addition to the GANsformer. For instance, to run a vanilla GAN model:
+The codebase suppors multiple baselines in addition to the GANformer. For instance, to run a vanilla GAN model:
 ```python
 python run_network.py --train --gpus 0 --baseline GAN --expname clevr-gan --dataset clevr 
 ```
@@ -162,7 +162,7 @@ python run_network.py --eval --gpus 0 --expname clevr-exp --dataset clevr
 ```
 Add `--pretrained-pkl gdrive:<dataset>-snapshot.pkl` to evalute a pretrained model.
 
-Below we provide the FID-50k scores for the GANsformer (_using the pretrained checkpoints above_) as well as baseline models.  
+Below we provide the FID-50k scores for the GANformer (_using the pretrained checkpoints above_) as well as baseline models.  
 Note that these scores are different than the scores reported in the StyleGAN2 paper since they run experiments for up to 7x more training steps (5k-15k kimg-steps in our experiments over all models, which takes about 3-4 days with 4 GPUs, vs 50-70k kimg-steps in their experiments, which take over 90 GPU-days).
 
 | Model          | CLEVR        | LSUN-Bedroom | FFHQ       | Cityscapes |
@@ -172,7 +172,7 @@ Note that these scores are different than the scores reported in the StyleGAN2 p
 | **SAGAN**      | 26.04        | 14.06        | 16.21      | 12.81      |
 | **StyleGAN2**  | 16.05        | 11.53        | 16.21      | 8.35       |
 | **VQGAN**      | 32.60        | 59.63        | 63.12      | 173.80     |
-| **GANsformer** | ***9.24***   | ***6.15***   | ***7.42*** | ***5.23*** |
+| **GANformer** | ***9.24***   | ***6.15***   | ***7.42*** | ***5.23*** |
 
 <div>
   <img src="https://cs.stanford.edu/people/dorarad/plot1.png" width="350px">
@@ -180,7 +180,7 @@ Note that these scores are different than the scores reported in the StyleGAN2 p
 </div>
 
 ### Model Change-log
-Compared to the original GANsformer depicted in the paper, this repository make several additional improvments that contributed to the performance:
+Compared to the original GANformer depicted in the paper, this repository make several additional improvments that contributed to the performance:
 * Use `--mapping_ltnt2ltnt` so that the latents communicate with each other directly through self-attention inside the mapping network before starting to generate the image.
 * Add an additional global latent (`--style`) to the `k` latent components, such that first the global latent modulates all the image features uniformly, and then the `k` latents modulate different regions based on the bipartite transformer's attention.  
 The global latent is useful for coordinating holistic aspects of the image such as global lighting conditions, global style properties for e.g. faces, etc.
@@ -192,7 +192,7 @@ The code supports producing qualitative results and visualizations. For instance
 python run_network.py --gpus 0 --eval --expname clevr-exp --dataset clevr --vis-layer-maps
 ```
 
-Below you can see sample images and attention maps produced by the GANsformer:
+Below you can see sample images and attention maps produced by the GANformer:
 
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/atts.png" style="float:left" width="831px">
@@ -210,7 +210,7 @@ In the following we list some of the most useful model options.
 * `--data-dir` and `--result-dir`: Directory names for the datasets (`tfrecords`) and logging/results.
 
 ### Model (most useful)
-* `--transformer`: To add transformer layers to the generator (GANsformer)
+* `--transformer`: To add transformer layers to the generator (GANformer)
 * `--components-num`: Number of latent components, which will attend to the image. We recommend values in the range of `8-16` (default: `1`)
 * `--latent-size`: Overall latent size (default: `512`). The size of each latent component will then be `latent_size/components_num`
 * `--num-heads`: Number of attention heads (default: `1`)
@@ -268,11 +268,11 @@ nvcc test_nvcc.cu -o test_nvcc -run
 ```
 
 ## Architecture Overview
-The GANsformer consists of two networks:
+The GANformer consists of two networks:
 
-**Generator**: which produces the images (`x`) given randomly sampled latents (`z`). The latent z has a shape `[batch_size, component_num, latent_dim]`, where `component_num = 1` by default (Vanilla GAN, StyleGAN) but is > 1 for the GANsformer model. We can define the latent components by splitting `z` along the second dimension to obtain `z_1,...,z_k` latent components. The generator likewise consists of two parts:
+**Generator**: which produces the images (`x`) given randomly sampled latents (`z`). The latent z has a shape `[batch_size, component_num, latent_dim]`, where `component_num = 1` by default (Vanilla GAN, StyleGAN) but is > 1 for the GANformer model. We can define the latent components by splitting `z` along the second dimension to obtain `z_1,...,z_k` latent components. The generator likewise consists of two parts:
 * **Mapping network**: converts sampled latents from a normal distribution (`z`) to the intermediate space (`w`). A series of Feed-forward layers. The k latent components either are mapped independently from the `z` space to the `w` space or interact with each other through self-attention (optional flag).
-* **Synthesis network**: the intermediate latents w are used to guide the generation of new images. Images features begin from a small constant/sampled grid of `4x4`, and then go through multiple layers of convolution and up-sampling until reaching the desirable resolution (e.g. `256x256`). After each convolution, the image features are modulated (meaning that their variance and bias are controlled) by the intermediate latent vectors `w`. While in the StyleGAN model there is one global w vectors that controls all the features equally. The GANsformer uses attention so that the k latent components specialize to control different regions in the image to create it cooperatively, and therefore perform better especially in generating images depicting multi-object scenes.
+* **Synthesis network**: the intermediate latents w are used to guide the generation of new images. Images features begin from a small constant/sampled grid of `4x4`, and then go through multiple layers of convolution and up-sampling until reaching the desirable resolution (e.g. `256x256`). After each convolution, the image features are modulated (meaning that their variance and bias are controlled) by the intermediate latent vectors `w`. While in the StyleGAN model there is one global w vectors that controls all the features equally. The GANformer uses attention so that the k latent components specialize to control different regions in the image to create it cooperatively, and therefore perform better especially in generating images depicting multi-object scenes.
 * **Attention** can be used in several ways
   * **Simplex Attention**: when attention is applied in one direction only from the latents to the image features (**top-down**).
   * **Duplex Attention**: when attention is applied in the two directions: latents to image features (**top-down**) and then image features back to latents (**bottom-up**), so that each representation informs the other iteratively.
@@ -284,6 +284,6 @@ The GANsformer consists of two networks:
 ## Codebase
 This codebase builds on top of and extends the great [StyleGAN2 repository](https://github.com/NVlabs/stylegan2) by Karras et al.  
 
-The GANsformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANsformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
+The GANformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
 
 If you have questions, comments or feedback, please feel free to contact me at dorarad@stanford.edu, Thank you! :)

@@ -46,7 +46,7 @@ def log(txt, color = None):
 
 def open_file_or_url(file_or_url):
     if dnnlib.util.is_url(file_or_url):
-        return dnnlib.util.open_url(file_or_url, cache_dir = ".GANsformer-cache")
+        return dnnlib.util.open_url(file_or_url, cache_dir = ".GANformer-cache")
     return open(file_or_url, "rb")
 
 def load_pkl(file_or_url):

@@ -43,8 +43,8 @@ def slerp(a, b, ts):
 ## Creates variety of visualizations. Supported types
 # imgs           : Save image samples
 # ltnts          : Save latent vectors
-# maps           : Save attention maps (for GANsformer only)
-# layer_maps     : Save attention maps for all layers (for GANsformer only)
+# maps           : Save attention maps (for GANformer only)
+# layer_maps     : Save attention maps for all layers (for GANformer only)
 # interpolations : Create latent interpolations
 # noise_var      : Create noise variation visualization
 # style_mix      : Create style mixing visualization
@@ -165,7 +165,7 @@ def eval(G,
             misc.save_npys(latents, pattern_of("latents-z", step, "npy"), verbose, idx)
             misc.save_npys(wlatents, pattern_of("latents-w", step, "npy"), verbose, idx)
 
-        # For the GANsformer model, save attention maps
+        # For the GANformer model, save attention maps
         if attention:
             if "maps" in vis:
                 pallete = np.expand_dims(misc.get_colors(components_num), axis = [2, 3])
@@ -209,7 +209,7 @@ def eval(G,
                     save_images(maps, pattern, idx)
 
     # Produce interpolations between pairs or source latents
-    # In the GANsformer case, varying one component at a time
+    # In the GANformer case, varying one component at a time
     if "interpolations" in vis:
         ts = np.array(np.linspace(0.0, 1.0, num = intrp_density, endpoint = True))
 
@@ -275,7 +275,7 @@ def eval(G,
         PIL.Image.fromarray(diff, "L").save(dnnlib.make_run_dir_path("eval/noise-variance.png"))
 
     # Compute style mixing table, varying using the latent A in some of the layers and latent B in rest.
-    # For the GANsformer, also produce component mixes (using latents from A in some of the components,
+    # For the GANformer, also produce component mixes (using latents from A in some of the components,
     # and latents from B in the rest.
     if "style_mix" in vis:
         if verbose:

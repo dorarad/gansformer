@@ -39,7 +39,7 @@ def dset(d, name, prop, default):
 # Set network (generator or discriminator): model, loss and optimizer
 def set_net(net, reg_interval):
     ret = EasyDict()
-    ret.args  = EasyDict(func_name = "training.network.{}_GANsformer".format(net[0])) # network options
+    ret.args  = EasyDict(func_name = "training.network.{}_GANformer".format(net[0])) # network options
     ret.loss_args = EasyDict(func_name = "training.loss.{}_loss".format(net[0]))      # loss options
     ret.opt_args  = EasyDict(beta1 = 0.0, beta2 = 0.99, epsilon = 1e-8)               # optimizer options
     ret.reg_interval = reg_interval
@@ -61,7 +61,7 @@ def run(**args):
     if not args.train and not args.eval:
         misc.log("Warning: Neither --train nor --eval are provided. Therefore, we only print network shapes", "red")
 
-    if args.gansformer_default:
+    if args.ganformer_default:
         task = args.dataset
 
         nset(args, "recompile", args.pretrained_pkl is not None)
@@ -194,7 +194,7 @@ def run(**args):
     if args.components_num > 1:
         if not (args.transformer or args.kgan):
             misc.error("--components-num > 1 but the model is not using components. " + 
-                "Either add --transformer for GANsformer or --kgan for k-GAN.")
+                "Either add --transformer for GANformer or --kgan for k-GAN.")
 
         args.latent_size = int(args.latent_size / args.components_num)
     cD.args.latent_size = cG.args.latent_size = cG.args.dlatent_size = args.latent_size
@@ -210,7 +210,7 @@ def run(**args):
         cset(cG.args, arg, args[arg])
     cD.args.mbstd_group_size = args.minibatch_std_size
 
-    # GANsformer
+    # GANformer
     cset(cG.args, "transformer", args.transformer)
     cset(cD.args, "transformer", args.d_transformer)
 
@@ -234,7 +234,7 @@ def run(**args):
     cset([cG.args, train], "merge", args.kgan)
 
     if args.kgan and args.transformer:
-        misc.error("Either have --transformer for GANsformer or --kgan for k-GAN, not both")
+        misc.error("Either have --transformer for GANformer or --kgan for k-GAN, not both")
 
     # Attention
     for arg in ["start_res", "end_res", "ltnt2ltnt", "img2img"]: # , "local_attention"
@@ -351,7 +351,7 @@ def _parse_comma_sep(s):
     return s.split(",")
 
 def main():
-    parser = argparse.ArgumentParser(description = "Train the GANsformer")
+    parser = argparse.ArgumentParser(description = "Train the GANformer")
 
     # Framework
     # ------------------------------------------------------------------------------------------------------
@@ -361,7 +361,7 @@ def main():
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
 
     ## Default configurations
-    parser.add_argument("--gansformer-default", help = "Select a default GANsformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
+    parser.add_argument("--ganformer-default", help = "Select a default GANformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
     parser.add_argument("--baseline",           help = "Use a baseline model configuration", default = None, choices = ["GAN", "StyleGAN2", "kGAN", "SAGAN"], type = str)
 
     ## Resumption
@@ -403,8 +403,8 @@ def main():
     ## Visualization
     parser.add_argument("--vis-images",         help = "Save image samples", default = None, action = "store_true")
     parser.add_argument("--vis-latents",        help = "Save latent vectors", default = None, action = "store_true")
-    parser.add_argument("--vis-maps",           help = "Save attention maps (for GANsformer only)", default = None, action = "store_true")
-    parser.add_argument("--vis-layer-maps",     help = "Save attention maps for all layers (for GANsformer only)", default = None, action = "store_true")
+    parser.add_argument("--vis-maps",           help = "Save attention maps (for GANformer only)", default = None, action = "store_true")
+    parser.add_argument("--vis-layer-maps",     help = "Save attention maps for all layers (for GANformer only)", default = None, action = "store_true")
     parser.add_argument("--vis-interpolations", help = "Create latent interpolations", default = None, action = "store_true")
     parser.add_argument("--vis-noise-var",      help = "Create noise variation visualization", default = None, action = "store_true")
     parser.add_argument("--vis-style-mix",      help = "Create style mixing visualization", default = None, action = "store_true")
@@ -455,7 +455,7 @@ def main():
     parser.add_argument("--local-noise",        help = "Add stochastic local noise each layer (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--minibatch-std-size", help = "Add minibatch standard deviation layer in the discriminator, 0 to disable (default: %(default)s)", default = 4, type = int)
 
-    ## GANsformer
+    ## GANformer
     parser.add_argument("--transformer",        help = "Add transformer layers to the generator: top-down latents-to-image (default: False)", default = None, action = "store_true")
     parser.add_argument("--latent-size",        help = "Latent size, summing the dimension of all components (default: %(default)s)", default = 512, type = int)
     parser.add_argument("--components-num",     help = "Components number. Each component has latent dimension of 'latent-size / components-num'. " +

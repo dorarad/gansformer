@@ -1,4 +1,4 @@
-﻿# Network architectures for the GANSformer model, as well as multiple baselines such as
+﻿# Network architectures for the GANformer model, as well as multiple baselines such as
 # vanilla GAN, StyleGAN2, k-GAN and SAGAN, all implemented as extensions of the same
 # model skeleton for most precise comparability under same settings.
 # See readme for architecture overview.
@@ -431,7 +431,7 @@ def modulated_conv2d_layer(x, y, dim, kernel, # Convolution parameters
 
     return x
 
-# Local attention block, potentially replacing convolution (not used by default in GANsformer)
+# Local attention block, potentially replacing convolution (not used by default in GANformer)
 # Grid is positional embeddings that match the size of a convolution receptive window
 # X shape is [NCHW]
 def att2d_layer(x, dim, kernel, grid, up = False, down = False, resample_kernel = None, num_heads = 4):
@@ -797,7 +797,7 @@ def merge_images(x, dlatents, k, type, same = False):
 
 # Generator network, composed of two sub-networks: mapping and synthesis, as defined below
 # This function is mostly similar to the original StyleGAN2 version
-def G_GANsformer(
+def G_GANformer(
     latents_in,                               # First input: Latent vectors (z) [batch_size, latent_size]
     labels_in,                                # Second input (optional): Conditioning labels [batch_size, label_size]
     # General arguments
@@ -907,7 +907,7 @@ def G_GANsformer(
     # Mixing (see StyleGAN): mixes together some of the W latents mapped from one set of
     # source latents A, and another set of source latents B. Mixing can be between latents
     # that correspond either to different layers or to the different k components used in
-    # the GANsformer.
+    # the GANformer.
     # Used only during training, and by default only layers are mixes as in StyleGAN.
     def mixing(latents_in, dlatents, prob, num, idx):
         if prob is None or prob == 0:
@@ -960,7 +960,7 @@ def G_GANsformer(
 
 ########################################### Mapping network ###########################################
 
-# Mostly similar to the StylGAN version, with new options for the GANsformer such as:
+# Mostly similar to the StylGAN version, with new options for the GANformer such as:
 # self-attention among latents, shared mapping of components, and support for mapping_dim != output_dim
 def G_mapping(
     # Tensor inputs
@@ -977,7 +977,7 @@ def G_mapping(
     dlatent_broadcast       = None,         # Output disentangled latent (w) as [batch_size, dlatent_size]
                                             # or [batch_size, dlatent_broadcast, dlatent_size]
     normalize_latents       = True,         # Normalize latent vectors (z) before feeding them to the mapping layers?
-    transformer             = False,        # Whereas the generator uses attention or not (i.e. GANsformer or StyleGAN)
+    transformer             = False,        # Whereas the generator uses attention or not (i.e. GANformer or StyleGAN)
     # Mapping network
     mapping_layersnum       = 8,            # Number of mapping layers
     mapping_dim             = None,         # Number of activations in the mapping layers
@@ -1101,7 +1101,7 @@ def G_mapping(
 
 # Main differences from the StyleGAN version include the incorporation of transformer layers.
 # This function supports different generator forms:
-# - GANsformer (--transformer)
+# - GANformer (--transformer)
 # - GAN (--latent-stem --style = False)
 # - StyleGAN (--style)
 # - SAGAN (--img2img)
@@ -1120,7 +1120,7 @@ def G_synthesis(
     fmap_decay          = 1.0,          # log2 network dimension reduction when doubling the resolution
     fmap_min            = 1,            # Minimum network dimension in any layer
     fmap_max            = 512,          # Maximum network dimension in any layer
-    # General settings (StyleGAN/GANsformer related)
+    # General settings (StyleGAN/GANformer related)
     architecture        = "skip",       # Architecture: orig, skip, resnet
     nonlinearity        = "lrelu",      # Activation function: relu, lrelu", etc.
     resample_kernel     = [1, 3, 3, 1], # Low-pass filter to apply when resampling activations, None = no filtering
@@ -1131,8 +1131,8 @@ def G_synthesis(
     randomize_noise     = True,         # If True, randomize noise inputs every time (non-deterministic)
                                         # Otherwise, read noise inputs from variables
     tanh                = False,        # Use tanh on output activations (turns out to be unnecessary and suboptimal)
-    # GANsformer settings
-    transformer         = False,        # Whereas the generator uses attention or not (i.e. GANsformer or StyleGAN)
+    # GANformer settings
+    transformer         = False,        # Whereas the generator uses attention or not (i.e. GANformer or StyleGAN)
     components_num      = 1,            # Number of Latent (z) vector components z_1,...,z_k
     num_heads           = 1,            # Number of attention heads
     attention_dropout   = 0.12,         # Attention dropout rate
@@ -1206,7 +1206,7 @@ def G_synthesis(
     batch_size = get_shape(dlatents_in)[0]
 
     # Positional encodings (spatial)
-    # Image positional encodings, dictionary at different resolutions (used in GANsformer)
+    # Image positional encodings, dictionary at different resolutions (used in GANformer)
     grid_poses = get_positional_embeddings(resolution_log2, pos_dim, pos_type, pos_directions_num, pos_init)
     # Encodings for Local attention (not used by default)
     if local_attention:
@@ -1357,7 +1357,7 @@ def G_synthesis(
             return upsample_2d(y, k = resample_kernel)
 
     # Convert image features to output image (e.g. RGB)
-    # - For GANsformer: optionally perform transformer on highest resolution (if end_res >= resolution_log2)
+    # - For GANformer: optionally perform transformer on highest resolution (if end_res >= resolution_log2)
     # - For k-GAN: Merge the k images, if didn't merge so far
     # - optional tanh activation on outputs (not used by default)
     # - skip connections (for --g-arch skip)
@@ -1479,7 +1479,7 @@ def G_synthesis(
 # -----------------------------------------------------------------------------------------------------
 
 # Discriminator network, with convolution, downsampling, and optional transformer layers
-def D_GANsformer(
+def D_GANformer(
     images_in,                          # First input: Images [batch_size, channel, height, width]
     labels_in,                          # Second input: Labels [batch_size, label_size]
     # Dimensions and resolution
@@ -1498,7 +1498,7 @@ def D_GANsformer(
     mbstd_group_size    = 4,            # Group size for the minibatch standard deviation layer, 0 = disable
     mbstd_num_features  = 1,            # Number of features for the minibatch standard deviation layer
     resample_kernel     = [1, 3, 3, 1], # Low-pass filter to apply when resampling activations, None = no filtering
-    # GANsformer settings
+    # GANformer settings
     transformer         = False,        # Whereas the discriminator uses attention or not
     components_num      = 1,            # Number of aggregator variables
     num_heads           = 1,            # Number of attention heads

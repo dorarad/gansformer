@@ -30,7 +30,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 **Contact**: dorarad@stanford.edu  
 **Implementation**: [`network.py`](training/network.py)
 
-## Update: Pytorch version to be released soon!
+## Update: Pytorch version will be released soon!
 :white_check_mark: Uploading initial code and readme  
 :white_check_mark: Image sampling and visualization script  
 :white_check_mark: Code clean-up and refacotiring, adding documentation  

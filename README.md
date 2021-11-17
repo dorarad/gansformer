@@ -80,7 +80,7 @@ We recommend setting it to values in the range of `0.6-1.0`.
 
 We currently provide pretrained models for resolution 256&times;256 but keep training them and will release newer checkpoints as well as pretrained models for resolution 1024&times;1024 soon!
 
-We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py).  
+We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_network.py`](run_network.py).  
 The model architecutre can be found at [`network.py`](training/network.py). The training procedure is implemented at [`training_loop.py`](training/training_loop.py).
 
 ## Data preparation
@@ -111,7 +111,7 @@ python prepare_data.py --task <dataset-name> --images-dir <source-dir> --format 
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
 ### Dataset Catalog
-| Dataset           | # Images  | Resolution    | Dowhnload Size | TFrecords Size   | Gamma | 
+| Dataset           | # Images  | Resolution    | Download Size | TFrecords Size   | Gamma | 
 | :---------------: | :-------: | :-----------: | :------------: | :--------------: | :---: |
 | **FFHQ**          | 70,000    | 256&times;256 | 13GB           | 13GB             | 10    |
 | **CLEVR**         | 100,015   | 256&times;256 | 18GB           | 15.5GB           | 40    |

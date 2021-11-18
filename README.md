@@ -12,6 +12,9 @@
   <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a>* & <a href="http://larryzitnick.org/">C. Lawrence Zitnick</a></b></span>
 </p>
 
+### Update: We released the new [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
+
+
 *_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area and also in the visual context, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
 <div align="center">
@@ -30,13 +33,14 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 **Contact**: dorarad@stanford.edu  
 **Implementation**: [`network.py`](training/network.py)
 
-## Update: Pytorch version will be released soon!
+## Pytorch version will be released soon!
 :white_check_mark: Uploading initial code and readme  
 :white_check_mark: Image sampling and visualization script  
 :white_check_mark: Code clean-up and refacotiring, adding documentation  
 :white_check_mark: Training and data-prepreation intructions  
 :white_check_mark: Pretrained networks for all datasets  
 :white_check_mark: Extra visualizations and evaluations  
+⬜️ Releasing the GANformer2 model
 ⬜️ Providing models trained for longer  
 ⬜️ Releasing pre-trained models for high-resolutions (up to 1024 x 1024)  
 ⬜️ Releasing Pytorch version  

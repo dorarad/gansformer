@@ -29,7 +29,8 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 
 <img align="right" src="https://cs.stanford.edu/people/dorarad/img3.png" width="270px">
 
-**Paper**: [https://arxiv.org/pdf/2103.01209](https://arxiv.org/pdf/2103.01209)  
+**1st Paper**: [https://arxiv.org/pdf/2103.01209](https://arxiv.org/pdf/2103.01209)  
+**2nd Paper**: [https://arxiv.org/abs/2111.08960](https://arxiv.org/abs/2111.08960)  
 **Contact**: dorarad@stanford.edu  
 **Implementation**: [`network.py`](training/network.py)
 
@@ -39,11 +40,11 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Code clean-up and refacotiring, adding documentation  
 :white_check_mark: Training and data-prepreation intructions  
 :white_check_mark: Pretrained networks for all datasets  
-:white_check_mark: Extra visualizations and evaluations  
+:white_check_mark: Extra visualizations and evaluations 
+⬜️ Releasing Pytorch version (coming soon!)
 ⬜️ Releasing the GANformer2 model
 ⬜️ Providing models trained for longer  
 ⬜️ Releasing pre-trained models for high-resolutions (up to 1024 x 1024)  
-⬜️ Releasing Pytorch version  
 ⬜️ Adding support for conditional image generation (will be added soon!)
 
 If you experience any issues or have suggestions for improvements or extensions, feel free to contact me either thourgh the issues page or at dorarad@stanford.edu. 

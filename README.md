@@ -56,6 +56,13 @@ If you experience any issues or have suggestions for improvements or extensions,
   journal={Proceedings of the 38th International Conference on Machine Learning, {ICML} 2021},
   year={2021}
 }
+
+@article{hudson2021ganformer2,
+  title={Compositional Transformers for Scene Generation},
+  author={Hudson, Drew A and Zitnick, C. Lawrence},
+  journal={Advances in Neural Information Processing Systems {NeurIPS} 2021},
+  year={2021}
+}
 ```
 
 ## Sample Images

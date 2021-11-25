@@ -40,9 +40,9 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Code clean-up and refacotiring, adding documentation  
 :white_check_mark: Training and data-prepreation intructions  
 :white_check_mark: Pretrained networks for all datasets  
-:white_check_mark: Extra visualizations and evaluations 
-⬜️ Releasing Pytorch version (coming soon!)
-⬜️ Releasing the GANformer2 model
+:white_check_mark: Extra visualizations and evaluations  
+⬜️ Releasing Pytorch version (coming soon!)  
+⬜️ Releasing the GANformer2 model  
 ⬜️ Providing models trained for longer  
 ⬜️ Releasing pre-trained models for high-resolutions (up to 1024 x 1024)  
 ⬜️ Adding support for conditional image generation (will be added soon!)

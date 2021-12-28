@@ -1,8 +1,8 @@
 # Training loop:
 # 1. Sets up the environment and data
 # 2. Builds the generator (g) and discriminator (d) networks
-# 3. Manage the training process
-# 4. Run periodic evaluations on specified metrics
+# 3. Manages the training process
+# 4. Runs periodic evaluations on specified metrics
 # 5. Produces sample images over the course of training
 
 # It supports training over data in TF records as produced by dataset_tool.py.

@@ -5,9 +5,9 @@
 # 4. Runs periodic evaluations on specified metrics
 # 5. Produces sample images over the course of training
 
-# It supports training over data in TF records as produced by dataset_tool.py.
-# Labels can optionally be provided although not essential
-# If provided, image will be generated conditioned on a chosen label
+# It supports training over data in TF records as produced by prepare_data.py
+# Labels can optionally be provided although are not essential
+# If provided, image will be generated conditioned on the chosen label
 import glob
 import numpy as np
 import tensorflow as tf

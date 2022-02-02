@@ -28,7 +28,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 **1st Paper**: [https://arxiv.org/pdf/2103.01209](https://arxiv.org/pdf/2103.01209)  
 **2nd Paper**: [https://arxiv.org/abs/2111.08960](https://arxiv.org/abs/2111.08960)  
 **Contact**: dorarad@cs.stanford.edu  
-**Implementation**: [`network.py`](training/network.py) ([TF](network.py) and [Pytorch](pytorch_version/training/networks.py))
+**Implementation**: [`network.py`](training/network.py) ([TF](network.py) / [Pytorch](pytorch_version/training/networks.py))
 
 ### We now support both [`Pytorch`](pytorch_version) and TF!
 :white_check_mark: Uploading initial code and readme  
@@ -76,10 +76,10 @@ Using the pre-trained models (generated after training for ***5-7x*** less steps
 - For the Pytorch version: We support Pytorch >= 1.8.
 - The code was tested with CUDA 10.0 toolkit and cuDNN 7.5.
 - We have performed experiments on Titan V GPU. We assume 12GB of GPU memory (more memory can expedite training).
-- See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
+- See [`requirements.txt`](requirements.txt) ([TF](requirements.py) / [Pytorch](pytorch_version/requirements.py)) for the required python packages and run `pip install -r requirements.txt` to install them.
 
 ## Quickstart & Overview
-Our repository supports both Tensorflow (at the main directory) and Pytorch (at [`pytorch_version`](pytorch_version)). The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install [requirements](pytorch_version/requirements.txt).
+Our repository supports both Tensorflow (at the main directory) and Pytorch (at [`pytorch_version`](pytorch_version)). The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install the [requirements](pytorch_version/requirements.txt).
 Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any questions or suggestions about the new implementation!
 
 A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py) ([TF](generate.py) / [Pytorch](pytorch_version/generate.py)). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:

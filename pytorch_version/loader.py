@@ -309,7 +309,7 @@ def convert_network_pickle(source, dest):
 
     The tool is able to load the main network configurations exported using the TensorFlow version of GANFormer.
 
-    Example: python legacy.py --source = ganformer-tf.pkl --des t= ganformer-pytorch.pkl
+    Example: python loader.py --source=checkpoint-TF.pkl --dest=checkpoint.pkl
     """
     print(f"Loading {source}...")
     with dnnlib.util.open_url(source) as f:

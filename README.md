@@ -1,7 +1,3 @@
-[![PWC](https://img.shields.io/endpoint.svg?style=plastic&url=https://paperswithcode.com/badge/generative-adversarial-transformers/image-generation-on-clevr)](https://paperswithcode.com/sota/image-generation-on-clevr?p=generative-adversarial-transformers)
-[![PWC](https://img.shields.io/endpoint.svg?style=plastic&url=https://paperswithcode.com/badge/generative-adversarial-transformers/image-generation-on-cityscapes)](https://paperswithcode.com/sota/image-generation-on-cityscapes?p=generative-adversarial-transformers)
-[![PWC](https://img.shields.io/endpoint.svg?style=plastic&url=https://paperswithcode.com/badge/generative-adversarial-transformers/image-generation-on-lsun-bedroom-256-x-256)](https://paperswithcode.com/sota/image-generation-on-lsun-bedroom-256-x-256?p=generative-adversarial-transformers)
-
 ![Python 3.7](https://img.shields.io/badge/python-3.7-blueviolet.svg?style=plastic)
 ![TensorFlow 1.10](https://img.shields.io/badge/tensorflow-1.14-2545e6.svg?style=plastic)
 ![cuDNN 7.3.1](https://img.shields.io/badge/cudnn-10.0-b0071e.svg?style=plastic)

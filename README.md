@@ -8,6 +8,7 @@
   <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a>* & <a href="http://larryzitnick.org/">C. Lawrence Zitnick</a></b></span>
 </p>
 
+### Update: The repository now includes both Pytorch and TF versions!
 ### Update: We released the new [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
 
 
@@ -37,7 +38,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Training and data-prepreation intructions  
 :white_check_mark: Pretrained networks for all datasets  
 :white_check_mark: Extra visualizations and evaluations  
-⬜️ Releasing Pytorch version (coming soon!)  
+:white_check_mark: Releasing Pytorch version
 ⬜️ Releasing the GANformer2 model  
 ⬜️ Providing models trained for longer  
 ⬜️ Releasing pre-trained models for high-resolutions (up to 1024 x 1024)  

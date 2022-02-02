@@ -8,7 +8,7 @@
   <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a>* & <a href="http://larryzitnick.org/">C. Lawrence Zitnick</a></b>
 </p>
 
-## Check out our new [`Pytorch version`](pytorch_version) and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
+## Check out our new [Pytorch](pytorch_version) version and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
 
 *_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
@@ -28,7 +28,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 **1st Paper**: [https://arxiv.org/pdf/2103.01209](https://arxiv.org/pdf/2103.01209)  
 **2nd Paper**: [https://arxiv.org/abs/2111.08960](https://arxiv.org/abs/2111.08960)  
 **Contact**: dorarad@cs.stanford.edu  
-**Implementation**: [`network.py (TF)`](training/network.py) and [`network.py (Pytorch)`](pytorch_version/training/network.py) 
+**Implementation**: [`network.py` (TF)](training/network.py) and [`network.py` (Pytorch)](pytorch_version/training/network.py) 
 
 ### We now support both [`Pytorch`](pytorch_version) and TF!
 :white_check_mark: Uploading initial code and readme  

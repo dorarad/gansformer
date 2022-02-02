@@ -28,7 +28,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 **1st Paper**: [https://arxiv.org/pdf/2103.01209](https://arxiv.org/pdf/2103.01209)  
 **2nd Paper**: [https://arxiv.org/abs/2111.08960](https://arxiv.org/abs/2111.08960)  
 **Contact**: dorarad@cs.stanford.edu  
-**Implementation**: [`network.py`](training/network.py) ([TF](network.py) and [Pytorch](pytorch_version/training/network.py))
+**Implementation**: [`network.py`](training/network.py) ([TF](network.py) and [Pytorch](pytorch_version/training/networks.py))
 
 ### We now support both [`Pytorch`](pytorch_version) and TF!
 :white_check_mark: Uploading initial code and readme  

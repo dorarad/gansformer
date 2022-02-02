@@ -72,14 +72,17 @@ Using the pre-trained models (generated after training for ***5-7x*** less steps
 <img align="right" src="https://cs.stanford.edu/people/dorarad/dia.png" width="190px">
 
 - Python 3.6 or 3.7 are supported.
-- We recommend TensorFlow 1.14 which was used for development, but TensorFlow 1.15 is also supported.
+- For the TF version: We recommend TensorFlow 1.14 which was used for development, but TensorFlow 1.15 is also supported.
+- For the Pytorch version: We support Pytorch >= 1.8.
 - The code was tested with CUDA 10.0 toolkit and cuDNN 7.5.
 - We have performed experiments on Titan V GPU. We assume 12GB of GPU memory (more memory can expedite training).
 - See [`requirements.txt`](requirements.txt) for the required python packages and run `pip install -r requirements.txt` to install them.
 
 ## Quickstart & Overview
+Our repository supports both Tensorflow (at the main directory) and Pytorch (at [`pytorch_version`](pytorch_version)). The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install [requirements](pytorch_version/requirements.txt).
+Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any questions or suggestions about the new implementation!
 
-A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
+A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py) ([TF](generate.py) / [Pytorch](pytorch_version/generate.py)). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
 ```python
 python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir images --images-num 32
 ```
@@ -88,14 +91,17 @@ We recommend setting it to values in the range of `0.6-1.0`.
 
 We currently provide pretrained models for resolution 256&times;256 but keep training them and will release newer checkpoints as well as pretrained models for resolution 1024&times;1024 soon!
 
-We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py).  
-The model architecutre can be found at [`network.py`](training/network.py). The training procedure is implemented at [`training_loop.py`](training/training_loop.py).
+We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py) ([TF](run_network.py) / [Pytorch](pytorch_version/run_network.py)).  
+The model architecutre can be found at [`network.py`](training/network.py) ([TF](training/network.py) / [Pytorch](pytorch_version/training/network.py)). The training procedure is implemented at [`training_loop.py`](training/training_loop.py) ([TF](training/training_loop.py) / [Pytorch](pytorch_version/training/training_loop.py)).
+
+## Pytorch version
+Our new pytorch implementation can be found at 
 
 ## Data preparation
 We explored the GANformer model on 4 datasets for images and scenes: [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/), [LSUN-Bedrooms](https://www.yf.io/p/lsun), [Cityscapes](https://www.cityscapes-dataset.com/) and [FFHQ](https://github.com/NVlabs/ffhq-dataset). The model can be trained on other datasets as well.
 We trained the model on `256x256` resolution. Higher resolutions are supported too. The model will automatically adapt to the resolution of the images in the dataset.
 
-The [`prepare_data.py`](prepare_data.py) can either prepare the datasets from our catalog or create new datasets.
+The [`prepare_data.py`](prepare_data.py) ([TF](prepare_data.py) / [Pytorch](pytorch_version/prepare_data.py)) can either prepare the datasets from our catalog or create new datasets.
 
 ### Default Datasets 
 To prepare the datasets from the catalog, run the following command:
@@ -108,7 +114,7 @@ See table below for details about the datasets in the catalog.
 **Useful options**:  
 * `--data-dir` the output data directory (default: `datasets`)  
 * `--shards-num` to select the number of shards for the data (default: adapted to each dataset)  
-* `--max-images` to store only a subset of the dataset, in order to reduce the size of the stored `tfrecord` files (default: _max_).  
+* `--max-images` to store only a subset of the dataset, in order to reduce the size of the stored `tfrecord`/image files (default: _max_).  
 This can be particularly useful to save space in case of large datasets, such as LSUN-bedrooms (originaly contains 3M images)
 
 ### Custom Datasets
@@ -150,7 +156,7 @@ We support a large variety of command-line options to adjust the model, training
 we recommend exploring different values for `--gamma` when training on new datasets. If you train on resolution >= 512 and observe OOM issues, consider reducing `--minibatch-size` to a lower value.
 
 ### Logging
-* During training, sample images and attention maps will be generated and stored at results/<expname>-<run-id> (`--keep-samples`).
+* During training, sample images and attention maps will be generated and stored at `results/<expname>-<run-id>` (`--keep-samples`).
 * Metrics will also be regularly commputed and reported in a `metric-<name>.txt` file. `--metrics` can be set to `fid` for FID, `is` for Inception Score and `pr` for Precision/Recall.
 * Tensorboard logs are also created (`--summarize`) that track the metrics, loss values for the generator and discriminator, and other useful statistics over the course of training.
 
@@ -161,8 +167,8 @@ python run_network.py --train --gpus 0 --baseline GAN --expname clevr-gan --data
 ```
 * **[Vanialla GAN](https://arxiv.org/abs/1406.2661)**: `--baseline GAN`, a standard GAN without style modulation.
 * **[StyleGAN2](https://arxiv.org/abs/1912.04958)**: `--baseline StyleGAN2`, with one global latent that modulates the image features.
-* **[k-GAN](https://arxiv.org/abs/1810.10340)**: `--baseline kGAN`, which generates multiple image layers independetly and then merge them into one shared image.
-* **[SAGAN]()**: `--baseline SAGAN`, which performs self-attention between all image features in low-resolution layer (e.g. `32x32`).
+* **[k-GAN](https://arxiv.org/abs/1810.10340)**: `--baseline kGAN`, which generates multiple image layers independetly and then merge them into one shared image (supported only in TF version).
+* **[SAGAN]()**: `--baseline SAGAN`, which performs self-attention between all image features in low-resolution layer (e.g. `32x32`) (supported only in TF version).
 
 ## Evaluation
 To evalute a model, use the `--eval` option:
@@ -261,7 +267,7 @@ Run `python run_network.py -h` for the full options list.
 </div>
 
 ## CUDA / Installation
-The model relies on custom TensorFlow ops that are compiled on the fly using [NVCC](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html). 
+The model relies on custom TensorFlow/Pytorch ops that are compiled on the fly using [NVCC](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html). 
 
 To set up the environment e.g. for cuda-10.0:
 ```python
@@ -291,7 +297,7 @@ The GANformer consists of two networks:
 **Discriminator**: Receives and image and has to predict whether it is real or fake – originating from the dataset or the generator. The model perform multiple layers of convolution and downsampling on the image, reducing the representation's resolution gradually until making final prediction. Optionally, attention can be incorporated into the discriminator as well where it has multiple (k) aggregator variables, that use attention to adaptively collect information from the image while being processed. We observe small improvements in model performance when attention is used in the discriminator, although note that most of the gain in using attention based on our observations arises from the generator.
 
 ## Codebase
-This codebase builds on top of and extends the great [StyleGAN2 repository](https://github.com/NVlabs/stylegan2) by Karras et al.  
+This codebase builds on top of and extends the great [StyleGAN2](https://github.com/NVlabs/stylegan2) and [StyleGAN2-ADA](https://github.com/NVlabs/stylegan2-ada-pytorch/) repositories by Karras et al.  
 
 The GANformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
 

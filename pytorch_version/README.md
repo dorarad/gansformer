@@ -1,4 +1,4 @@
-## See the [repository readme](../readme.md) for full usage instructions!
+## See the [repository readme](../README.md) for full usage instructions!
 
 ### Pytorch implementation
 Our repository now supports both **Tensorflow** (at [the main directory](../)) and **Pytorch** (at this directory). 

@@ -79,7 +79,7 @@ Using the pre-trained models (generated after training for ***5-7x*** less steps
 - See [`requirements.txt`](requirements.txt) ([TF](requirements.py) / [Pytorch](pytorch_version/requirements.py)) for the required python packages and run `pip install -r requirements.txt` to install them.
 
 ## Quickstart & Overview
-**Our repository supports both Tensorflow (at the main directory) and Pytorch (at [`pytorch_version`](pytorch_version))**. The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install the [requirements](pytorch_version/requirements.txt).
+Our repository supports both **Tensorflow** (at the main directory) and **Pytorch** (at [`pytorch_version`](pytorch_version)). The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install the [requirements](pytorch_version/requirements.txt).
 Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any questions or suggestions about the new implementation!
 
 A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py) ([TF](generate.py) / [Pytorch](pytorch_version/generate.py)). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:

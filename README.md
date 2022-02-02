@@ -8,7 +8,7 @@
   <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a>* & <a href="http://larryzitnick.org/">C. Lawrence Zitnick</a></b>
 </p>
 
-## Checkout our new pytorch version and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
+## Check out our new [`Pytorch version`](pytorch_version) and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
 
 *_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 

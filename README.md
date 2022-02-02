@@ -79,7 +79,7 @@ Using the pre-trained models (generated after training for ***5-7x*** less steps
 - See [`requirements.txt`](requirements.txt) ([TF](requirements.py) / [Pytorch](pytorch_version/requirements.py)) for the required python packages and run `pip install -r requirements.txt` to install them.
 
 ## Quickstart & Overview
-Our repository supports both Tensorflow (at the main directory) and Pytorch (at [`pytorch_version`](pytorch_version)). The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install the [requirements](pytorch_version/requirements.txt).
+**Our repository supports both Tensorflow (at the main directory) and Pytorch (at [`pytorch_version`](pytorch_version))**. The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install the [requirements](pytorch_version/requirements.txt).
 Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any questions or suggestions about the new implementation!
 
 A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py) ([TF](generate.py) / [Pytorch](pytorch_version/generate.py)). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
@@ -93,9 +93,6 @@ We currently provide pretrained models for resolution 256&times;256 but keep tra
 
 We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py) ([TF](run_network.py) / [Pytorch](pytorch_version/run_network.py)).  
 The model architecutre can be found at [`network.py`](training/network.py) ([TF](training/network.py) / [Pytorch](pytorch_version/training/network.py)). The training procedure is implemented at [`training_loop.py`](training/training_loop.py) ([TF](training/training_loop.py) / [Pytorch](pytorch_version/training/training_loop.py)).
-
-## Pytorch version
-Our new pytorch implementation can be found at 
 
 ## Data preparation
 We explored the GANformer model on 4 datasets for images and scenes: [CLEVR](https://cs.stanford.edu/people/jcjohns/clevr/), [LSUN-Bedrooms](https://www.yf.io/p/lsun), [Cityscapes](https://www.cityscapes-dataset.com/) and [FFHQ](https://github.com/NVlabs/ffhq-dataset). The model can be trained on other datasets as well.

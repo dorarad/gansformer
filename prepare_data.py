@@ -208,7 +208,7 @@ def run_cmdline(argv):
     args = parser.parse_args()
     if not args.tasks:
         misc.error("No tasks specified. Please see '-h' for help.")
-    if args.max_images < 50000:
+    if args.max_images is not None and args.max_images < 50000:
         misc.log("Warning: max-images is set to {}. We recommend setting it at least to 50,000 to allow statistically correct computation of the FID-50k metric.".format(args.max_images), "red")
 
     prepare(**vars(args))

@@ -1205,10 +1205,10 @@ class SynthesisNetwork(torch.nn.Module):
             setattr(self, f"b{res}", block)
 
     # Convert the list of all attention maps from all layers into one tensor
-    def list2tensor(self, att_list):
+    def list2tensor(self, att_list, device):
         att_list = [att_map for att_map in att_list if att_map is not None]
         if len(att_list) == 0:
-            return None
+            return torch.zeros([1], device = device)
 
         maps_out = []
         for att_map in att_list:
@@ -1245,7 +1245,7 @@ class SynthesisNetwork(torch.nn.Module):
             block = getattr(self, f"b{res}")
             x, img, _att_maps, att_vars = block(x, img, cur_ws, att_vars, **block_kwargs)
             att_maps += _att_maps
-        att_maps = self.list2tensor(att_maps)
+        att_maps = self.list2tensor(att_maps, ws.device)
 
         return img, att_maps
 

@@ -1,5 +1,5 @@
 ![Python 3.7](https://img.shields.io/badge/python-3.7-b0071e.svg?style=plastic)
-![Pytorch 1.8](https://img.shields.io/badge/pytorch-1.8-%239e008e.svg?style=plastic)
+![PyTorch 1.8](https://img.shields.io/badge/pytorch-1.8-%239e008e.svg?style=plastic)
 ![TensorFlow 1.14](https://img.shields.io/badge/tensorflow-1.14-blueviolet.svg?style=plastic)
 ![cuDNN 7.3.1](https://img.shields.io/badge/cuda-10.0-2545e6.svg?style=plastic)
 ![License CC BY-NC](https://img.shields.io/badge/license-MIT-108a00.svg?style=plastic)
@@ -9,7 +9,7 @@
   <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a>* & <a href="http://larryzitnick.org/">C. Lawrence Zitnick</a></b>
 </p>
 
-## Check out our new [Pytorch](pytorch_version) version and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
+## Check out our new [PyTorch](pytorch_version) version and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
 
 *_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
@@ -31,14 +31,14 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 **Contact**: dorarad@cs.stanford.edu  
 **Implementation**: [`network.py`](training/network.py) ([TF](network.py) / [Pytorch](pytorch_version/training/networks.py))
 
-### We now support both [`Pytorch`](pytorch_version) and TF!
+### We now support both [`PyTorch`](pytorch_version) and TF!
 :white_check_mark: Uploading initial code and readme  
 :white_check_mark: Image sampling and visualization script  
 :white_check_mark: Code clean-up and refacotiring, adding documentation  
 :white_check_mark: Training and data-prepreation intructions  
 :white_check_mark: Pretrained networks for all datasets  
 :white_check_mark: Extra visualizations and evaluations  
-:white_check_mark: Releasing the Pytorch version  
+:white_check_mark: Releasing the PyTorch version  
 ⬜️ Releasing the GANformer2 model  
 ⬜️ Providing models trained for longer  
 ⬜️ Releasing pre-trained models for high-resolutions (up to 1024 x 1024)  

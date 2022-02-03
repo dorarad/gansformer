@@ -13,13 +13,7 @@ from dnnlib import EasyDict
 import argparse
 import glob
 import sys 
-
-pretrained_networks = {
-    "gdrive:clevr-snapshot.pkl": "https://drive.google.com/uc?id=1JNb9r2j0MKpygxn-FT-HGClfzZ0CV_dy",
-    "gdrive:cityscapes-snapshot.pkl": "https://drive.google.com/uc?id=1SLImpJEw--fKe9ngM99-KKXOXmmoWw6g",
-    "gdrive:ffhq-snapshot.pkl": "https://drive.google.com/uc?id=13rF5RXN4-FeEZX9Ph40jXnt7Bqw0PJDk",
-    "gdrive:bedrooms-snapshot.pkl": "https://drive.google.com/uc?id=1-2L3iCBpP_cf6T2onf3zEQJFAAzxsQne"
-}
+import loader
 
 # Conditional set: if property is not None, then assign d[name] := prop
 # for every d in a set of dictionaries
@@ -335,8 +329,8 @@ def setup_savefile(args, run_name, run_dir, config):
     if args.pretrained_pkl is not None and args.pretrained_pkl != "None":
         # Soft links support
         if args.pretrained_pkl.startswith("gdrive"):
-            if args.pretrained_pkl not in pretrained_networks:
-                misc.error("--pretrained_pkl {} not available in the catalog (see pretrained_networks dict)")
+            if args.pretrained_pkl not in loader.pretrained_networks:
+                misc.error("--pretrained_pkl {} not available in the catalog (see loader.pretrained_networks dict)")
 
             snapshot = args.pretrained_pkl
         else: 

@@ -36,11 +36,10 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Training and data-prepreation intructions  
 :white_check_mark: Pretrained networks for all datasets  
 :white_check_mark: Extra visualizations and evaluations  
+:white_check_mark: Providing models trained for longer  
 :white_check_mark: Releasing the PyTorch version  
-⬜️ Releasing the GANformer2 model  
-⬜️ Providing models trained for longer  
 ⬜️ Releasing pre-trained models for high-resolutions (up to 1024 x 1024)  
-⬜️ Adding support for conditional image generation (will be added soon!)
+⬜️ Releasing the GANformer2 model (supporting layout generation and conditional layout2image generation) (coming soon!)
 
 If you experience any issues or have suggestions for improvements or extensions, feel free to contact me either thourgh the issues page or at dorarad@stanford.edu. 
 
@@ -83,7 +82,7 @@ Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any 
 
 A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py) ([TF](generate.py) / [Pytorch](pytorch_version/generate.py)). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
 ```python
-python generate.py --gpus 0 --model gdrive:clevr-snapshot.pkl --output-dir images --images-num 32
+python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir images --images-num 32
 ```
 You can use `--truncation-psi` to control the generated images quality/diversity trade-off.  
 We recommend setting it to values in the range of `0.6-1.0`.

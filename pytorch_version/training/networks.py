@@ -477,6 +477,8 @@ def get_positional_encoding(
 
 # Produce trainable embeddings of shape [size, dim], uniformly/normally initialized
 def get_embeddings(size, dim, init = "uniform", name = None):
+    if size == 0:
+        return None    
     initializer = torch.rand if init == "uniform" else torch.randn
     emb = torch.nn.Parameter(initializer([size, dim]))
     return emb

@@ -202,7 +202,7 @@ The global latent is useful for coordinating holistic aspects of the image such 
 ## Visualization
 The code supports producing qualitative results and visualizations. For instance, to create attention maps for each layer:
 ```python
-python run_network.py --gpus 0 --eval --expname clevr-exp --dataset clevr --vis-layer-maps
+python run_network.py --gpus 0 --vis --expname clevr-exp --dataset clevr --vis-layer-maps
 ```
 
 Below you can see sample images and attention maps produced by the GANformer:

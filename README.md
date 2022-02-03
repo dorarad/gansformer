@@ -92,7 +92,7 @@ We recommend setting it to values in the range of `0.6-1.0`.
 
 We currently provide pretrained models for resolution 256&times;256 but keep training them and will release newer checkpoints as well as pretrained models for resolution 1024&times;1024 soon!
 
-We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_netowrk.py`](run_network.py) ([TF](run_network.py) / [Pytorch](pytorch_version/run_network.py)).  
+We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_network.py`](run_network.py) ([TF](run_network.py) / [Pytorch](pytorch_version/run_network.py)).  
 The model architecutre can be found at [`network.py`](training/network.py) ([TF](training/network.py) / [Pytorch](pytorch_version/training/network.py)). The training procedure is implemented at [`training_loop.py`](training/training_loop.py) ([TF](training/training_loop.py) / [Pytorch](pytorch_version/training/training_loop.py)).
 
 ## Data preparation
@@ -123,12 +123,12 @@ python prepare_data.py --task <dataset-name> --images-dir <source-dir> --format 
 The script supports several formats: `png`, `jpg`, `npy`, `hdf5`, `tfds` and `lmdb`.
 
 ### Dataset Catalog
-| Dataset           | # Images  | Resolution    | Dowhnload Size | TFrecords Size   | Gamma | 
-| :---------------: | :-------: | :-----------: | :------------: | :--------------: | :---: |
-| **FFHQ**          | 70,000    | 256&times;256 | 13GB           | 13GB             | 10    |
-| **CLEVR**         | 100,015   | 256&times;256 | 18GB           | 15.5GB           | 40    |
-| **Cityscapes**    | 24,998    | 256&times;256 | 1.8GB          | 8GB              | 20    |
-| **LSUN-Bedrooms** | 3,033,042 | 256&times;256 | 42.8GB         | Up to 480GB      | 100   |
+| Dataset           | # Images  | Resolution    | Download Size | TFrecords Size   | Gamma | 
+| :---------------: | :-------: | :-----------: | :-----------: | :--------------: | :---: |
+| **FFHQ**          | 70,000    | 256&times;256 | 13GB          | 13GB             | 10    |
+| **CLEVR**         | 100,015   | 256&times;256 | 18GB          | 15.5GB           | 40    |
+| **Cityscapes**    | 24,998    | 256&times;256 | 1.8GB         | 8GB              | 20    |
+| **LSUN-Bedrooms** | 3,033,042 | 256&times;256 | 42.8GB        | Up to 480GB      | 100   |
 
 Use `--max-images` to reduce the size of the `tfrecord` files.
 
@@ -163,7 +163,7 @@ The codebase suppors multiple baselines in addition to the GANformer. For instan
 ```python
 python run_network.py --train --gpus 0 --baseline GAN --expname clevr-gan --dataset clevr 
 ```
-* **[Vanialla GAN](https://arxiv.org/abs/1406.2661)**: `--baseline GAN`, a standard GAN without style modulation.
+* **[Vanilla GAN](https://arxiv.org/abs/1406.2661)**: `--baseline GAN`, a standard GAN without style modulation.
 * **[StyleGAN2](https://arxiv.org/abs/1912.04958)**: `--baseline StyleGAN2`, with one global latent that modulates the image features.
 * **[k-GAN](https://arxiv.org/abs/1810.10340)**: `--baseline kGAN`, which generates multiple image layers independetly and then merge them into one shared image (supported only in the TF version).
 * **[SAGAN]()**: `--baseline SAGAN`, which performs self-attention between all image features in low-resolution layer (e.g. `32x32`) (supported only in the TF version).

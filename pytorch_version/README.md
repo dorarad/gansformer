@@ -8,7 +8,7 @@ To switch from the TF to Pytorch, simply enter into `pytorch_version`, and insta
 The Pytorch implementation is compatible with models trained through the TF implementation. 
 To convert a TF model to Pytorch, run the following:
 ```python
-python loader.py --source=checkpoint.pkl --dest=checkpoint.pkl
+python loader.py --source=checkpoint-TF.pkl --dest=checkpoint.pkl
 ```
 
 Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any questions or suggestions about the new implementation!

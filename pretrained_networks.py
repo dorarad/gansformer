@@ -4,10 +4,10 @@ import dnnlib
 import dnnlib.tflib as tflib
 
 gdrive_urls = {
-    "gdrive:clevr-snapshot.pkl": "https://drive.google.com/uc?id=1JNb9r2j0MKpygxn-FT-HGClfzZ0CV_dy",
-    "gdrive:cityscapes-snapshot.pkl": "https://drive.google.com/uc?id=1SLImpJEw--fKe9ngM99-KKXOXmmoWw6g",
-    "gdrive:ffhq-snapshot.pkl": "https://drive.google.com/uc?id=13rF5RXN4-FeEZX9Ph40jXnt7Bqw0PJDk",
-    "gdrive:bedrooms-snapshot.pkl": "https://drive.google.com/uc?id=1-2L3iCBpP_cf6T2onf3zEQJFAAzxsQne"
+    "gdrive:clevr-snapshot.pkl":        "https://drive.google.com/uc?id=1eRgwoasbDgUAA2tsD-LKghDiYTsfHWn3",
+    "gdrive:cityscapes-snapshot.pkl":   "https://drive.google.com/uc?id=1Lrq3ga9N9ViH2KyvpCnSdG2xyZe_yDUA",
+    "gdrive:ffhq-snapshot.pkl":         "https://drive.google.com/uc?id=1QvGFQfvPXsqsiQE5jWgRM9awxfaWnoqd",
+    "gdrive:bedrooms-snapshot.pkl":     "https://drive.google.com/uc?id=1GkmnFqwUI0X5dOnSHOFDeWg_jJAc08Za"
 }
 
 def get_path_or_url(path_or_gdrive_path):

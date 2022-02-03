@@ -151,7 +151,7 @@ For comparing to state-of-the-art, we compute metric scores using 50,000 sample 
 
 We support a large variety of command-line options to adjust the model, training, and evaluation. Run `python run_network.py -h` for the full list of options!
 
-we recommend exploring different values for `--gamma` when training on new datasets. If you train on resolution >= 512 and observe OOM issues, consider reducing `--minibatch-size` to a lower value.
+we recommend exploring different values for `--gamma` when training on new datasets. If you train on resolution >= 512 and observe OOM issues, consider reducing `--batch-gpu` to a lower value.
 
 ### Logging
 * During training, sample images and attention maps will be generated and stored at `results/<expname>-<run-id>` (`--keep-samples`).

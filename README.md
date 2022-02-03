@@ -11,8 +11,6 @@
 
 ## Check out our new [PyTorch](pytorch_version) version and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
 
-*_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
-
 <div align="center">
   <img src="https://cs.stanford.edu/people/dorarad/image1.png" style="float:left" width="340px">
   <img src="https://cs.stanford.edu/people/dorarad/image3.png" style="float:right" width="440px">
@@ -80,7 +78,7 @@ Using the pre-trained models (generated after training for ***5-7x*** less steps
 - See [`requirements.txt`](requirements.txt) ([TF](requirements.py) / [Pytorch](pytorch_version/requirements.py)) for the required python packages and run `pip install -r requirements.txt` to install them.
 
 ## Quickstart & Overview
-Our repository supports both **Tensorflow** (at the main directory) and **Pytorch** (at [`pytorch_version`](pytorch_version)). The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into the [`pytorch_version`](pytorch_version)), and install the [requirements](pytorch_version/requirements.txt).
+Our repository supports both **Tensorflow** (at the main directory) and **Pytorch** (at [`pytorch_version`](pytorch_version)). The two implementations follow a close code and files structure, and share the same interface. To switch from the TF to Pytorch, simply enter into [`pytorch_version`](pytorch_version)), and install the [requirements](pytorch_version/requirements.txt).
 Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any questions or suggestions about the new implementation!
 
 A minimal example of using a pre-trained GANformer can be found at [`generate.py`](generate.py) ([TF](generate.py) / [Pytorch](pytorch_version/generate.py)). When executed, the 10-lines program downloads a pre-trained modle and uses it to generate some images:
@@ -298,5 +296,8 @@ The GANformer consists of two networks:
 This codebase builds on top of and extends the great [StyleGAN2](https://github.com/NVlabs/stylegan2) and [StyleGAN2-ADA](https://github.com/NVlabs/stylegan2-ada-pytorch/) repositories by Karras et al.  
 
 The GANformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
+
+## Acknowledgement
+*_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
 If you have questions, comments or feedback, please feel free to contact me at dorarad@stanford.edu, Thank you! :)

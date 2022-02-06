@@ -84,8 +84,8 @@ A minimal example of using a pre-trained GANformer can be found at [`generate.py
 ```python
 python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir images --images-num 32
 ```
-You can use `--truncation-psi` to control the generated images quality/diversity trade-off.  
-We recommend setting it to values in the range of `0.6-1.0`.
+**You can use `--truncation-psi` to control the generated images quality/diversity trade-off.  
+We recommend trying out different values in the range of `0.6-1.0`.**
 
 We currently provide pretrained models for resolution 256&times;256 but keep training them and will release newer checkpoints as well as pretrained models for resolution 1024&times;1024 soon!
 

@@ -5,7 +5,7 @@ import re
 import json
 import tempfile
 # import torch
-import misc
+from training import misc
 
 import dnnlib
 from dnnlib import EasyDict

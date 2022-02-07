@@ -87,7 +87,16 @@ python generate.py --gpus 0 --model gdrive:bedrooms-snapshot.pkl --output-dir im
 **You can use `--truncation-psi` to control the generated images quality/diversity trade-off.  
 We recommend trying out different values in the range of `0.6-1.0`.**
 
-We currently provide pretrained models for resolution 256&times;256 but keep training them and will release newer checkpoints as well as pretrained models for resolution 1024&times;1024 soon!
+### Pretrained models and High resolutions
+We provide pretrained models for resolution 256&times;256 for all datasets, as well as 1024&times;1024 for FFHQ and 1024&times;2048 for Cityscapes.
+
+To generate images for the high-resolution models, run the following commands:
+(We reduce their batch-size to 1 so that they can load onto a single GPU)
+
+```python
+python generate.py --gpus 0 --model gdrive:ffhq-snapshot-1024.pkl --output-dir ffhq_images --images-num 32 --batch-size 1
+python generate.py --gpus 0 --model gdrive:cityscapes-snapshot-2048.pkl --output-dir cityscapes_images --images-num 32 --batch-size 1 --ratio 0.5
+```
 
 We can train and evaluate new or pretrained model both quantitatively and qualitative with [`run_network.py`](run_network.py) ([TF](run_network.py) / [Pytorch](pytorch_version/run_network.py)).  
 The model architecutre can be found at [`network.py`](training/network.py) ([TF](training/network.py) / [Pytorch](pytorch_version/training/network.py)). The training procedure is implemented at [`training_loop.py`](training/training_loop.py) ([TF](training/training_loop.py) / [Pytorch](pytorch_version/training/training_loop.py)).

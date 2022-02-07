@@ -237,7 +237,7 @@ def evaluate(Gs, snapshot_pkl, metrics, eval_images_num, dataset_args, num_gpus,
 def init_img_grid(dataset, input_shape, device, run_dir, log): 
     if not log:
         return None, None, None
-    grid_size, images, labels = misc.setup_snapshot_img_grid(dataset = dataset)
+    grid_size, images, labels = misc.setup_snapshot_img_grid(dataset)
     misc.save_img_grid(images, os.path.join(run_dir, "reals.png"), drange = [0, 255], grid_size = grid_size)
     grid_z = torch.randn([labels.shape[0], *input_shape[1:]], device = device)
     grid_c = torch.from_numpy(labels).to(device)
@@ -357,7 +357,7 @@ def training_loop(
 
     if vis and log:
         misc.log("Produce visualizations...")
-        visualize.vis(Gs, dataset, device, batch_gpu, drange_net = drange_net, ratio = dataset_args.ratio, 
+        visualize.vis(Gs, dataset, device, batch_gpu, drange_net = drange_net, ratio = dataset.ratio, 
             truncation_psi = truncation_psi, **vis_args)
 
     if not train:
@@ -424,7 +424,7 @@ def training_loop(
         if log and (img_snapshot_ticks is not None) and (done or cur_tick % img_snapshot_ticks == 0):
             visualize.vis(Gs, dataset, device, batch_gpu, training = True,
                 step = cur_nimg // 1000, grid_size = grid_size, latents = grid_z, 
-                labels = grid_c, drange_net = drange_net, ratio = dataset_args.ratio, **vis_args)
+                labels = grid_c, drange_net = drange_net, ratio = dataset.ratio, **vis_args)
 
         # Save network snapshot
         if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0):

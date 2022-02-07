@@ -88,17 +88,17 @@ def conditional_entropy(p):
     return max(0.0, entropy(y) - mutual_information(p)) # can slip just below 0 due to FP inaccuracies, clean those up.
 
 class LS(metric_base.MetricBase):
-    def __init__(self, num_samples, num_keep, attrib_indices, minibatch_per_gpu, **kwargs):
+    def __init__(self, num_samples, num_keep, attrib_indices, batch_per_gpu, **kwargs):
         assert num_keep <= num_samples
         super().__init__(**kwargs)
         self.num_samples = num_samples
         self.num_keep = num_keep
         self.attrib_indices = attrib_indices
-        self.minibatch_per_gpu = minibatch_per_gpu
+        self.batch_per_gpu = batch_per_gpu
         self.num_shuffles = 10
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus):
-        minibatch_size = num_gpus * self.minibatch_per_gpu
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, **kwargs):
+        batch_size = num_gpus * self.batch_per_gpu
 
         # Construct TensorFlow graph for each GPU
         result_expr = []
@@ -107,8 +107,8 @@ class LS(metric_base.MetricBase):
                 Gs_clone = Gs.clone()
 
                 # Generate images
-                latents = tf.random_normal([self.minibatch_per_gpu] + Gs_clone.input_shape[1:])
-                labels = self._get_random_labels_tf(self.minibatch_per_gpu)
+                latents = tf.random_normal([self.batch_per_gpu] + Gs_clone.input_shape[1:])
+                labels = self._get_random_labels_tf(self.batch_per_gpu)
                 ret = Gs_clone.get_output_for(latents, labels, return_dlatents = True, **Gs_kwargs)
                 imgs, dlatents = ret[0], ret[-1]
 
@@ -129,7 +129,7 @@ class LS(metric_base.MetricBase):
 
         # Sampling loop
         results = []
-        for begin in range(0, self.num_samples, minibatch_size):
+        for begin in range(0, self.num_samples, batch_size):
             self._report_progress(begin, self.num_samples)
             results += tflib.run(result_expr)
         results = {key: np.concatenate([value[key] for value in results], axis = 0) for key in results[0].keys()}

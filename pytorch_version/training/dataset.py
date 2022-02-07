@@ -11,16 +11,18 @@ import glob
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self,
-        name,                   # Name of the dataset
-        shape,                  # Shape of the raw image data (NCHW)
-        max_items       = None, # Limit the size of the dataset. None = no limit
-        use_labels     = False, # Enable conditioning labels? False = label dimension is zero
-        mirror_augment = False, # Augment the dataset with horizontally mirrored images
-        **_kwargs               # Ignore unrecognized keyword args
+        name,                       # Name of the dataset
+        shape,                      # Shape of the raw image data (NCHW)
+        max_items      = None,      # Limit the size of the dataset. None = no limit
+        use_labels     = False,     # Enable conditioning labels? False = label dimension is zero
+        mirror_augment = False,     # Augment the dataset with horizontally mirrored images
+        ratio          = 1.0,       # Image height/width ratio in the dataset
+        **_kwargs                   # Ignore unrecognized keyword args
     ):
         self._name = name
         self.shape = list(shape)
         self.use_labels = use_labels
+        self.ratio = ratio
 
         self._label_shape = None # To be overridden by subclass
 

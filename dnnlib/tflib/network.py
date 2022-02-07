@@ -61,8 +61,8 @@ class Network:
     #     components: Container for sub-networks. Passed to the build func, and retained between calls
     #     num_inputs: Number of input tensors
     #     num_outputs: Number of output tensors
-    #     input_shapes: Input tensor shapes (NC or NCHW), including minibatch dimension
-    #     output_shapes: Output tensor shapes (NC or NCHW), including minibatch dimension
+    #     input_shapes: Input tensor shapes (NC or NCHW), including batch dimension
+    #     output_shapes: Output tensor shapes (NC or NCHW), including batch dimension
     #     input_shape: Short-hand for input_shapes[0]
     #     output_shape: Short-hand for output_shapes[0]
     #     input_templates: Input placeholders in the template graph
@@ -346,7 +346,7 @@ class Network:
         if len(uninitialized) > 0:
             print(bcolored("Uninitialized variables:", "red"))
             for name in uninitialized:
-                print("{}: {}".format(bold(name), self.vars[name].shape))
+                print(f"{bold(name)}: {self.vars[name].shape}")
 
         for name in names:
             if self.vars[name].shape == src_net.vars[self.translate(name)].shape:
@@ -355,7 +355,7 @@ class Network:
                 if not mismatch:
                     mismatch = True
                     print(bcolored("Variables shape mismatching:", "red"))
-                print("{}: {}, {}".format(bold(name), self.vars[name].shape, src_net.vars[self.translate(name)].shape))
+                print(f"{bold(name)}: {self.vars[name].shape}, {src_net.vars[self.translate(name)].shape}")
         names = names_new
         tfutil.set_vars(tfutil.run({self.vars[name]: src_net.vars[self.translate(name)] for name in names}))
 
@@ -392,7 +392,7 @@ class Network:
             output_transform: dict = None,
             return_as_list: bool = False,
             print_progress: bool = False,
-            minibatch_size: int = None,
+            batch_size: int = None,
             num_gpus: int = 1,
             assume_frozen: bool = False,
             verbose: bool = False,
@@ -407,7 +407,7 @@ class Network:
         #                         TensorFlow expression(s) as positional arguments. Any remaining fields of the dict will be passed in as kwargs.
         #     return_as_list:     True = return a list of NumPy arrays, False = return a single NumPy array, or a tuple if there are multiple outputs.
         #     print_progress:     Print progress to the console? Useful for very large input arrays.
-        #     minibatch_size:     Maximum minibatch size to use, None = disable batching.
+        #     batch_size:         Maximum batch size to use, None = disable batching.
         #     num_gpus:           Number of GPUs to use.
         #     assume_frozen:      Improve multi-GPU performance by assuming that the trainable parameters will remain changed between calls.
         #     dynamic_kwargs:     Additional keyword arguments to be passed into the network build function.
@@ -424,8 +424,8 @@ class Network:
         assert output_transform is None or util.is_top_level_function(output_transform["func"])
         output_transform, dynamic_kwargs = _handle_legacy_output_transforms(output_transform, dynamic_kwargs)
         num_items = in_arrays[0].shape[0]
-        if minibatch_size is None:
-            minibatch_size = num_items
+        if batch_size is None:
+            batch_size = num_items
 
         # Construct unique hash key from all arguments that affect the TensorFlow graph
         key = dict(input_transform = input_transform, output_transform = output_transform, num_gpus = num_gpus, assume_frozen = assume_frozen, dynamic_kwargs = dynamic_kwargs)
@@ -469,20 +469,20 @@ class Network:
                     out_expr = [tf.concat(outputs, axis = 0) for outputs in zip(*out_split)]
                     self._run_cache[key] = in_expr, out_expr
 
-        # Run minibatches
+        # Run batches
         in_expr, out_expr = self._run_cache[key]
         out_arrays = [np.empty([num_items] + expr.shape.as_list()[1:], expr.dtype.name) for expr in out_expr]
 
         range_fn = range
         if verbose:
-            range_fn = lambda start, end, step: trange(start, end, step, unit_scale = minibatch_size, 
-                unit = "image ({} batches of {} images)".format(len(range(0, num_items, minibatch_size)), minibatch_size))
+            range_fn = lambda start, end, step: trange(start, end, step, unit_scale = batch_size, 
+                unit = f"image ({len(range(0, num_items, batch_size))} batches of {batch_size} images)")
 
-        for mb_begin in range_fn(0, num_items, minibatch_size):
+        for mb_begin in range_fn(0, num_items, batch_size):
             if print_progress:
                 print("\r%d / %d" % (mb_begin, num_items), end="")
 
-            mb_end = min(mb_begin + minibatch_size, num_items)
+            mb_end = min(mb_begin + batch_size, num_items)
             mb_num = mb_end - mb_begin
             mb_in = [src[mb_begin : mb_end] if src is not None else np.zeros([mb_num] + shape[1:]) for src, shape in zip(in_arrays, self.input_shapes)]
             mb_out = tf.get_default_session().run(out_expr, dict(zip(in_expr, mb_in)))

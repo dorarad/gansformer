@@ -9,17 +9,17 @@ from dnnlib.tflib.autosummary import autosummary
 
 def G_loss(G, D,
         dataset,                 # The dataset object for the real images
-        minibatch_size,          # size of each minibatch
+        batch_size,              # size of each batch
         loss_type,               # The loss type: logistic, hinge, wgan
         reg_weight = 1.0,        # Regularization strength
         pathreg = False,         # Path regularization
-        pl_minibatch_shrink = 2, # Minibatch shrink (for path regularization only)
+        pl_batch_shrink = 2,     # batch shrink (for path regularization only)
         pl_decay = 0.01,         # Decay (for path regularization only)
         pl_weight = 2.0,         # Weight (for path regularization only)
         **kwargs):
 
-    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
-    labels = dataset.get_random_labels_tf(minibatch_size)
+    latents = tf.random_normal([batch_size] + G.input_shapes[0][1:])
+    labels = dataset.get_random_labels_tf(batch_size)
     fake_imgs_out = G.get_output_for(latents, labels, is_training = True)[0]
     fake_scores_out = D.get_output_for(fake_imgs_out, labels, is_training = True)
 
@@ -35,16 +35,16 @@ def G_loss(G, D,
     reg = None
     if pathreg:
         with tf.name_scope("PathReg"):
-            # Evaluate the regularization term using a smaller minibatch to conserve memory
-            if pl_minibatch_shrink > 1:
-                pl_minibatch = minibatch_size // pl_minibatch_shrink
-                pl_latents = tf.random_normal([pl_minibatch] + G.input_shapes[0][1:])
-                pl_labels = dataset.get_random_labels_tf(pl_minibatch)
-                ret = G.get_output_for(pl_latents, pl_labels, is_training = True, return_dlatents = True)
-                fake_imgs_out, dlatents = ret[0], ret[-1]
+            # Evaluate the regularization term using a smaller batch to conserve memory
+            if pl_batch_shrink > 1:
+                pl_batch = batch_size // pl_batch_shrink
+                pl_latents = tf.random_normal([pl_batch] + G.input_shapes[0][1:])
+                pl_labels = dataset.get_random_labels_tf(pl_batch)
+                ret = G.get_output_for(pl_latents, pl_labels, is_training = True, return_ws = True)
+                fake_imgs_out, ws = ret[0], ret[-1]
             # Compute |J*y|
             pl_noise = tf.random_normal(tf.shape(fake_imgs_out)) / np.sqrt(np.prod(G.output_shape[2:]))
-            pl_grads = tf.gradients(tf.reduce_sum(fake_imgs_out * pl_noise), [dlatents])[0]
+            pl_grads = tf.gradients(tf.reduce_sum(fake_imgs_out * pl_noise), [ws])[0]
             pl_lengths = tf.sqrt(tf.reduce_mean(tf.reduce_sum(tf.square(pl_grads), axis = 3), axis = [1, 2]))
             pl_lengths = autosummary("Loss/pl_lengths", pl_lengths)
 
@@ -69,7 +69,7 @@ def G_loss(G, D,
 def D_loss(G, D,
         reals,                  # A batch of real images
         labels,                 # A batch of labels (default 0s if no labels)
-        minibatch_size,         # Size of each minibatch
+        batch_size,             # Size of each batch
         loss_type,              # Loss type: logistic, hinge, wgan
         reg_type,               # Regularization type: r1, t2, gp (mixed)
         gamma = 10.0,           # Regularization strength
@@ -77,7 +77,7 @@ def D_loss(G, D,
         wgan_target = 1.0,      # Wasserstein target (for wgan only)
         **kwargs):
 
-    latents = tf.random_normal([minibatch_size] + G.input_shapes[0][1:])
+    latents = tf.random_normal([batch_size] + G.input_shapes[0][1:])
     fake_imgs_out = G.get_output_for(latents, labels, is_training = True)[0]
 
     real_scores_out = D.get_output_for(reals, labels, is_training = True)
@@ -109,7 +109,7 @@ def D_loss(G, D,
             gradient_penalty = autosummary("Loss/gradient_penalty", gradient_penalty)
             reg = gradient_penalty * (gamma * 0.5)
         elif reg_type == "gp":
-            mixing_factors = tf.random_uniform([minibatch_size, 1, 1, 1], 0.0, 1.0, dtype = fake_imgs_out.dtype)
+            mixing_factors = tf.random_uniform([batch_size, 1, 1, 1], 0.0, 1.0, dtype = fake_imgs_out.dtype)
             mixed_imgs_out = tflib.lerp(tf.cast(reals, fake_imgs_out.dtype), fake_imgs_out, mixing_factors)
             mixed_scores_out = D.get_output_for(mixed_imgs_out, labels, is_training = True)
             mixed_scores_out = autosummary("Loss/scores/mixed", mixed_scores_out)

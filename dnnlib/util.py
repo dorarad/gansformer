@@ -43,9 +43,9 @@ class EasyDict(dict):
     def __delattr__(self, name: str) -> None:
         del self[name]
 
+# Redirect stderr to stdout, optionally print stdout to a file,
+# and optionally force flushing on both stdout and the file
 class Logger(object):
-    # Redirect stderr to stdout, optionally print stdout to a file,
-    # and optionally force flushing on both stdout and the file
     def __init__(self, file_name: str = None, file_mode: str = "a", should_flush: bool = True,
             screen = True):
         self.file = None
@@ -98,30 +98,30 @@ class Logger(object):
         if self.file is not None:
             self.file.close()
 
+# Convert the seconds to human readable string with days, hours, minutes and seconds
 def format_time(seconds: Union[int, float]) -> str:
-    # Convert the seconds to human readable string with days, hours, minutes and seconds
     s = int(np.rint(seconds))
 
     if s < 60:
-        return "{0}s".format(s)
+        return f"{s}s"
     elif s < 60 * 60:
-        return "{0}m {1:02}s".format(s // 60, s % 60)
+        return f"{s // 60}m {s % 60:02}s"
     elif s < 24 * 60 * 60:
-        return "{0}h {1:02}m {2:02}s".format(s // (60 * 60), (s // 60) % 60, s % 60)
+        return f"{s // (60 * 60)}h {(s // 60) % 60:02}m {s % 60:02}s"
     else:
-        return "{0}d {1:02}h {2:02}m".format(s // (24 * 60 * 60), (s // (60 * 60)) % 24, (s // 60) % 60)
+        return f"{24 * 60 * 60}d {(s // (60 * 60)) % 24:02}h {(s // 60) % 60:02}m"
 
+# Ask the user the question until the user inputs a valid answer
 def ask_yes_no(question: str) -> bool:
-    # Ask the user the question until the user inputs a valid answer
     while True:
         try:
-            print("{0} [y/n]".format(question))
+            print(f"{question} [y/n]")
             return strtobool(input().lower())
         except ValueError:
             pass
 
+# Calculate the product of the tuple elements
 def tuple_product(t: Tuple) -> Any:
-    # Calculate the product of the tuple elements
     result = 1
     for v in t:
         result *= v
@@ -140,9 +140,9 @@ _str_to_ctype = {
     "float64": ctypes.c_double
 }
 
+# Given a type name string (or an object having a __name__ attribute),
+# return matching Numpy and ctypes types that have the same size in bytes
 def get_dtype_and_ctype(type_obj: Any) -> Tuple[np.dtype, Any]:
-    # Given a type name string (or an object having a __name__ attribute),
-    # return matching Numpy and ctypes types that have the same size in bytes
     type_str = None
 
     if isinstance(type_obj, str):

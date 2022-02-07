@@ -75,7 +75,7 @@ def vis(G,
     vis_types           = None,       # Visualization types to be created
     num                 = 100,        # Number of produced samples
     rich_num            = 5,          # Number of samples for which richer visualizations will be created
-                                      # (requires more memory and disk space, and therefore rich_num < num)
+                                      # (requires more memory and disk space, and therefore rich_num <= num)
     grid                = None,       # Whether to save the samples in one large grid files
                                       # or in separated files one per sample
     grid_size           = None,       # Grid proportions (w, h)
@@ -105,7 +105,12 @@ def vis(G,
 
     vis = vis_types
     # For time efficiency, during training save only image and map samples rather than richer visualizations
-    vis = {"imgs", "maps", "layer_maps"} if training else (vis or {"imgs", "maps", "ltnts", "interpolations", "noise_var"}) 
+    if training:
+        vis = {"imgs", "maps"}
+        if num_heads == 1:
+            vis.add("layer_maps")
+    else:
+        vis = vis or {"imgs", "maps", "ltnts", "interpolations", "noise_var"}
 
     # Build utility functions
     save_images = misc.save_images_builder(drange_net, ratio, grid_size, grid, verbose)
@@ -139,7 +144,7 @@ def vis(G,
 
         # Compute source latents/labels that images will be produced from
         latents = get_rnd_latents(curr_size) if _latents is None else section_of(_latents, idx, section_size)
-        labels  = get_rnd_labels(curr_size)  if labels   is None else section_of(_labels,  idx, section_size)
+        labels  = get_rnd_labels(curr_size)  if _labels  is None else section_of(_labels,  idx, section_size)
         if idx == 0:
             latents0, labels0 = latents, labels
         # Run network over latents and produce images and attention maps

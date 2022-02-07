@@ -102,7 +102,7 @@ def get_plugin(cuda_file):
         # Compile if not already compiled
         tf_ver = float(".".join(tf.__version__.split(".")[:-1]))
         bin_file_ext = '.dll' if os.name == 'nt' else '.so'
-        bin_file = os.path.join(cuda_cache_path, cuda_file_name + "_{}_".format(tf_ver) + bin_file_ext) #  + '_' + md5.hexdigest()
+        bin_file = os.path.join(cuda_cache_path, f"{cuda_file_name}_{tf_ver}_{bin_file_ext}") #  + '_' + md5.hexdigest()
 
         if not os.path.isfile(bin_file):
             # Hash headers included by the CUDA code by running it through the preprocessor

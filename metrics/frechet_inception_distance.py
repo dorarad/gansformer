@@ -12,9 +12,9 @@ from metrics import metric_base
 from training import misc
 
 class FID(metric_base.MetricBase):
-    def __init__(self, minibatch_per_gpu, **kwargs):
+    def __init__(self, batch_per_gpu, **kwargs):
         super().__init__(**kwargs)
-        self.minibatch_per_gpu = minibatch_per_gpu
+        self.batch_per_gpu = batch_per_gpu
 
     def _feats_to_stats(self, feats):
         mu = np.mean(feats, axis = 0)
@@ -27,27 +27,27 @@ class FID(metric_base.MetricBase):
         fid = np.real(m + np.trace(sigma_fake + sigma_real - 2*s))
         return fid
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None, **kwargs):
-        minibatch_size = num_gpus * self.minibatch_per_gpu
-        inception = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/inception_v3_features.pkl")
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, ratio = 1.0, paths = None, **kwargs):
+        batch_size = num_gpus * self.batch_per_gpu
+        featurizer = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/inception_v3_features.pkl")
 
         # Compute statistics for reals
-        cache_file = self._get_cache_file_for_reals(num_imgs)
+        cache_file = self._get_cache_file_for_reals(num_imgs, ratio)
         os.makedirs(os.path.dirname(cache_file), exist_ok = True)
         if os.path.isfile(cache_file):
             mu_real, sigma_real = misc.load_pkl(cache_file)
         else:
-            imgs_iter = self._iterate_reals(minibatch_size = minibatch_size)
-            feats_real = self._get_feats(imgs_iter, inception, minibatch_size, num_gpus, num_imgs)
+            imgs_iter = self._iterate_reals(batch_size = batch_size)
+            feats_real = self._get_feats(imgs_iter, featurizer, batch_size, ratio, num_gpus, num_imgs)
             mu_real, sigma_real = self._feats_to_stats(feats_real)
             misc.save_pkl((mu_real, sigma_real), cache_file)
 
         if paths is not None:
             # Extract features for local sample image files (paths)
-            feats = self._paths_to_feats(paths, inception_func, minibatch_size, num_gpus, num_imgs)
+            feats = self._paths_to_feats(paths, featurizer, batch_size, ratio, num_gpus, num_imgs)
         else:
             # Extract features for newly generated fake images
-            feats = self._gen_feats(Gs, inception, minibatch_size, num_imgs, num_gpus, Gs_kwargs)
+            feats = self._gen_feats(Gs, featurizer, batch_size, ratio, num_imgs, num_gpus, Gs_kwargs)
 
         # Compute FID
         mu_fake, sigma_fake = self._feats_to_stats(feats)

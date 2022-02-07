@@ -101,7 +101,7 @@ class ManifoldEstimator():
 
                 distance_batch[0:end1-begin1, begin2:end2] = self._distance_block.pairwise_distances(feature_batch, ref_batch)
 
-            # From the minibatch of new feature vectors, determine if they are in the estimated manifold.
+            # From the batch of new feature vectors, determine if they are in the estimated manifold.
             # If a feature vector is inside a hypersphere of some reference sample, then the new sample lies on the estimated manifold.
             # The radii of the hyperspheres are determined from distances of neighborhood size k.
             samples_in_manifold = distance_batch[0:end1-begin1, :, None] <= self.D
@@ -119,11 +119,11 @@ class ManifoldEstimator():
 
         return batch_predictions
 
-def knn_precision_recall_features(ref_features, eval_features, feature_net, nhood_sizes,
+def knn_precision_recall_features(ref_features, eval_features, featurizer, nhood_sizes,
                                   row_batch_size, col_batch_size, num_imgs, num_gpus):
     # Computes k-NN precision and recall for two sets of feature vectors
     state = dnnlib.EasyDict()
-    num_features = feature_net.output_shape[1]
+    num_features = featurizer.output_shape[1]
     state.ref_features = ref_features
     state.eval_features = eval_features
 
@@ -149,38 +149,38 @@ def knn_precision_recall_features(ref_features, eval_features, feature_net, nhoo
     return state
 
 class PR(metric_base.MetricBase):
-    def __init__(self, nhood_size, minibatch_per_gpu, row_batch_size, col_batch_size, **kwargs):
+    def __init__(self, nhood_size, batch_per_gpu, row_batch_size, col_batch_size, **kwargs):
         super().__init__(**kwargs)
         self.nhood_size = nhood_size
-        self.minibatch_per_gpu = minibatch_per_gpu
+        self.batch_per_gpu = batch_per_gpu
         self.row_batch_size = row_batch_size
         self.col_batch_size = col_batch_size
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None, **kwargs):
-        minibatch_size = num_gpus * self.minibatch_per_gpu
-        feature_net = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/vgg16.pkl")
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, ratio = 1.0, paths = None, **kwargs):
+        batch_size = num_gpus * self.batch_per_gpu
+        featurizer = misc.load_pkl("http://d36zk2xti64re0.cloudfront.net/stylegan1/networks/metrics/vgg16.pkl")
 
         # Compute features for reals
-        cache_file = self._get_cache_file_for_reals(num_imgs)
+        cache_file = self._get_cache_file_for_reals(num_imgs, ratio)
         os.makedirs(os.path.dirname(cache_file), exist_ok = True)
         if os.path.isfile(cache_file):
             ref_features = misc.load_pkl(cache_file)
         else:
-            imgs_iter = self._iterate_reals(minibatch_size = minibatch_size)
-            ref_features = self._get_feats(imgs_iter, feature_net, minibatch_size, num_gpus, num_imgs)
+            imgs_iter = self._iterate_reals(batch_size = batch_size)
+            ref_features = self._get_feats(imgs_iter, featurizer, batch_size, ratio, num_gpus, num_imgs)
 
             misc.save_pkl(ref_features, cache_file)
 
         if paths is not None:
             # Extract features for local sample image files (paths)
-            eval_features = self._paths_to_feats(paths, feature_net, minibatch_size, num_gpus, num_imgs)
+            eval_features = self._paths_to_feats(paths, featurizer, batch_size, ratio, num_gpus, num_imgs)
         else:
             # Extract features for newly generated fake imgs
-            eval_features = self._gen_feats(Gs, feature_net, minibatch_size, num_imgs, num_gpus, Gs_kwargs)
+            eval_features = self._gen_feats(Gs, featurizer, batch_size, ratio, num_imgs, num_gpus, Gs_kwargs)
 
         # Compute precision and recall
         state = knn_precision_recall_features(ref_features = ref_features, eval_features = eval_features,
-            feature_net = feature_net, nhood_sizes = [self.nhood_size], row_batch_size = self.row_batch_size,
+            featurizer = featurizer, nhood_sizes = [self.nhood_size], row_batch_size = self.row_batch_size,
             col_batch_size = self.row_batch_size, num_imgs = num_imgs, num_gpus = num_gpus)
         self._report_result(state.knn_precision[0], suffix = "_precision")
         self._report_result(state.knn_recall[0], suffix = "_recall")

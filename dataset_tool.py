@@ -37,9 +37,7 @@ class TFRecordExporter:
 
         if self.verbose:
             print("Creating dataset %s" % tfrecord_dir)
-        if not os.path.isdir(self.tfrecord_dir):
-            os.makedirs(self.tfrecord_dir)
-        assert os.path.isdir(self.tfrecord_dir)
+        os.makedirs(self.tfrecord_dir, exist_ok = True)
 
     def close(self):
         if self.verbose:
@@ -207,7 +205,7 @@ def display(tfrecord_dir):
     idx = 0
     while True:
         try:
-            imgs, labels = dset.get_minibatch_np(1)
+            imgs, labels = dset.get_batch_np(1)
         except tf.errors.OutOfRangeError:
             break
         if idx == 0:
@@ -229,14 +227,13 @@ def extract(tfrecord_dir, output_dir):
     tflib.init_uninitialized_vars()
 
     print("Extracting images to %s" % output_dir)
-    if not os.path.isdir(output_dir):
-        os.makedirs(output_dir)
+    os.makedirs(output_dir, exist_ok = True)
     idx = 0
     while True:
         if idx % 10 == 0:
             print("%d\r" % idx, end = "", flush = True)
         try:
-            imgs, _labels = dset.get_minibatch_np(1)
+            imgs, _labels = dset.get_batch_np(1)
         except tf.errors.OutOfRangeError:
             break
         if imgs.shape[1] == 1:
@@ -264,11 +261,11 @@ def compare(tfrecord_dir_a, tfrecord_dir_b, ignore_labels):
         if idx % 100 == 0:
             print("%d\r" % idx, end = "", flush = True)
         try:
-            imgs_a, labels_a = dset_a.get_minibatch_np(1)
+            imgs_a, labels_a = dset_a.get_batch_np(1)
         except tf.errors.OutOfRangeError:
             imgs_a, labels_a = None, None
         try:
-            imgs_b, labels_b = dset_b.get_minibatch_np(1)
+            imgs_b, labels_b = dset_b.get_batch_np(1)
         except tf.errors.OutOfRangeError:
             imgs_b, labels_b = None, None
         if imgs_a is None or imgs_b is None:
@@ -660,7 +657,7 @@ def create_celebahq(tfrecord_dir, celeba_dir, delta_dir, num_threads = 4, num_ta
 def create_from_imgs(tfrecord_dir, img_dir, format = "png", shuffle = False, ratio = None, 
         max_imgs = None, shards_num = 5):
     print("Loading images from %s" % img_dir)
-    img_filenames = sorted(glob.glob("{}/**/*.{}".format(img_dir, format), recursive = True))
+    img_filenames = sorted(glob.glob(f"{img_dir}/**/*.{format}", recursive = True))
     if len(img_filenames) == 0:
         error("No input images found")
     if max_imgs is None:
@@ -699,7 +696,7 @@ def create_from_tfds(tfrecord_dir, dataset_name, ratio = None, max_imgs = None, 
     import tensorflow_datasets as tfds
 
     print("Loading dataset %s" % dataset_name)
-    ds = tfds.load(dataset_name, split = "train", data_dir = "{}/tfds".format(tfrecord_dir))
+    ds = tfds.load(dataset_name, split = "train", data_dir = f"{tfrecord_dir}/tfds")
     with TFRecordExporter(tfrecord_dir, 0, shards_num = shards_num) as tfr:
         for i, ex in tqdm(enumerate(tfds.as_numpy(ds))):
             img = PIL.Image.fromarray(ex["image"])
@@ -745,7 +742,7 @@ def create_from_lmdb(tfrecord_dir, lmdb_dir, ratio = None, max_imgs = None, shar
                     break
 
     if bad_imgs > 0:
-        print("Couldn't read {} out of {} images".format(bad_imgs, max_imgs))
+        print(f"Couldn't read {bad_imgs} out of {max_imgs} images")
 
 def create_from_npy(tfrecord_dir, npy_filename, shuffle = False, max_imgs = None, shards_num = 5):
     print("Loading NPY archive from %s" % npy_filename)

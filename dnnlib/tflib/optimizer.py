@@ -1,6 +1,6 @@
 # Tensorflow optimizer, supports:
 ### Gradient averaging for multi-GPU training
-### Gradient accumulation for arbitrarily large minibatches
+### Gradient accumulation for arbitrarily large batches
 ### Dynamic loss scaling and typecasts for FP16 training
 ### Ignoring corrupted gradients that contain NaNs/Infs
 ### Reporting statistics
@@ -28,12 +28,12 @@ class Optimizer:
         name:                   str             = "Train",                  # Name string that will appear in TensorFlow graph
         tf_optimizer:           str             = "tf.train.AdamOptimizer", # Underlying optimizer class
         learning_rate:          TfExpressionEx  = 0.001,                    # Learning rate, can vary over time
-        minibatch_multiplier:   TfExpressionEx  = None,                     # Treat N consecutive minibatches as one by accumulating gradients
+        batch_multiplier:       TfExpressionEx  = None,                     # Treat N consecutive batches as one by accumulating gradients
         share:                  "Optimizer"     = None,                     # Share internal state with a previously created optimizer?
         use_loss_scaling:       bool            = False,                    # Enable dynamic loss scaling for robust mixed-precision training?
         loss_scaling_init:      float           = 64.0,                     # Log2 of initial loss scaling factor
-        loss_scaling_inc:       float           = 0.0005,                   # Log2 of per-minibatch loss scaling increment when there is no overflow
-        loss_scaling_dec:       float           = 1.0,                      # Log2 of per-minibatch loss scaling decrement when there is an overflow
+        loss_scaling_inc:       float           = 0.0005,                   # Log2 of per-batch loss scaling increment when there is no overflow
+        loss_scaling_dec:       float           = 1.0,                      # Log2 of per-batch loss scaling decrement when there is an overflow
         report_mem_usage:       bool            = False,                    # Report fine-grained memory usage statistics in TensorBoard?
         clip:                   float           = None,
         **kwargs):
@@ -41,7 +41,7 @@ class Optimizer:
         # Public fields
         self.name                   = name
         self.learning_rate          = learning_rate
-        self.minibatch_multiplier   = minibatch_multiplier
+        self.batch_multiplier       = batch_multiplier
         self.id                     = self.name.replace("/", ".")
         self.scope                  = tf.get_default_graph().unique_name(self.id)
         self.optimizer_class        = util.get_obj_by_name(tf_optimizer)
@@ -191,8 +191,8 @@ class Optimizer:
                     # Scale as needed
                     scale = 1.0 / len(device.grad_raw[var]) / len(self._devices)
                     scale = tf.constant(scale, dtype = tf.float32, name = "scale")
-                    if self.minibatch_multiplier is not None:
-                        scale /= tf.cast(self.minibatch_multiplier, tf.float32)
+                    if self.batch_multiplier is not None:
+                        scale /= tf.cast(self.batch_multiplier, tf.float32)
                     scale = self.undo_loss_scaling(scale)
                     device.grad_clean[var] = grad * scale
 
@@ -210,7 +210,7 @@ class Optimizer:
         for device_idx, device in enumerate(self._devices.values()):
             with tfutil.absolute_name_scope(self.scope + "/Apply%d" % device_idx), tf.device(device.name):
                 # Accumulate gradients over time
-                if self.minibatch_multiplier is None:
+                if self.batch_multiplier is None:
                     acc_ok = tf.constant(True, name = "acc_ok")
                     device.grad_acc = OrderedDict(device.grad_clean)
                 else:
@@ -224,7 +224,7 @@ class Optimizer:
                     count_cur = device.grad_acc_count + 1.0
                     count_inc_op = lambda: tf.assign(device.grad_acc_count, count_cur)
                     count_reset_op = lambda: tf.assign(device.grad_acc_count, tf.zeros([]))
-                    acc_ok = (count_cur >= tf.cast(self.minibatch_multiplier, tf.float32))
+                    acc_ok = (count_cur >= tf.cast(self.batch_multiplier, tf.float32))
                     all_ops.append(tf.cond(acc_ok, count_reset_op, count_inc_op))
 
                     # Track gradients
@@ -260,7 +260,7 @@ class Optimizer:
         self.reset_optimizer_state()
         if self.use_loss_scaling:
             tfutil.init_uninitialized_vars([device.loss_scaling_var for device in self._devices.values()])
-        if self.minibatch_multiplier is not None:
+        if self.batch_multiplier is not None:
             tfutil.run([var.initializer for device in self._devices.values() for var in list(device.grad_acc_vars.values()) + [device.grad_acc_count]])
 
         # Group everything into a single op

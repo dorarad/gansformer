@@ -7,17 +7,24 @@ import torch
 import dnnlib
 from torch_utils import misc
 
-gdrive_urls = {
-    "gdrive:clevr-snapshot.pkl":        "https://drive.google.com/uc?id=1eRgwoasbDgUAA2tsD-LKghDiYTsfHWn3",
-    "gdrive:cityscapes-snapshot.pkl":   "https://drive.google.com/uc?id=1Lrq3ga9N9ViH2KyvpCnSdG2xyZe_yDUA",
-    "gdrive:ffhq-snapshot.pkl":         "https://drive.google.com/uc?id=1QvGFQfvPXsqsiQE5jWgRM9awxfaWnoqd",
-    "gdrive:bedrooms-snapshot.pkl":     "https://drive.google.com/uc?id=1GkmnFqwUI0X5dOnSHOFDeWg_jJAc08Za"
+pretrained_networks = {
+    "gdrive:clevr-snapshot.pkl":        "https://drive.google.com/uc?id=1zBh-U2kyVgN3C_P_7GqsMEHvBdz2lobu",
+    "gdrive:cityscapes-snapshot.pkl":   "https://drive.google.com/uc?id=1XPGYzUP_1ETFtz5bUhpUFPha1IBNTuZh",
+    "gdrive:ffhq-snapshot.pkl":         "https://drive.google.com/uc?id=1tgs-hHaziWrh0piuX3sEd8PwE9gFwlNh",
+    "gdrive:bedrooms-snapshot.pkl":     "https://drive.google.com/uc?id=1BpICHESy7O0gjXK0KNES5OgZ130QzMup"
 }
 
-def get_path_or_url(path_or_gdrive_path):
-    return gdrive_urls.get(path_or_gdrive_path, path_or_gdrive_path)
+eval_pretrained_networks = pretrained_networks.copy()
+eval_pretrained_networks.update({
+    "gdrive:cityscapes-snapshot-2048.pkl":   "https://drive.google.com/uc?id=1Zw1cFxxN6-iC_M4x6Zbf9lwH9wKryW3p",
+    "gdrive:ffhq-snapshot-1024.pkl":         "https://drive.google.com/uc?id=10V4yK_rQWb4F6Q4vwqkO5XNKX721k3zl"
+})
 
-def load_network(filename):
+def get_path_or_url(path_or_gdrive_path, eval = False):
+    nets = eval_pretrained_networks if eval else pretrained_networks
+    return nets.get(path_or_gdrive_path, path_or_gdrive_path)
+
+def load_network(filename, eval = False):
     filename = get_path_or_url(filename)
     with dnnlib.util.open_url(filename) as f:
         network = load_network_pkl(f)
@@ -88,26 +95,29 @@ def convert_tf_generator(tf_G):
 
     # Collect kwargs
     tf_kwargs = tf_G.static_kwargs
-    known_kwargs = set()
-    def kwarg(tf_name, default = None, none = None):
-        known_kwargs.add(tf_name)
-        val = tf_kwargs.get(tf_name, default)
+    def kwarg(tf_names, default = None, none = None):
+        if not isinstance(tf_names, list):
+            tf_names = [tf_names]
+        val = default
+        for tf_name in tf_names:
+            if tf_name in tf_kwargs:
+                val = tf_kwargs[tf_name]
         return val if val is not None else none
 
     # Convert kwargs
     kwargs = dnnlib.EasyDict(
-        z_dim                   = kwarg("latent_size",          512),
-        c_dim                   = kwarg("label_size",           0),
-        w_dim                   = kwarg("dlatent_size",         512),
+        z_dim                   = kwarg(["latent_size",  "z_dim"], 512),
+        c_dim                   = kwarg(["label_size",   "c_dim"], 0),
+        w_dim                   = kwarg(["dlatent_size", "w_dim"], 512),
         k                       = kwarg("components_num",       1) + int(tf_G.static_kwargs.get("transformer", False)),
         img_resolution          = kwarg("resolution",           1024),
         img_channels            = kwarg("num_channels",         3),
         mapping_kwargs = dnnlib.EasyDict(
-            num_layers          = kwarg("mapping_layersnum",    8),
+            num_layers          = kwarg(["mapping_layersnum", "mapping_num_layers"], 8),
             layer_dim           = kwarg("mapping_dim",          None),
             act                 = kwarg("mapping_nonlinearity", "lrelu"),
             lrmul               = kwarg("mapping_lrmul",        0.01),
-            w_avg_beta          = kwarg("dlatent_avg_beta",     0.995,  none = 1),
+            w_avg_beta          = kwarg(["dlatent_avg_beta", "w_avg_beta"], 0.995,  none = 1),
             resnet              = kwarg("mapping_resnet",       False),
             ltnt2ltnt           = kwarg("mapping_ltnt2ltnt",    False),
             transformer         = kwarg("transformer",          False),
@@ -118,13 +128,14 @@ def convert_tf_generator(tf_G):
             normalize_global    = False,
         ),
         synthesis_kwargs = dnnlib.EasyDict(
-            channel_base        = kwarg("fmap_base",            16 << 10) * 2,
-            channel_max         = kwarg("fmap_max",             512),
+            crop_ratio          = kwarg("crop_ratio",           None),
+            channel_base        = kwarg(["fmap_base", "channel_base"],   16 << 10) * 2,
+            channel_max         = kwarg(["fmap_max",  "channel_max"],    512),
             architecture        = kwarg("architecture",         "skip"),
             resample_kernel     = kwarg("resample_kernel",      [1,3,3,1]),
             local_noise         = kwarg("local_noise",          True),
             act                 = kwarg("nonlinearity",         "lrelu"),
-            latent_stem         = kwarg("latent_stem",          False),
+            ltnt_stem           = kwarg(["latent_stem", "ltnt_stem"],    False),
             style               = kwarg("style",                True),
             transformer         = kwarg("transformer",          False),
             start_res           = kwarg("start_res",            0),
@@ -142,19 +153,9 @@ def convert_tf_generator(tf_G):
             pos_dim             = kwarg("pos_dim",              None),
             pos_type            = kwarg("pos_type",             "sinus"),
             pos_init            = kwarg("pos_init",             "uniform"),
-            pos_directions_num  = kwarg("pos_directions_num",   2),            
-
+            pos_directions_num  = kwarg("pos_directions_num",   2),
         ),
     )
-
-    # Check for unknown kwargs
-    # kwarg("truncation_psi")
-    # kwarg("truncation_cutoff")
-    # kwarg("style_mixing_prob")
-    # kwarg("structure")
-    # unknown_kwargs = list(set(tf_kwargs.keys()) - known_kwargs)
-    # if len(unknown_kwargs) > 0:
-    #     raise ValueError("Unknown TensorFlow kwarg", unknown_kwargs[0])
 
     # Collect params
     tf_params = _collect_tf_params(tf_G)
@@ -172,21 +173,22 @@ def convert_tf_generator(tf_G):
     index = lambda r, i: "" if int(r) == 4 else f"{i}{['_up',''][int(i)]}"
     plural = lambda s: {"queries": "query", "keys": "key", "values": "value"}[s]
     global_fix = lambda s: "global/" if "global" in s else ""
+    z_dim = tf_G.static_kwargs.get("latent_size") or tf_G.static_kwargs.get("z_dim") or 512
 
     _populate_module_params(G,
-        r"pos",                                             lambda:     tf_params["ltnt_emb/emb"],
+        r"pos",                                             lambda:          tf_params["ltnt_emb/emb"],
         # Mapping network
-        r"mapping\.w_avg",                                  lambda:     tf_params["dlatent_avg"],
-        r"mapping\.embed\.weight",                          lambda:     tf_params["mapping/LabelConcat/weight"].transpose(),
-        r"mapping\.embed\.bias",                            lambda:     np.zeros([tf_G.static_kwargs.get("latent_size", 512)]),
-        r"mapping\.([a-z_]+)\.l(\d+)\.fc(\d+)\.weight",     lambda s, i, j:   tf_params[f"mapping/{global_fix(s)}Dense{i}_{j}/weight"].transpose(),
-        r"mapping\.([a-z_]+)\.l(\d+)\.fc(\d+)\.bias",       lambda s, i, j:   tf_params[f"mapping/{global_fix(s)}Dense{i}_{j}/bias"],
-        r"mapping\.([a-z_]+)\.out_layer\.weight",           lambda s:     tf_params[f"mapping/{global_fix(s)}Dense3/weight"].transpose(),
-        r"mapping\.([a-z_]+)\.out_layer\.bias",             lambda s:     tf_params[f"mapping/{global_fix(s)}Dense3/bias"],
-        r"mapping\.mlp\.l(\d+)\.fc(\d+)\.weight",           lambda i, j:   tf_params[f"mapping/Dense{i}_{j}/weight"].transpose(),
-        r"mapping\.mlp\.l(\d+)\.fc(\d+)\.bias",             lambda i, j:   tf_params[f"mapping/Dense{i}_{j}/bias"],
-        r"mapping\.mlp\.out_layer\.weight",                 lambda:     tf_params[f"mapping/Dense3/weight"].transpose(),
-        r"mapping\.mlp\.out_layer\.bias",                   lambda:     tf_params[f"mapping/Dense3/bias"],
+        r"mapping\.w_avg",                                  lambda:          tf_params["dlatent_avg"],
+        r"mapping\.embed\.weight",                          lambda:          tf_params["mapping/LabelConcat/weight"].transpose(),
+        r"mapping\.embed\.bias",                            lambda:          np.zeros([z_dim]),
+        r"mapping\.([a-z_]+)\.l(\d+)\.fc(\d+)\.weight",     lambda s, i, j:  tf_params[f"mapping/{global_fix(s)}Dense{i}_{j}/weight"].transpose(),
+        r"mapping\.([a-z_]+)\.l(\d+)\.fc(\d+)\.bias",       lambda s, i, j:  tf_params[f"mapping/{global_fix(s)}Dense{i}_{j}/bias"],
+        r"mapping\.([a-z_]+)\.out_layer\.weight",           lambda s:        tf_params[f"mapping/{global_fix(s)}Dense3/weight"].transpose(),
+        r"mapping\.([a-z_]+)\.out_layer\.bias",             lambda s:        tf_params[f"mapping/{global_fix(s)}Dense3/bias"],
+        r"mapping\.mlp\.l(\d+)\.fc(\d+)\.weight",           lambda i, j:     tf_params[f"mapping/Dense{i}_{j}/weight"].transpose(),
+        r"mapping\.mlp\.l(\d+)\.fc(\d+)\.bias",             lambda i, j:     tf_params[f"mapping/Dense{i}_{j}/bias"],
+        r"mapping\.mlp\.out_layer\.weight",                 lambda:          tf_params[f"mapping/Dense3/weight"].transpose(),
+        r"mapping\.mlp\.out_layer\.bias",                   lambda:          tf_params[f"mapping/Dense3/bias"],
         # Mapping ltnt2ltnt
         r"mapping\.mlp\.sa(\d+)\.to_([a-z]+)\.weight",        lambda i, s:   tf_params[f"mapping/AttLayer_{i}/weight_{plural(s)}"].transpose(),
         r"mapping\.mlp\.sa(\d+)\.to_([a-z]+)\.bias",          lambda i, s:   tf_params[f"mapping/AttLayer_{i}/bias_{plural(s)}"],
@@ -199,25 +201,25 @@ def convert_tf_generator(tf_G):
         r"mapping\.mlp\.sa(\d+)\.queries2centroids",          lambda i:      tf_params[f"mapping/AttLayer_{i}/bias_key2"],        
         r"mapping\.mlp\.sa(\d+)\.att_weight",                 lambda i:      tf_params[f"mapping/AttLayer_{i}/iter_0/st_weights"],
         # Synthesis Network
-        r"synthesis\.b4\.const",                            lambda:     tf_params[f"synthesis/4x4/Const/const"][0],
-        r"synthesis\.b(\d+)\.conv0\.weight",                lambda r:   tf_params[f"synthesis/{r}x{r}/Conv0_up/weight"][::-1, ::-1].transpose(3, 2, 0, 1),
-        r"synthesis\.b(\d+)\.conv1\.weight",                lambda r:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,1)}/weight"].transpose(3, 2, 0, 1),
-        r"synthesis\.b(\d+)\.conv(\d+)\.biasAct\.bias",     lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/bias"],
-        r"synthesis\.b(\d+)\.conv(\d+)\.noise_const",       lambda r, i:   tf_params[f"synthesis/noise{int(np.log2(int(r)))*2-5+int(i)}"][0, 0],
-        r"synthesis\.b(\d+)\.conv(\d+)\.noise_strength",    lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/noise_strength"],
-        r"synthesis\.b(\d+)\.conv(\d+)\.affine\.weight",    lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/mod_weight"].transpose(),
-        r"synthesis\.b(\d+)\.conv(\d+)\.affine\.bias",      lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/mod_bias"] + 1,
+        r"synthesis\.b4\.const",                            lambda:          tf_params[f"synthesis/4x4/Const/const"][0],
+        r"synthesis\.b(\d+)\.conv0\.weight",                lambda r:        tf_params[f"synthesis/{r}x{r}/Conv0_up/weight"][::-1, ::-1].transpose(3, 2, 0, 1),
+        r"synthesis\.b(\d+)\.conv1\.weight",                lambda r:        tf_params[f"synthesis/{r}x{r}/Conv{index(r,1)}/weight"].transpose(3, 2, 0, 1),
+        r"synthesis\.b(\d+)\.conv(\d+)\.biasAct\.bias",     lambda r, i:     tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/bias"],
+        r"synthesis\.b(\d+)\.conv(\d+)\.noise_const",       lambda r, i:     tf_params[f"synthesis/noise{int(np.log2(int(r)))*2-5+int(i)}"][0, 0],
+        r"synthesis\.b(\d+)\.conv(\d+)\.noise_strength",    lambda r, i:     tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/noise_strength"],
+        r"synthesis\.b(\d+)\.conv(\d+)\.affine\.weight",    lambda r, i:     tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/mod_weight"].transpose(),
+        r"synthesis\.b(\d+)\.conv(\d+)\.affine\.bias",      lambda r, i:     tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/mod_bias"] + 1,
         # Synthesis Network: Latents to Image
         r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.to_([a-z]+)\.weight",        lambda r, i, s:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/weight_{plural(s)}"].transpose(),
         r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.to_([a-z]+)\.bias",          lambda r, i, s:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/bias_{plural(s)}"],
         r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.([a-z]+)_pos_map\.weight",   lambda r, i, s:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/weight_{s}_pos"].transpose(),
         r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.([a-z]+)_pos_map\.bias",     lambda r, i, s:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/bias_{s}_pos"],
-        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.modulation\.weight",         lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/weight_out"].transpose(),
-        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.modulation\.bias",           lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/bias_out"],
-        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.centroids",                  lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/toasgn_init"],
-        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.queries2centroids",          lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/weight_key2"].transpose(),
-        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.queries2centroids",          lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/bias_key2"],        
-        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.att_weight",                 lambda r, i:   tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/iter_0/st_weights"],
+        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.modulation\.weight",         lambda r, i:      tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/weight_out"].transpose(),
+        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.modulation\.bias",           lambda r, i:      tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/bias_out"],
+        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.centroids",                  lambda r, i:      tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/toasgn_init"],
+        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.queries2centroids",          lambda r, i:      tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/weight_key2"].transpose(),
+        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.queries2centroids",          lambda r, i:      tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/bias_key2"],        
+        r"synthesis\.b(\d+)\.conv(\d+)\.transformer\.att_weight",                 lambda r, i:      tf_params[f"synthesis/{r}x{r}/Conv{index(r,i)}/AttLayer_l2n/iter_0/st_weights"],
         # Synthesis Network's RGB layer
         r"synthesis\.b(\d+)\.torgb\.weight",                lambda r:   tf_params[f"synthesis/{r}x{r}/ToRGB/weight"].transpose(3, 2, 0, 1),
         r"synthesis\.b(\d+)\.torgb\.biasAct\.bias",         lambda r:   tf_params[f"synthesis/{r}x{r}/ToRGB/bias"],
@@ -240,19 +242,23 @@ def convert_tf_discriminator(tf_D):
 
     # Collect kwargs
     tf_kwargs = tf_D.static_kwargs
-    known_kwargs = set()
-    def kwarg(tf_name, default = None):
-        known_kwargs.add(tf_name)
-        return tf_kwargs.get(tf_name, default)
+    def kwarg(tf_names, default = None):
+        if not isinstance(tf_names, list):
+            tf_names = [tf_names]
+        for tf_name in tf_names:
+            if tf_name in tf_kwargs:
+                return tf_kwargs[tf_name]
+        return default
 
     # Convert kwargs
     kwargs = dnnlib.EasyDict(
-        c_dim                   = kwarg("label_size",           0),
+        c_dim                   = kwarg(["label_size", "c_dim"], 0),
         img_resolution          = kwarg("resolution",           1024),
         img_channels            = kwarg("num_channels",         3),
         architecture            = kwarg("architecture",         "resnet"),
         channel_base            = kwarg("fmap_base",            16 << 10) * 2,
         channel_max             = kwarg("fmap_max",             512),
+        crop_ratio              = kwarg("crop_ratio",           None),
         block_kwargs = dnnlib.EasyDict(
             act                 = kwarg("nonlinearity",         "lrelu"),
             resample_kernel     = kwarg("resample_kernel",      [1,3,3,1]),
@@ -263,11 +269,6 @@ def convert_tf_discriminator(tf_D):
             mbstd_num_channels  = kwarg("mbstd_num_features",   1),
         ),
     )
-    # Check for unknown kwargs
-    # kwarg("structure")
-    # unknown_kwargs = list(set(tf_kwargs.keys()) - known_kwargs)
-    # if len(unknown_kwargs) > 0:
-        # raise ValueError("Unknown TensorFlow kwarg", unknown_kwargs[0])
 
     # Collect params
     tf_params = _collect_tf_params(tf_D)
@@ -309,7 +310,7 @@ def convert_network_pickle(source, dest):
 
     The tool is able to load the main network configurations exported using the TensorFlow version of GANFormer.
 
-    Example: python loader.py --source=checkpoint-TF.pkl --dest=checkpoint.pkl
+    Example: python loader.py --source=checkpoint-tf.pkl --dest=checkpoint.pkl
     """
     print(f"Loading {source}...")
     with dnnlib.util.open_url(source) as f:

@@ -10,7 +10,7 @@ from training import misc
 # Compute the effective batch size given a total number of elements, the batch index, and the
 # batch size. For the last batch, its effective size might be smaller if the total_num is not
 # evenly divided by the batch_size.
-def curr_batch_size(total_num, idx, batch_size):
+def curr_section_size(total_num, idx, batch_size):
     start = idx * batch_size
     end = min((idx + 1) * batch_size, total_num)
     return end - start
@@ -48,7 +48,7 @@ def slerp(a, b, ts):
 # interpolations : Create latent interpolations
 # noise_var      : Create noise variation visualization
 # style_mix      : Create style mixing visualization
-def eval(G,
+def vis(G,
     dataset,                          # The dataset object for accessing the data
     batch_size,                       # Visualization batch size
     training            = False,      # Training mode
@@ -64,7 +64,7 @@ def eval(G,
     vis_types           = None,       # Visualization types to be created
     num                 = 100,        # Number of produced samples
     rich_num            = 5,          # Number of samples for which richer visualizations will be created
-                                      # (requires more memory and disk space, and therefore rich_num < num)
+                                      # (requires more memory and disk space, and therefore rich_num <= num)
     grid                = None,       # Whether to save the samples in one large grid files
                                       # or in separated files one per sample
     grid_size           = None,       # Grid proportions (w, h)
@@ -79,8 +79,8 @@ def eval(G,
     noise_samples_num   = 100,        # Number of samples used to compute noise variation visualization
     section_size        = 100):       # Visualization section size (section_size <= num) for reducing memory footprint
     
-    def prefix(step): return "" if step is None else "{:06d}_".format(step)
-    def pattern_of(dir, step, suffix): return "eval/{}/{}%06d.{}".format(dir, prefix(step), suffix)
+    def prefix(step): return "" if step is None else f"{step:06d}_"
+    def pattern_of(dir, step, suffix): return f"visuals/{dir}/{prefix(step)}%06d.{suffix}"
 
     # For time efficiency, during training save only image and map samples
     # rather than richer visualizations
@@ -105,12 +105,14 @@ def eval(G,
     if grid_size is not None:
         rich_num = num = np.prod(grid_size)
 
-    # build image functions
+    assert rich_num <= section_size
+
+    # Build image functions
     save_images = misc.save_images_builder(drange_net, ratio, grid_size, grid, verbose)
     save_blends = misc.save_blends_builder(drange_net, ratio, grid_size, grid, verbose, alpha)
     crange = trange if verbose else range
 
-    # Set up logging
+    # Set up noise
     noise_vars = [var for name, var in G.components.synthesis.vars.items() if name.startswith("noise")]
     noise_var_vals = {var: np.random.randn(*var.shape.as_list()) for var in noise_vars}
     tflib.set_vars(noise_var_vals)
@@ -124,30 +126,32 @@ def eval(G,
     if "interpolations" in vis:  dirs += ["interpolations-z", "interpolation-w"]
 
     if not keep_samples:
-        shutil.rmtree("eval")
+        shutil.rmtree(dnnlib.make_run_dir_path("visuals"))
     for dir in dirs:
-        misc.mkdir(dnnlib.make_run_dir_path("eval/{}".format(dir)))        
+        misc.mkdir(dnnlib.make_run_dir_path(f"visuals/{dir}"))        
 
     # Produce visualizations
-    for idx in range(0, num, section_size):
-        curr_size = curr_batch_size(num, idx, section_size)
+    for idx in crange(0, num, section_size):
+        curr_size = curr_section_size(num, idx, section_size)
         if verbose and num > curr_size:
-            print("--- Batch {}/{}".format(idx + 1, num))
+            print(f"--- Batch {idx + 1}/{num}")
 
         # Compute source latents images will be produced from
         if latents is None:
             latents = np.random.randn(curr_size, *G.input_shape[1:])
         if labels is None:
-            labels = dataset.get_minibatch_np(curr_size)[1]
+            labels = dataset.get_batch_np(curr_size)[1]
+
+        if idx == 0:
+            latents0, labels0 = latents, labels
 
         # Run network over latents and produce images and attention maps
         if verbose:
             print("Running network...")
 
-        ret = G.run(latents, labels, randomize_noise = False, minibatch_size = batch_size, 
-            return_dlatents = True) # is_visualization = True
+        ret = G.run(latents, labels, noise_mode = "const", batch_size = batch_size, return_ws = True) # is_visualization = True
         # For memory efficiency, save full information only for a small amount of images
-        images, attmaps_all_layers, wlatents_all_layers = ret[0], ret[-2], ret[-1]
+        images, attmaps_all_layers, wlatents_all_layers = ret
         soft_maps = attmaps_all_layers[:,:,-1,0] if attention else None
         attmaps_all_layers = attmaps_all_layers[:rich_num]
         wlatents = wlatents_all_layers[:,:,0]
@@ -192,37 +196,38 @@ def eval(G,
                     for head, hmap in enumerate(lmaps):
                         hmap = (hmap == np.amax(hmap, axis = 1, keepdims = True)).astype(float)
                         hmap = np.sum(pallete * hmap, axis = 1)
-                        all_maps.append((hmap, "l{}_h{}".format(layer, head)))
+                        all_maps.append((hmap, f"l{layer}_h{head}"))
 
                 if verbose:
                     print("Saving layer maps...")
                     all_maps = tqdm(all_maps)
-                if grid:
-                    for i in crange(rich_num):
-                        stepdir = "" if step is None else ("/{:06d}".format(step))
-                        misc.mkdir(dnnlib.make_run_dir_path("eval/layer_maps/%06d" % i + stepdir))
+                if not grid:
+                    for i in range(rich_num):
+                        stepdir = "" if step is None else (f"/{step:06d}")
+                        misc.mkdir(dnnlib.make_run_dir_path("visuals/layer_maps/%06d" % i + stepdir))
                 for maps, name in all_maps:
                     if grid:
-                        pattern = "eval/layer_maps/%06d/{}/{}.png".format(stepdir, name)
+                        pattern = f"visuals/layer_maps/{prefix(step)}%06d_{name}.png"
                     else:
-                        pattern = "eval/layer_maps/{}%06d_{}.png".format(prefix(step), name)
+                        pattern = f"visuals/layer_maps/%06d/{stepdir}/{name}.png"                       
                     save_images(maps, pattern, idx)
 
     # Produce interpolations between pairs or source latents
     # In the GANformer case, varying one component at a time
     if "interpolations" in vis:
-        ts = np.array(np.linspace(0.0, 1.0, num = intrp_density, endpoint = True))
+        ts = np.linspace(0.0, 1.0, num = intrp_density, endpoint = True)
 
         if verbose:
             print("Generating interpolations...")
         for i in crange(rich_num):
-            misc.mkdir(dnnlib.make_run_dir_path("eval/interpolations-z/%06d" % i))
-            misc.mkdir(dnnlib.make_run_dir_path("eval/interpolations-w/%06d" % i))
+            misc.mkdir(dnnlib.make_run_dir_path("visuals/interpolations-z/%06d" % i))
+            misc.mkdir(dnnlib.make_run_dir_path("visuals/interpolations-w/%06d" % i))
 
             z = np.random.randn(2, *G.input_shape[1:])
-            z[0] = latents[i:i+1]
-            w = G.run(z, labels, randomize_noise = False, return_dlatents = True,
-                minibatch_size = batch_size)[-1]
+            z[0] = latents0[i]
+            c = labels0[i:i+1]
+
+            w = G.run(z, c, noise_mode = "const", return_ws = True, batch_size = batch_size)[-1]
 
             def update(t, fn, ts, dim):
                 if dim == 3:
@@ -246,17 +251,16 @@ def eval(G,
             z_up = update(z, slerp, ts, 2)
             w_up = update(w, lerp, ts, 3)
 
-            imgs1 = G.run(z_up, labels, randomize_noise = False, minibatch_size = batch_size)[0]
-            imgs2 = G.run(w_up, labels, randomize_noise = False, minibatch_size = batch_size,
-                take_dlatents = True)[0]
+            imgs1 = G.run(z_up, labels, noise_mode = "const", batch_size = batch_size)[0]
+            imgs2 = G.run(w_up, labels, noise_mode = "const", batch_size = batch_size, take_ws = True)[0]
 
             def save_interpolation(imgs, name):
                 imgs = np.split(imgs, components_num, axis = 0)
                 for c in range(components_num):
-                    filename = "eval/interpolations-%s/%06d/%02d" % (name, i, c)
+                    filename = "visuals/interpolations-%s/%06d/%02d" % (name, i, c)
                     imgs[c] = [misc.to_pil(img, drange = drange_net) for img in imgs[c]]
-                    imgs[c][-1].save(dnnlib.make_run_dir_path("{}.png".format(filename)))
-                    misc.save_gif(imgs[c], dnnlib.make_run_dir_path("{}.gif".format(filename)))
+                    imgs[c][-1].save(dnnlib.make_run_dir_path(f"{filename}.png"))
+                    misc.save_gif(imgs[c], dnnlib.make_run_dir_path(f"{filename}.gif"))
 
             save_interpolation(imgs1, "z")
             save_interpolation(imgs2, "w")
@@ -268,11 +272,11 @@ def eval(G,
         if verbose:
             print("Generating noise variance...")
         z = np.tile(np.random.randn(1, *G.input_shape[1:]), [noise_samples_num, 1, 1])
-        imgs = G.run(z, labels, minibatch_size = batch_size)[0]
+        imgs = G.run(z, labels, batch_size = batch_size)[0]
         imgs = np.stack([misc.to_pil(img, drange = drange_net) for img in imgs], axis = 0)
         diff = np.std(np.mean(imgs, axis = 3), axis = 0) * 4
         diff = np.clip(diff + 0.5, 0, 255).astype(np.uint8)
-        PIL.Image.fromarray(diff, "L").save(dnnlib.make_run_dir_path("eval/noise-variance.png"))
+        PIL.Image.fromarray(diff, "L").save(dnnlib.make_run_dir_path("visuals/noise-variance.png"))
 
     # Compute style mixing table, varying using the latent A in some of the layers and latent B in rest.
     # For the GANformer, also produce component mixes (using latents from A in some of the components,
@@ -297,8 +301,7 @@ def eval(G,
             # Produce image mixes
             mix_ltnts = mix * row_ltnts  + (1 - mix) * col_ltnts
             mix_ltnts = np.reshape(mix_ltnts, [-1, *wlatents_all_layers.shape[1:]])
-            mix_imgs = G.run(mix_ltnts, labels, randomize_noise = False, take_dlatents = True,
-                minibatch_size = batch_size)[0]
+            mix_imgs = G.run(mix_ltnts, labels, noise_mode = "const", take_ws = True, batch_size = batch_size)[0]
             mix_imgs = np.reshape(mix_imgs, [len(row_lens) * rows, cols, *mix_imgs.shape[1:]])
 
             # Create image table canvas
@@ -311,11 +314,11 @@ def eval(G,
                     if (row_elem, col_elem) == (None, None):  continue
                     if row_elem is None:                    img = orig_imgs[col_elem]
                     elif col_elem is None:                  img = orig_imgs[cols + (row_elem % rows)]
-                    else:                                   img =  mix_imgs[row_elem, col_elem]
+                    else:                                   img = mix_imgs[row_elem, col_elem]
 
                     canvas.paste(misc.to_pil(img, drange = drange_net), (W * col_idx, H * row_idx))
 
-            canvas.save(dnnlib.make_run_dir_path("eval/{}-mixing.png".format(name)))
+            canvas.save(dnnlib.make_run_dir_path(f"visuals/{name}-mixing.png"))
 
     if verbose:
         misc.log("Visualizations Completed!", "blue")

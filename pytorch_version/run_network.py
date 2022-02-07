@@ -102,6 +102,11 @@ def setup_config(run_dir, **args):
     # General setup
     # ----------------------------------------------------------------------------
 
+     # If the flag is specified without arguments (--arg), set to True
+    for arg in ["cuda_bench", "allow_tf32", "keep_samples", "style", "local_noise"]:
+        if args[arg] is None:
+            args[arg] = True
+
     if not any([args.train, args.eval, args.vis]):
         misc.log("Warning: None of --train, --eval or --vis are provided. Therefore, we only print network shapes", "red")
     for arg in ["train", "eval", "vis", "last_snapshots"]:
@@ -114,10 +119,10 @@ def setup_config(run_dir, **args):
         misc.error("Number of GPUs must be a power of two")
     args.num_gpus = num_gpus
 
-    from metrics import metric_main
-    for metric in args.metrics:
-        if not metric_main.is_valid_metric(metric):
-            misc.error(f"Unknown metric: {metric}. The valid metrics are: {metric_main.list_valid_metrics()}")
+    # CUDA settings
+    for arg in ["batch_size", "batch_gpu", "allow_tf32"]:
+        cset(train, arg, args[arg])
+    cset(train, "cudnn_benchmark", args.cuda_bench)
 
     # Data setup
     # ----------------------------------------------------------------------------
@@ -130,18 +135,19 @@ def setup_config(run_dir, **args):
         "cityscapes": 0.5,
         "ffhq": 1.0
     }
-    args.ratio = ratios.get(args.dataset, args.ratio)
-    
+    args.ratio = args.ratio or ratios.get(args.dataset, 1.0)
+    args.crop_ratio = 0.5 if args.resolution > 256 and args.ratio < 0.5 else None
+
     args.printname = args.expname
     for arg in ["total_kimg", "printname"]:
         cset(train, arg, args[arg])
     
     dataset_args = EasyDict(
-        class_name = "training.dataset.ImageFolderDataset", 
-        path = f"{args.data_dir}/{args.dataset}",
-        max_items = args.train_images_num, 
-        resolution = args.resolution,
-        ratio = args.ratio,
+        class_name     = "training.dataset.ImageFolderDataset", 
+        path           = f"{args.data_dir}/{args.dataset}",
+        max_items      = args.train_images_num, 
+        resolution     = args.resolution,
+        ratio          = args.ratio,
         mirror_augment = args.mirror_augment
     )
     dataset_args.loader_args = EasyDict(
@@ -155,6 +161,10 @@ def setup_config(run_dir, **args):
 
     cG = set_net("Generator", ["mapping", "synthesis"], args.g_lr, 4)
     cD = set_net("Discriminator", ["mapping", "block", "epilogue"], args.d_lr, 16)
+    cset([cG, cD], "crop_ratio", args.crop_ratio)
+
+    mbstd = min(args.batch_gpu, 4) # other hyperparams behave more predictably if mbstd group size remains fixed
+    cset(cD.epilogue_kwargs, "mbstd_group_size", mbstd)
 
     # Automatic tuning
     if args.autotune:
@@ -163,12 +173,10 @@ def setup_config(run_dir, **args):
         nset(args, "batch_size", batch_size)
         nset(args, "batch_gpu", batch_gpu)
 
-        mbstd = min(args.batch_gpu, 4) # other hyperparams behave more predictably if mbstd group size remains fixed
         fmap_decay = 1 if args.resolution >= 512 else 0.5 # other hyperparams behave more predictably if mbstd group size remains fixed
         lr = 0.002 if args.resolution >= 1024 else 0.0025
         gamma = 0.0002 * (args.resolution ** 2) / args.batch_size # heuristic formula
 
-        cset(cD.epilogue_args, "mbstd_group_size", mbstd) 
         cset([cG.synthesis_kwargs, cD], "dim_base", int(fmap_decay * 32768)) 
         nset(args, "g_lr", lr); cset(cG.opt_args, "lr", args.g_lr)
         nset(args, "d_lr", lr); cset(cD.opt_args, "lr", args.d_lr)
@@ -178,7 +186,7 @@ def setup_config(run_dir, **args):
         train.ema_kimg = batch_size * 10 / 32
 
     if args.batch_size % (args.batch_gpu * args.num_gpus) != 0:
-        misc.error("'batch_size' should be divided by 'batch_gpu' * 'num_gpus'")
+        misc.error("--batch-size should be divided by --batch-gpu * 'num_gpus'")
 
     # Loss and regularization settings
     loss_args = EasyDict(class_name = "training.loss.StyleGAN2Loss", 
@@ -186,19 +194,19 @@ def setup_config(run_dir, **args):
         r1_gamma = args.gamma, pl_weight = args.pl_weight
     )
 
-    # CUDA settings
-    for arg in ["batch_size", "batch_gpu", "allow_tf32"]:
-        cset(train, arg, args[arg])
-
     # if args.fp16:
     #     cset([cG.synthesis_kwargs, cD], "num_fp16_layers", 4) # enable mixed-precision training
     #     cset([cG.synthesis_kwargs, cD], "conv_clamp", 256) # clamp activations to avoid float16 overflow
 
     # cset([cG.synthesis_kwargs, cD.block_args], "fp16_channels_last", args.nhwc)
-    cset(train, "cudnn_benchmark", args.cuda_bench)
 
     # Evaluation and visualization
     # ----------------------------------------------------------------------------
+
+    from metrics import metric_main
+    for metric in args.metrics:
+        if not metric_main.is_valid_metric(metric):
+            misc.error(f"Unknown metric: {metric}. The valid metrics are: {metric_main.list_valid_metrics()}")
 
     for arg in ["num_gpus", "metrics", "eval_images_num", "truncation_psi"]:
         cset(train, arg, args[arg])
@@ -237,7 +245,7 @@ def setup_config(run_dir, **args):
             misc.error("--components-num > 0 but the model is not using components. " + 
                 "Add --transformer for GANformer (which uses latent components).")
         if args.latent_size % args.components_num != 0:
-            misc.error(f"--latent_size ({args.latent_size}) should be divisible by k ({k})")
+            misc.error(f"--latent-size ({args.latent_size}) should be divisible by --components-num (k={k})")
         args.latent_size = int(args.latent_size / args.components_num)
 
     cG.z_dim = cG.w_dim = args.latent_size
@@ -446,8 +454,8 @@ def main():
     parser.add_argument("--train-images-num",   help = "Maximum number of images to train on. If not specified, train on the whole dataset.", default = None, type = int)
 
     ## CUDA
-    # parser.add_argument("--fp16",               help = "Enable mixed-precision training", default = False, action = "store_true")
-    # parser.add_argument("--nhwc",               help = "Use NHWC memory format with FP16", default = False, action = "store_true")
+    # parser.add_argument("--fp16",             help = "Enable mixed-precision training", default = False, action = "store_true")
+    # parser.add_argument("--nhwc",             help = "Use NHWC memory format with FP16", default = False, action = "store_true")
     parser.add_argument("--cuda-bench",         help = "Enable cuDNN benchmarking", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--allow-tf32",         help = "Allow PyTorch to use TF32 internally", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
 
@@ -464,7 +472,7 @@ def main():
     parser.add_argument("--result-dir",         help = "Root directory for experiments (default: %(default)s)", default = "results", metavar = "DIR")
     parser.add_argument("--metrics",            help = "Comma-separated list of metrics or none (default: %(default)s)", default = "fid", type = _parse_comma_sep)
     parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images " +
-                                                       "(used only for visualizations, _not used_ in training or for computing metrics) (default: %(default)s)", default = 0.65, type = float)
+                                                       "(used only for visualizations, _not used_ in training or for computing metrics) (default: %(default)s)", default = 0.75, type = float)
     parser.add_argument("--keep-samples",       help = "Keep all prior samples during training, or if False, just the most recent ones (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--eval-images-num",    help = "Number of images to evaluate metrics on (default: 50,000)", default = None, type = int)
 
@@ -477,12 +485,12 @@ def main():
     parser.add_argument("--vis-noise-var",      help = "Create noise variation visualization", default = None, action = "store_true")
     parser.add_argument("--vis-style-mix",      help = "Create style mixing visualization", default = None, action = "store_true")
 
-    parser.add_argument("--vis-grid",                    help = "Whether to save the samples in one large grid files (default: True in training)", default = None, action = "store_true")
-    parser.add_argument("--vis-num",                     help = "Number of images for which visualization will be created (default: grid-size/100 in train/eval)", default = None, type = int)
-    parser.add_argument("--vis-rich-num",                help = "Number of samples for which richer visualizations will be created (default: 5)", default = None, type = int)
-    parser.add_argument("--vis-section-size",            help = "Visualization section size to process at one (section-size <= vis-num) for memory footprint (default: 100)", default = None, type = int)
-    parser.add_argument("--blending-alpha",              help = "Proportion for generated images and attention maps blends (default: 0.3)", default = None, type = float)
-    parser.add_argument("--interpolation-density",       help = "Number of samples in between two end points of an interpolation (default: 8)", default = None, type = int)
+    parser.add_argument("--vis-grid",               help = "Whether to save the samples in one large grid files (default: True in training)", default = None, action = "store_true")
+    parser.add_argument("--vis-num",                help = "Number of images for which visualization will be created (default: grid-size/100 in train/eval)", default = None, type = int)
+    parser.add_argument("--vis-rich-num",           help = "Number of samples for which richer visualizations will be created (default: 5)", default = None, type = int)
+    parser.add_argument("--vis-section-size",       help = "Visualization section size to process at one (section-size <= vis-num) for memory footprint (default: 100)", default = None, type = int)
+    parser.add_argument("--blending-alpha",         help = "Proportion for generated images and attention maps blends (default: 0.3)", default = None, type = float)
+    parser.add_argument("--interpolation-density",  help = "Number of samples in between two end points of an interpolation (default: 8)", default = None, type = int)
 
     # Model
     # ------------------------------------------------------------------------------------------------------
@@ -502,7 +510,7 @@ def main():
     parser.add_argument("--g-loss",             help = "Generator loss type (default: %(default)s)", default = "logistic_ns", choices = ["logistic", "logistic_ns", "hinge", "wgan"], type = str)
     parser.add_argument("--d-loss",             help = "Discriminator loss type (default: %(default)s)", default = "logistic", choices = ["wgan", "logistic", "hinge"], type = str)
     parser.add_argument("--pl-weight",          help = "Generator regularization weight (default: %(default)s)", default = 0.0, type = float)
-    # parser.add_argument("--d-reg",              help = "Discriminator regularization type (default: %(default)s)", default = "r1", choices = ["non", "gp", "r1", "r2"], type = str)
+    # parser.add_argument("--d-reg",            help = "Discriminator regularization type (default: %(default)s)", default = "r1", choices = ["non", "gp", "r1", "r2"], type = str)
     # --gamma effectively functions as discriminator regularization weight
 
     # Mixing and dropout
@@ -516,7 +524,6 @@ def main():
     parser.add_argument("--style",              help = "Global style modulation (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--latent-stem",        help = "Input latent through the generator stem grid (default: False)", default = None, action = "store_true")
     parser.add_argument("--local-noise",        help = "Add stochastic local noise each layer (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
-    parser.add_argument("--minibatch-std-size", help = "Add minibatch standard deviation layer in the discriminator, 0 to disable (default: %(default)s)", default = 4, type = int)
 
     ## GANformer
     parser.add_argument("--transformer",        help = "Add transformer layers to the generator: top-down latents-to-image (default: False)", default = None, action = "store_true")
@@ -533,9 +540,9 @@ def main():
     parser.add_argument("--g-end-res",          help = "Transformer maximum generator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 8, type = int)
 
     # Discriminator attention layers
-    # parser.add_argument("--d-transformer",      help = "Add transformer layers to the discriminator (bottom-up image-to-latents) (default: False)", default = None, action = "store_true")
-    # parser.add_argument("--d-start-res",        help = "Transformer minimum discriminator resolution (logarithmic): first layer in which transformer will be applied (default: %(default)s)", default = 0, type = int)
-    # parser.add_argument("--d-end-res",          help = "Transformer maximum discriminator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 8, type = int)
+    # parser.add_argument("--d-transformer",    help = "Add transformer layers to the discriminator (bottom-up image-to-latents) (default: False)", default = None, action = "store_true")
+    # parser.add_argument("--d-start-res",      help = "Transformer minimum discriminator resolution (logarithmic): first layer in which transformer will be applied (default: %(default)s)", default = 0, type = int)
+    # parser.add_argument("--d-end-res",        help = "Transformer maximum discriminator resolution (logarithmic): last layer in which transformer will be applied (default: %(default)s)", default = 8, type = int)
 
     # Attention
     parser.add_argument("--ltnt-gate",          help = "Gate attention from latents, such that components may not send information " +
@@ -550,14 +557,14 @@ def main():
     # format is A2B: Elements _from_ B attend _to_ elements in A, and B elements get updated accordingly.
     # Note that it means that information propagates in the following direction: A -> B
     parser.add_argument("--mapping-ltnt2ltnt",  help = "Add self-attention over latents in the mapping network (default: False)", default = None, action = "store_true")
-    # parser.add_argument("--g-ltnt2ltnt",        help = "Add self-attention over latents in the synthesis network (default: False)", default = None, action = "store_true")
-    # parser.add_argument("--g-img2img",          help = "Add self-attention between images positions in that layer of the generator (SAGAN) (default: disabled)", default = 0, type = int)
-    # parser.add_argument("--g-img2ltnt",         help = "Add image to latents attention (bottom-up) (default: %(default)s)", default = None, action = "store_true")
+    # parser.add_argument("--g-ltnt2ltnt",      help = "Add self-attention over latents in the synthesis network (default: False)", default = None, action = "store_true")
+    # parser.add_argument("--g-img2img",        help = "Add self-attention between images positions in that layer of the generator (SAGAN) (default: disabled)", default = 0, type = int)
+    # parser.add_argument("--g-img2ltnt",       help = "Add image to latents attention (bottom-up) (default: %(default)s)", default = None, action = "store_true")
     # g-ltnt2img: default information flow direction when using --transformer
 
     # parser.add_argument("--d-ltnt2img",       help = "Add latents to image attention (top-down) (default: %(default)s)", default = None, action = "store_true")
-    # parser.add_argument("--d-ltnt2ltnt",        help = "Add self-attention over latents in the discriminator (default: False)", default = None, action = "store_true")
-    # parser.add_argument("--d-img2img",          help = "Add self-attention over images positions in that layer of the discriminator (SAGAN) (default: disabled)", default = 0, type = int)
+    # parser.add_argument("--d-ltnt2ltnt",      help = "Add self-attention over latents in the discriminator (default: False)", default = None, action = "store_true")
+    # parser.add_argument("--d-img2img",        help = "Add self-attention over images positions in that layer of the discriminator (SAGAN) (default: disabled)", default = 0, type = int)
     # d-img2ltnt: default information flow direction when using --d-transformer
 
     # Local attention operations (replacing convolution)
@@ -572,10 +579,10 @@ def main():
     parser.add_argument("--pos-directions-num", help = "Positional encoding number of spatial directions (default: %(default)s)", default = 2, type = int)
 
     ## k-GAN (not currently supported in the pytorch version. See TF version for implementation of this baseline)
-    # parser.add_argument("--kgan",               help = "Generate components-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true")
-    # parser.add_argument("--merge-layer",        help = "Merge layer, where images get combined through alpha-composition (default: %(default)s)", default = -1, type = int)
-    # parser.add_argument("--merge-type",         help = "Merge type (default: sum)", default = None, choices = ["sum", "softmax", "max", "leaves"], type = str)
-    # parser.add_argument("--merge-same",         help = "Merge images with same alpha weights across all spatial positions (default: %(default)s)", default = None, action = "store_true")
+    # parser.add_argument("--kgan",             help = "Generate components-num images and then merge them (k-GAN) (default: False)", default = None, action = "store_true")
+    # parser.add_argument("--merge-layer",      help = "Merge layer, where images get combined through alpha-composition (default: %(default)s)", default = -1, type = int)
+    # parser.add_argument("--merge-type",       help = "Merge type (default: sum)", default = None, choices = ["sum", "softmax", "max", "leaves"], type = str)
+    # parser.add_argument("--merge-same",       help = "Merge images with same alpha weights across all spatial positions (default: %(default)s)", default = None, action = "store_true")
 
     args = parser.parse_args()
 

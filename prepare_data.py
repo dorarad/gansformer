@@ -91,7 +91,7 @@ def mkdir(d):
             pass
 
 def verify_md5(filename, md5):
-    print("Verify MD5 for {}...".format(filename))
+    print(f"Verify MD5 for {filename}...")
     with open(filename, "rb") as f:
         new_md5 = hashlib.md5(f.read()).hexdigest()
     result = md5 == new_md5
@@ -104,7 +104,7 @@ def verify_md5(filename, md5):
 def is_unzipped(zip, dir):
     with zipfile.ZipFile(zip) as zf:
         archive = zf.namelist()
-    all_exist = all(os.path.exists("{}/{}".format(dir, file)) for file in archive)
+    all_exist = all(os.path.exists(f"{dir}/{file}") for file in archive)
     return all_exist
 
 def unzip(zip, dir):
@@ -119,7 +119,7 @@ def get_path(url, dir = None, path = None):
     if path is None:
         path = url.split("/")[-1]
     if dir is not None:
-        path = "{}/{}".format(dir, path)
+        path = f"{dir}/{path}"
     return path
 
 def download_file(url, path, block_sz = 8192):
@@ -156,35 +156,35 @@ def prepare(tasks, data_dir, shards_num = 1, max_images = None,
             "process": formats_catalog.get(format)
         }))
 
-        dirname = "{}/{}".format(data_dir, task)
+        dirname = f"{data_dir}/{task}"
         mkdir(dirname)
 
         # try:
-        print(misc.bold("Preparing the {} dataset...".format(c.name)))
+        print(misc.bold(f"Preparing the {c.name} dataset..."))
         
         if "local" not in c:
-            fname = "{}/{}".format(dirname, c.filename)
+            fname = f"{dirname}/{c.filename}"
             download = not ((os.path.exists(fname) and verify_md5(fname, c.md5)))
             path = get_path(c.url, dirname, path = c.filename)
 
             if download:
-                print(misc.bold("Downloading the data ({} GB)...".format(c.size)))
+                print(misc.bold(f"Downloading the data ({c.size} GB)..."))
                 download_file(c.url, path)
                 # print(misc.bold("Completed downloading {}".format(c.name)))
             
             if path.endswith(".zip"):
                 if not is_unzipped(path, dirname):
-                    print(misc.bold("Unzipping {}...".format(path)))
+                    print(misc.bold(f"Unzipping {path}..."))
                     unzip(path, dirname)
                     # print(misc.bold("Completed unzipping {}".format(path)))
 
         if "process" in c:
-            imgdir = images_dir if "local" in c else ("{}/{}".format(dirname, c.dir))
+            imgdir = images_dir if "local" in c else (f"{dirname}/{c.dir}")
             shards_num = c.shards if max_images is None else shards_num
             c.process(dirname, imgdir, ratio = c.ratio, 
                 shards_num = shards_num, max_imgs = max_images)
 
-        print(misc.bcolored("Completed preparations for {}!".format(c.name), "blue"))
+        print(misc.bcolored(f"Completed preparations for {c.name}!", "blue"))
         # except:
         #     print(misc.bcolored("Had an error in preparing the {} dataset. Will move on.".format(c.name), "red"))
         #     print(sys.exc_info())
@@ -208,8 +208,8 @@ def run_cmdline(argv):
     args = parser.parse_args()
     if not args.tasks:
         misc.error("No tasks specified. Please see '-h' for help.")
-    if args.max_images is not None and args.max_images < 50000:
-        misc.log("Warning: max-images is set to {}. We recommend setting it at least to 50,000 to allow statistically correct computation of the FID-50k metric.".format(args.max_images), "red")
+    if args.max_images is not None and args.max_images < 50000: 
+        misc.log(f"Warning: max-images is set to {args.max_images}. We recommend setting it at least to 50,000 to allow statistically correct computation of the FID-50k metric.", "red")
 
     prepare(**vars(args))
 

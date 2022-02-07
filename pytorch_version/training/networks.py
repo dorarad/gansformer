@@ -1,7 +1,7 @@
 ﻿import numpy as np
 import torch
 import math
-import misc
+from training import misc
 from torch_utils import misc as torch_misc
 from torch_utils import persistence
 from torch_utils.ops import conv2d_resample
@@ -94,7 +94,7 @@ def get_padding(kernel_size, mode):
 
 # Return a mapping from features resolution to their dimension (number of channels)
 def get_res2channels(channel_base, channel_max):
-    return lambda res: min(channel_base // res, channel_max)
+    return lambda res: int(min(channel_base // res, channel_max))
 
 # Return the gain value for each architecture (to be multiplied by its output)
 # For resent connections we divide the activations by sqrt(2) (following StyleGAN2)
@@ -174,12 +174,12 @@ class ResnetLayer(torch.nn.Module):
 # so to create one large batch with all the elements from the last axis.
 @persistence.persistent_class
 class MLP(torch.nn.Module):
-    def __init__(self, channels, act, resnet = False, sa = False, pool = False, lrmul = 1, **sa_kwargs):
+    def __init__(self, channels, act, resnet = False, sa = False, batch = True, lrmul = 1, **sa_kwargs):
         super().__init__()
 
         self.layers_num = int(len(channels) / 2) if resnet else (len(channels) - 1)
         self.out_layer = FullyConnectedLayer(channels[-1], channels[-1], act = act, lrmul = lrmul)
-        self.pool = pool
+        self.batch = batch
         self.sa = sa
 
         for idx in range(self.layers_num):
@@ -201,7 +201,7 @@ class MLP(torch.nn.Module):
     def forward(self, x, pos = None, mask = None):
         shape = x.shape
         if len(x.shape) > 2:
-            x = to_2d(x, "first" if self.pool else "last") 
+            x = to_2d(x, "last" if self.batch else "first") 
 
         for idx in range(self.layers_num):
             _x = x
@@ -372,7 +372,7 @@ def dropout(x, dp_func, noise_shape = None):
 
 # Set a mask for logits (set -Inf where mask is 0)
 def logits_mask(x, mask): 
-    return x + (1 - mask.to(float_dtype())) * -10000.0
+    return x + (1 - mask.to(torch.int32)).to(float_dtype()) * -10000.0
 
 # Positional encoding
 # ----------------------------------------------------------------------------
@@ -455,6 +455,7 @@ def get_positional_encoding(
         pos_init = "uniform",   # Positional encoding initialization distribution: normal or uniform
         pos_directions_num = 2, # Positional encoding number of spatial directions
         shared = False,         # Share embeddings for x and y axes
+        crop_ratio = None,      # Crop the embedding features to the ratio 
         **_kwargs):             # Ignore unrecognized keyword args
 
     params = []
@@ -473,12 +474,14 @@ def get_positional_encoding(
         xemb = xemb.unsqueeze(0).tile([res, 1, 1])
         yemb = yemb.unsqueeze(1).tile([1, res, 1])
         emb = torch.cat([xemb, yemb], dim = -1)
+
+    emb = misc.crop_tensor(emb, crop_ratio)
     return emb, params
 
 # Produce trainable embeddings of shape [size, dim], uniformly/normally initialized
 def get_embeddings(size, dim, init = "uniform", name = None):
     if size == 0:
-        return None    
+        return None
     initializer = torch.rand if init == "uniform" else torch.randn
     emb = torch.nn.Parameter(initializer([size, dim]))
     return emb
@@ -551,7 +554,6 @@ class TransformerLayer(torch.nn.Module):
             pos_dim,                                # Positional encoding dimension
             from_len,           to_len,             # The from/to tensors length (must be specified if from/to has 2 dims)
             from_dim,           to_dim,             # The from/to tensors dimensions
-            # from_pos = None,    to_pos = None,      # The positional encodings of the form/to tensors (optional)
             from_gate = False,  to_gate = False,    # Add sigmoid gate on from/to, so that info may not be sent/received
                                                     # when gate is low (i.e. the attention probs may not sum to 1)
             # Additional options
@@ -674,24 +676,25 @@ class TransformerLayer(torch.nn.Module):
     #
     # Some of the code here meant to be backward compatible with the pretrained networks
     # and may improve in further versions of the repository.
-    def compute_centroids(self, _queries, queries, to_from):
+    def compute_centroids(self, _queries, queries, to_from, hw_shape):
+        # We use [_queries, queries - _queries] for backward compatibility with the pretrained models
         from_elements = torch.cat([_queries, queries - _queries], dim = -1)
         from_elements = transpose_for_scores(from_elements, self.num_heads, self.from_len, self.centroid_dim) # [B, N, F, H]
-
+        hw_shape = [int(s / 2) for s in hw_shape]
         # to_from represent centroid_assignments of 'from' elements to 'to' elements
         # [batch_size, num_head, to_len, from_len]
         if to_from is not None:
             # upsample centroid_assignments from the prior generator layer
             # (where image grid dimensions were x2 smaller)
             if to_from.shape[-2] < self.to_len:
-                s = int(math.sqrt(to_from.shape[-2]))
-                to_from = upfirdn2d.upsample2d(to_from.reshape(-1, s, s, self.from_len).permute(0, 3, 1, 2), 
+                # s = int(math.sqrt(to_from.shape[-2]))
+                to_from = upfirdn2d.upsample2d(to_from.reshape(-1, *hw_shape, self.from_len).permute(0, 3, 1, 2), 
                     f = nearest_neighbors_kernel(queries.device))
                 to_from = to_from.permute(0, 2, 3, 1).reshape(-1, self.num_heads, self.to_len, self.from_len)
 
             if to_from.shape[-1] < self.from_len:
-                s = int(math.sqrt(to_from.shape[-1]))
-                to_from = upfirdn2d.upsample2d(to_from.reshape(-1, self.to_len, s, s), 
+                # s = int(math.sqrt(to_from.shape[-1]))
+                to_from = upfirdn2d.upsample2d(to_from.reshape(-1, self.to_len, *hw_shape), 
                     f = nearest_neighbors_kernel(queries.device))
                 to_from = to_from.reshape(-1, self.num_heads, self.to_len, self.from_len)
 
@@ -735,7 +738,8 @@ class TransformerLayer(torch.nn.Module):
     # Other arguments:
     # - att_vars: K-means variables carried over from layer to layer (only when --kmeans)
     # - att_mask: Attention mask to block from/to elements [batch_size, from_len, to_len]
-    def forward(self, from_tensor, to_tensor, from_pos, to_pos, att_vars = None, att_mask = None):
+    def forward(self, from_tensor, to_tensor, from_pos, to_pos, 
+            att_vars = None, att_mask = None, hw_shape = None):
         # Validate input shapes and map them to 2d
         from_tensor, from_pos, from_shape = self.process_input(from_tensor, from_pos, "from")
         to_tensor,   to_pos,   to_shape   = self.process_input(to_tensor, to_pos, "to")
@@ -756,7 +760,7 @@ class TransformerLayer(torch.nn.Module):
             keys = keys + self.to_pos_map(to_pos)
 
         if self.kmeans:
-            from_elements, to_centroids = self.compute_centroids(_queries, queries, to_from)
+            from_elements, to_centroids = self.compute_centroids(_queries, queries, to_from, hw_shape)
 
         # Reshape queries, keys and values, and then compute att_scores
         values = transpose_for_scores(values,  self.num_heads, self.to_len,   self.size_head)  # [B, N, T, H]
@@ -789,7 +793,6 @@ class TransformerLayer(torch.nn.Module):
                 att_scores = logits_mask(att_scores, att_mask.unsqueeze(1))
             # Turn attention logits to probabilities (softmax + dropout)
             att_probs = compute_probs(att_scores, self.att_dp)
-
         # Gate attention values for the from/to elements
         att_probs = self.to_gate_attention(att_probs, to_tensor, to_pos)
         att_probs = self.from_gate_attention(att_probs, from_tensor, from_pos)
@@ -808,6 +811,9 @@ class TransformerLayer(torch.nn.Module):
         # Reshape from_tensor to its original shape (if 3 dimensions)
         if len(from_shape) > 2:
             from_tensor = from_tensor.reshape(from_shape)
+
+        if hw_shape is not None:
+            att_probs = att_probs.reshape(-1, *hw_shape, self.to_len).permute(0, 3, 1, 2) # [NCHW]
 
         return from_tensor, att_probs, {"centroid_assignments": to_from}
 
@@ -861,7 +867,7 @@ class MappingNetwork(torch.nn.Module):
             self.embed = FullyConnectedLayer(c_dim, embed_dim)
 
         sa_kwargs = {
-           "sa": ltnt2ltnt and not shared,   "pool":    shared,
+           "sa": ltnt2ltnt and not shared,   "batch":   not shared,
            "from_len":  k - 1,               "to_len":  k - 1,
            "from_gate": ltnt_gate,           "to_gate": ltnt_gate,
         }
@@ -970,7 +976,9 @@ class SynthesisLayer(torch.nn.Module):
 
         self.local_noise = local_noise
         if local_noise:
-            self.register_buffer("noise_const", torch.randn([self.out_res, self.out_res]))
+            noise_shape = list(misc.crop_tensor_shape((self.out_res, self.out_res), 
+                transformer_kwargs.get("crop_ratio")))
+            self.register_buffer("noise_const", torch.randn(noise_shape))
             self.noise_strength = torch.nn.Parameter(torch.zeros([]))
 
         self.transformer = None
@@ -1018,6 +1026,7 @@ class SynthesisLayer(torch.nn.Module):
                 from_tensor = x,            to_tensor = get_components(y), 
                 from_pos = self.grid_pos,   to_pos = pos if self.use_pos else None,
                 att_vars = att_vars,        att_mask = mask.unsqueeze(1),
+                hw_shape = shape[-2:]
             )
             x = x.permute(0, 2, 1).reshape(shape)
 
@@ -1084,13 +1093,14 @@ class SynthesisBlock(torch.nn.Module):
         self.num_conv, self.num_torgb = 0, 0
 
         if self.stem:
+            self.init_shape = misc.crop_tensor_shape((self.res, self.res), layer_kwargs.get("crop_ratio"))
             if latent_stem:
                 # optional todo: add local noise (to comply with TF version)
-                self.conv_stem = FullyConnectedLayer(self.w_dim, out_channels * self.res * self.res, 
+                self.conv_stem = FullyConnectedLayer(self.w_dim, out_channels * np.prod(self.init_shape), 
                     act = layer_kwargs.get(act, "lrelu"), gain = np.sqrt(2) / 4)                
                 self.num_conv += 1
             else:
-                self.const = torch.nn.Parameter(torch.randn([out_channels, self.res, self.res]))
+                self.const = torch.nn.Parameter(torch.randn([out_channels, *self.init_shape]))
         else:
             self.conv0 = SynthesisLayer(in_channels, out_channels, out_resolution = self.res, up = 2, resample_kernel = resample_kernel, 
                 y_dim = w_dim, style = style, **layer_kwargs)
@@ -1130,7 +1140,7 @@ class SynthesisBlock(torch.nn.Module):
             batch_size = ws.shape[0]
             if self.latent_stem:
                 x = self.conv_stem(get_global(next(w_iter)))
-                x = x.reshape(batch_size, -1, self.res, self.res)
+                x = x.reshape(batch_size, -1, *self.init_shape)
             else:
                 x = self.const.unsqueeze(0).repeat([batch_size, 1, 1, 1])
         else:
@@ -1191,6 +1201,7 @@ class SynthesisNetwork(torch.nn.Module):
         self.img_channels = img_channels
         self.block_resolutions = [2 ** i for i in range(2, int(np.log2(img_resolution)) + 1)]
         channels_num = get_res2channels(channel_base, channel_max)
+        self.num_heads = block_kwargs.get("num_heads", 1)
 
         self.num_ws = 0
         for res in self.block_resolutions:
@@ -1215,15 +1226,15 @@ class SynthesisNetwork(torch.nn.Module):
         maps_out = []
         for att_map in att_list:
             # Reshape attention map into spatial
-            num_heads = att_map.shape[1]
-            s = int(math.sqrt(int(att_map.shape[2])))
-            att_map = att_map.reshape(-1, s, s, self.k - 1).permute(0, 3, 1, 2) # [NCHW]
+            # s = int(math.sqrt(int(att_map.shape[2])))
+            # att_map = att_map.reshape(-1, s, s, self.k - 1).permute(0, 3, 1, 2) # [NCHW]
             # Upsample attention map to final image resolution
             # (since attention map of early generator layers have lower resolutions)
+            s = att_map.shape[-1]
             if s < self.img_res:
                 factor = int(self.img_res / s)
                 att_map = upfirdn2d.upsample2d(att_map, f = nearest_neighbors_kernel(att_map.device, factor), up = factor)
-            att_map = att_map.reshape(-1, num_heads, self.k - 1, self.img_res, self.img_res) # [NhkHW]
+            att_map = att_map.reshape(-1, self.num_heads, self.k - 1, self.img_res, self.img_res) # [NhkHW]
             maps_out.append(att_map)
 
         maps_out = torch.stack(maps_out, dim = 1).permute(0, 3, 1, 2, 4, 5) # [NklhHW]
@@ -1357,12 +1368,12 @@ class DiscriminatorBlock(torch.nn.Module):
     def forward(self, x, img):
         # Input
         if x is not None:
-            torch_misc.assert_shape(x, [None, self.in_channels, self.resolution, self.resolution])
+            # torch_misc.assert_shape(x, [None, self.in_channels, self.resolution, self.resolution])
             x = convert(x)
 
         # FromRGB
         if self.stem or self.architecture == "skip":
-            torch_misc.assert_shape(img, [None, self.img_channels, self.resolution, self.resolution])
+            # torch_misc.assert_shape(img, [None, self.img_channels, self.resolution, self.resolution])
             y = self.fromrgb(convert(img))
             x = x + y if x is not None else y
             img = upfirdn2d.downsample2d(img, self.resample_kernel) if self.architecture == "skip" else None
@@ -1433,12 +1444,11 @@ class DiscriminatorEpilogue(torch.nn.Module):
         self.out = FullyConnectedLayer(in_channels, max(c_dim, 1))
 
     def forward(self, x, img, c):
-        torch_misc.assert_shape(x, [None, self.in_channels, self.resolution, self.resolution]) # [NCHW]
+        # torch_misc.assert_shape(x, [None, self.in_channels, self.resolution, self.resolution]) # [NCHW]
 
         # FromRGB
         x = convert(x)
         if self.architecture == "skip":
-            torch_misc.assert_shape(img, [None, self.img_channels, self.resolution, self.resolution])
             x = x + self.fromrgb(convert(img))
 
         # Main layers
@@ -1461,6 +1471,7 @@ class Discriminator(torch.nn.Module):
         c_dim,                          # Conditioning label (C) dimensionality
         img_resolution,                 # Input resolution
         img_channels,                   # Number of input color channels
+        crop_ratio          = None,     # Crop image features to output ratio during model's computation
         architecture        = "resnet", # Architecture: "orig", "skip", "resnet"
         channel_base        = 32 << 10, # Overall multiplier for the number of channels
         channel_max         = 512,      # Maximum number of channels in any layer
@@ -1472,6 +1483,7 @@ class Discriminator(torch.nn.Module):
         self.c_dim = c_dim
         self.img_resolution = img_resolution
         self.img_channels = img_channels
+        self.crop_ratio = crop_ratio
         self.block_resolutions = [2 ** i for i in range(int(np.log2(img_resolution)), 2, -1)]
         channels_num = get_res2channels(channel_base, channel_max)
 
@@ -1486,6 +1498,10 @@ class Discriminator(torch.nn.Module):
         self.b4 = DiscriminatorEpilogue(channels_num(4), c_dim, resolution = 4, **epilogue_kwargs, **common_kwargs)
 
     def forward(self, img, c, **block_kwargs):
+        img = misc.crop_tensor(img, self.crop_ratio)
+        img_shape = misc.crop_tensor_shape((self.img_resolution, self.img_resolution), self.crop_ratio)
+        torch_misc.assert_shape(img, [None, self.img_channels, *img_shape])
+
         x = None
         for res in self.block_resolutions:
             block = getattr(self, f"b{res}")

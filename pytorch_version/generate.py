@@ -9,8 +9,8 @@ import dnnlib
 import torch
 import loader
 
-import misc
-from misc import crop_max_rectangle as crop
+from training import misc
+from training.misc import crop_max_rectangle as crop
 
 # Generate images using pretrained network pickle.
 def run(model, gpus, output_dir, images_num, truncation_psi, ratio):
@@ -18,7 +18,7 @@ def run(model, gpus, output_dir, images_num, truncation_psi, ratio):
     device = torch.device("cuda")
 
     print("Loading networks...")
-    G = loader.load_network(model)["Gs"].to(device)                       # Load pre-trained network
+    G = loader.load_network(model, eval = True)["Gs"].to(device)          # Load pre-trained network
 
     print("Generate and save images...")
     os.makedirs(output_dir, exist_ok = True)                              # Make output directory

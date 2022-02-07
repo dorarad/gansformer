@@ -27,13 +27,13 @@ def bcolored(txt, color):
 # maxval = 0 turns functionality off.
 def cond_bcolored(num, maxval, color):
     num = num or 0
-    txt = "{:>6.3f}".format(num)
+    txt = f"{num:>6.3f}"
     if maxval > 0 and num > maxval:
         return bcolored(txt, color)
     return txt
 
 def error(txt):
-    print(bcolored("Error: {}".format(txt), "red"))
+    print(bcolored(f"Error: {txt}", "red"))
     exit()
 
 def log(txt, color = None):
@@ -53,14 +53,7 @@ def load_pkl(file_or_url):
     with open_file_or_url(file_or_url) as file:
         return pickle.load(file, encoding = "latin1")
 
-def save_pkl(obj, filename, remove = True):
-    if remove:
-        pattern = "{}-*.pkl".format("-".join(filename.split("-")[:-1]))
-        toRemove = sorted(glob.glob(pattern))[:-5]
-
-        for file in toRemove:
-            os.remove(file)
-
+def save_pkl(obj, filename):
     with open(filename, "wb") as file:
         pickle.dump(obj, file, protocol = pickle.HIGHEST_PROTOCOL)
 
@@ -101,13 +94,22 @@ def float2uint_np(imgs):
 
 # Cut image center (to avoid computing inception score on the padding margins)
 def crop_tensor(imgs, ratio = 1.0): 
-    if ratio == 1.0:
+    if ratio == 1.0 or ratio is None:
         return imgs
-    width = imgs.shape[2]
+    width = imgs.shape.as_list()[-1] if isinstance(imgs, tf.Tensor) else imgs.shape[-1]
+    
     start = int(math.floor(((1 - ratio) * width / 2)))
     end = int(math.ceil((1 + ratio) * width / 2))
-    imgs = imgs[:,start:end + 1]
+    imgs = imgs[...,start:end + 1,:]
     return imgs
+
+def crop_tensor_shape(shape, ratio = 1.0): 
+    if ratio == 1.0 or ratio is None:
+        return shape
+    width = shape[2]
+    start = int(math.floor(((1 - ratio) * width / 2)))
+    end = int(math.ceil((1 + ratio) * width / 2))
+    return (end - start, width)
 
 def pad_tensor(imgs):
     shape = tf.shape(imgs)
@@ -260,12 +262,12 @@ def to_pil(img, drange = [-1,1]):
 
     return img
 
-# Randomly horizontally flip the images in the minibatch BCHW
-def apply_mirror_augment(minibatch):
-    mask = np.random.rand(minibatch.shape[0]) < 0.5
-    minibatch = np.array(minibatch)
-    minibatch[mask] = minibatch[mask, :, :, ::-1]
-    return minibatch
+# Randomly horizontally flip the images in the batch BCHW
+def apply_mirror_augment(batch):
+    mask = np.random.rand(batch.shape[0]) < 0.5
+    batch = np.array(batch)
+    batch[mask] = batch[mask, :, :, ::-1]
+    return batch
 
 # Size and contents of the image snapshot grids that are exported
 # periodically during training
@@ -319,7 +321,7 @@ def setup_snapshot_img_grid(dataset, size = "1080p", layout = "random"):
 
     # Random layout
     if layout == "random":
-        reals[:], labels[:] = dataset.get_minibatch_np(gw * gh)
+        reals[:], labels[:] = dataset.get_batch_np(gw * gh)
 
     # Class-conditional layouts
     class_layouts = dict(row_per_class = [gw, 1], col_per_class = [1, gh], class4x4 = [4, 4])
@@ -329,7 +331,7 @@ def setup_snapshot_img_grid(dataset, size = "1080p", layout = "random"):
         nh = (gh - 1) // bh + 1
         blocks = [[] for _i in range(nw * nh)]
         for _iter in range(1000000):
-            (real, seg), label = dataset.get_minibatch_np(1)
+            (real, seg), label = dataset.get_batch_np(1)
             idx = np.argmax(label[0])
             while idx < len(blocks) and len(blocks[idx]) >= bw * bh:
                 idx += dataset.label_size

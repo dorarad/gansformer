@@ -21,18 +21,18 @@ def bcolored(txt, color):
 # maxval = 0 turns functionality off
 def cond_bcolored(num, maxval, color):
     num = num or 0
-    txt = "{:>6.3f}".format(num)
+    txt = f"{num:>6.3f}"
     if maxval > 0 and num > maxval:
         return bcolored(txt, color)
     return txt
 
 def error(txt):
-    print(bcolored("Error: {}".format(txt), "red"))
+    print(bcolored(f"Error: {txt}", "red"))
     exit()
 
 def log(txt, color = None, log = True):
-	if log:
-	    print(bcolored(txt, color) if color is not None else bold(txt))
+    if log:
+        print(bcolored(txt, color) if color is not None else bold(txt))
 
 # File processing
 # ----------------------------------------------------------------------------
@@ -63,14 +63,22 @@ def save_npys(npys, path, verbose = False, offset = 0):
 # ----------------------------------------------------------------------------
 
 # Cut image center (to avoid computing detector score on the padding margins)
-def crop_nparray(imgs, ratio = 1.0): 
-    if ratio == 1.0:
+def crop_tensor(imgs, ratio = 1.0): 
+    if ratio == 1.0 or ratio is None:
         return imgs
-    width = imgs.shape[-1]
+    width = int(imgs.shape[-1])
     start = int(math.floor(((1 - ratio) * width / 2)))
     end = int(math.ceil((1 + ratio) * width / 2))
-    imgs = imgs[:,:,start:end + 1]
+    imgs = imgs[...,start:end + 1,:]
     return imgs
+
+def crop_tensor_shape(shape, ratio = 1.0): 
+    if ratio == 1.0 or ratio is None:
+        return shape
+    width = int(shape[-1])
+    start = int(math.floor(((1 - ratio) * width / 2)))
+    end = int(math.ceil((1 + ratio) * width / 2))
+    return (end - start, width)
 
 # Pad an image of dimension w,h to the smallest containing square (max(w,h), max(w,h))
 def pad_min_square(img, pad_color = (0, 0, 0)):

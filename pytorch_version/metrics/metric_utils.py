@@ -7,7 +7,7 @@ import uuid
 import numpy as np
 import torch
 import dnnlib
-import misc 
+from training import misc 
 
 class MetricOptions:
     def __init__(self, max_items = None, G = None, dataset_args = {}, num_gpus = 1, rank = 0, 
@@ -196,7 +196,7 @@ def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_l
 
     # Initialize
     stats = FeatureStats(max_items = num_items, **stats_args)
-    progress = opts.progress.sub(tag = "dataset features", num_items = num_items, rel_lo = rel_lo, rel_hi = rel_hi)
+    progress = opts.progress.sub(tag = "Evaluation: computing dataset features", num_items = num_items, rel_lo = rel_lo, rel_hi = rel_hi)
     detector = get_feature_detector(url = detector_url, device = opts.device, num_gpus = opts.num_gpus, rank = opts.rank, verbose = progress.verbose)
 
     # Main loop
@@ -204,7 +204,7 @@ def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_l
     for images, _labels in torch.utils.data.DataLoader(dataset = dataset, sampler = item_subset, batch_size = batch_size, **data_loader_args):
         if images.shape[1] == 1:
             images = images.repeat([1, 3, 1, 1])
-        images = misc.crop_nparray(images, opts.dataset_args.ratio)
+        images = misc.crop_tensor(images, opts.dataset_args.ratio)
         features = detector(images.to(opts.device), **detector_kwargs)
         stats.append_torch(features, num_gpus = opts.num_gpus, rank = opts.rank)
         progress.update(stats.num_items)
@@ -243,7 +243,7 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
     # Initialize 
     stats = FeatureStats(max_items = opts.max_items, **stats_args)
     assert stats.max_items is not None
-    progress = opts.progress.sub(tag = "generator features", num_items = stats.max_items, rel_lo = rel_lo, rel_hi = rel_hi)
+    progress = opts.progress.sub(tag = "Evaluation: computing generator features", num_items = stats.max_items, rel_lo = rel_lo, rel_hi = rel_hi)
     detector = get_feature_detector(url = detector_url, device = opts.device, num_gpus = opts.num_gpus, rank = opts.rank, verbose = progress.verbose)
 
     # Main loop
@@ -256,7 +256,7 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
         images = torch.cat(images)
         if images.shape[1] == 1:
             images = images.repeat([1, 3, 1, 1])
-        images = misc.crop_nparray(images, opts.dataset_args.ratio)            
+        images = misc.crop_tensor(images, opts.dataset_args.ratio)            
         features = detector(images, **detector_kwargs)
         stats.append_torch(features, num_gpus = opts.num_gpus, rank = opts.rank)
         progress.update(stats.num_items)

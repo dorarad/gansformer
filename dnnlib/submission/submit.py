@@ -178,7 +178,7 @@ def _create_run_dir_local(submit_config: SubmitConfig, resume: bool, create_new:
 
     if not resume:
         if os.path.exists(run_dir) and create_new:
-            raise RuntimeError("The run dir already exists! ({0})".format(run_dir))
+            raise RuntimeError(f"The run dir already exists! ({run_dir})")
         if not os.path.exists(run_dir):
             os.makedirs(run_dir)
 
@@ -242,7 +242,7 @@ def run_wrapper(submit_config: SubmitConfig) -> None:
 
     exit_with_errcode = False
     try:
-        print("dnnlib: Running {0}() on {1}...".format(submit_config.run_func_name, submit_config.host_name))
+        print(f"dnnlib: Running {submit_config.run_func_name}() on {submit_config.host_name}...")
         start_time = time.time()
 
         run_func_obj = util.get_obj_by_name(submit_config.run_func_name)
@@ -253,7 +253,7 @@ def run_wrapper(submit_config: SubmitConfig) -> None:
         else:
             run_func_obj(**submit_config.run_func_kwargs)
 
-        print("dnnlib: Finished {0}() in {1}.".format(submit_config.run_func_name, util.format_time(time.time() - start_time)))
+        print(f"dnnlib: Finished {submit_config.run_func_name}() in {util.format_time(time.time() - start_time)}.")
     except:
         if is_local:
             raise
@@ -261,7 +261,7 @@ def run_wrapper(submit_config: SubmitConfig) -> None:
             traceback.print_exc()
 
             log_src = os.path.join(submit_config.run_dir, "log.txt")
-            log_dst = os.path.join(get_path_from_template(submit_config.run_dir_root), "{0}-error.txt".format(submit_config.run_name))
+            log_dst = os.path.join(get_path_from_template(submit_config.run_dir_root), f"{submit_config.run_name}-error.txt")
             shutil.copyfile(log_src, log_dst)
 
             # Defer sys.exit(1) to happen after we close the logs and create a _finished.txt
@@ -318,7 +318,7 @@ def submit_run(submit_config: SubmitConfig, run_func_name: str, create_newdir: b
     #--------------------------------------------------------------------
     host_run_dir = _create_run_dir_local(submit_config, resume, create_new = create_newdir)
 
-    submit_config.task_name = "{}-{:05d}-{}".format(submit_config.user_name, submit_config.run_id, submit_config.run_desc)
+    submit_config.task_name = f"{submit_config.user_name}-{submit_config.run_id:05d}-{submit_config.run_desc}"
     docker_valid_name_regex = "^[a-zA-Z0-9][a-zA-Z0-9_.-]+$"
     if not re.match(docker_valid_name_regex, submit_config.task_name):
         raise RuntimeError("Invalid task name.  Probable reason: unacceptable characters in your submit_config.run_desc.  Task name must be accepted by the following regex: " + docker_valid_name_regex + ", got " + submit_config.task_name)

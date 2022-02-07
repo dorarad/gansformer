@@ -128,19 +128,19 @@ def format_time(seconds: Union[int, float]) -> str:
     s = int(np.rint(seconds))
 
     if s < 60:
-        return "{0}s".format(s)
+        return f"{s}s"
     elif s < 60 * 60:
-        return "{0}m {1:02}s".format(s // 60, s % 60)
+        return f"{s // 60}m {s % 60:02}s"
     elif s < 24 * 60 * 60:
-        return "{0}h {1:02}m {2:02}s".format(s // (60 * 60), (s // 60) % 60, s % 60)
+        return f"{s // (60 * 60)}h {(s // 60) % 60:02}m {s % 60:02}s"
     else:
-        return "{0}d {1:02}h {2:02}m".format(s // (24 * 60 * 60), (s // (60 * 60)) % 24, (s // 60) % 60)
+        return f"{24 * 60 * 60}d {(s // (60 * 60)) % 24:02}h {(s // 60) % 60:02}m"
 
 # Ask the user the question until the user inputs a valid answer
 def ask_yes_no(question: str) -> bool:
     while True:
         try:
-            print("{0} [y/n]".format(question))
+            print(f"{question} [y/n]")
             return strtobool(input().lower())
         except ValueError:
             pass

@@ -1,9 +1,9 @@
 # Training loop:
-# 1. Sets up the environment and data
-# 2. Builds the generator (g) and discriminator (d) networks
-# 3. Manages the training process
-# 4. Runs periodic evaluations on specified metrics
-# 5. Produces sample images over the course of training
+# 1. Set up the environment and data
+# 2. Build the generator (g) and discriminator (d) networks
+# 3. Manage the training process
+# 4. Run periodic evaluations on specified metrics
+# 5. Produce sample images over the course of training
 
 # It supports training over data in TF records as produced by prepare_data.py
 # Labels can optionally be provided although are not essential
@@ -36,12 +36,11 @@ def process_reals(x, drange_data, drange_net, mirror_augment):
             x = tf.where(tf.random_uniform([tf.shape(x)[0]]) < 0.5, x, tf.reverse(x, [3]))
     return x
 
-def read_data(data, name, shape, minibatch_gpu_in):
-    var = tf.Variable(name = name, trainable = False,
-        initial_value = tf.zeros(shape))
-    data_write = tf.concat([data, var[minibatch_gpu_in:]], axis = 0)
+def read_data(data, name, shape, batch_gpu_in):
+    var = tf.Variable(name = name, trainable = False, initial_value = tf.zeros(shape))
+    data_write = tf.concat([data, var[batch_gpu_in:]], axis = 0)
     data_fetch_op = tf.assign(var, data_write)
-    data_read = var[:minibatch_gpu_in]
+    data_read = var[:batch_gpu_in]
     return data_read, data_fetch_op
 
 # Scheduling and optimization
@@ -63,7 +62,7 @@ def training_schedule(
     s.tick_kimg = tick_kimg
     s.resolution = 2 ** dataset.resolution_log2
 
-    for arg in ["G_lrate", "D_lrate", "minibatch_size", "minibatch_gpu"]:
+    for arg in ["G_lrate", "D_lrate", "batch_size", "batch_gpu"]:
         s[arg] = sched_args[arg]
 
     # Learning rate optional rampup
@@ -75,17 +74,17 @@ def training_schedule(
     return s
 
 # Build two optimizers a network cN for the loss and regularization terms
-def set_optimizer(cN, lrate_in, minibatch_multiplier, lazy_regularization = True, clip = None):
+def set_optimizer(cN, lrate_in, batch_multiplier, lazy_regularization = True, clip = None):
     args = dict(cN.opt_args)
-    args["minibatch_multiplier"] = minibatch_multiplier
+    args["batch_multiplier"] = batch_multiplier
     args["learning_rate"] = lrate_in
     if lazy_regularization:
         mb_ratio = cN.reg_interval / (cN.reg_interval + 1)
         args["learning_rate"] *= mb_ratio
         if "beta1" in args: args["beta1"] **= mb_ratio
         if "beta2" in args: args["beta2"] **= mb_ratio
-    cN.opt = tflib.Optimizer(name = "Loss{}".format(cN.name), clip = clip, **args)
-    cN.reg_opt = tflib.Optimizer(name = "Reg{}".format(cN.name), share = cN.opt, clip = clip, **args)
+    cN.opt = tflib.Optimizer(name = f"Loss{cN.name}", clip = clip, **args)
+    cN.reg_opt = tflib.Optimizer(name = f"Reg{cN.name}", share = cN.opt, clip = clip, **args)
 
 # Create optimization operations for computing and optimizing loss, gradient norm and regularization terms
 def set_optimizer_ops(cN, lazy_regularization, no_op):
@@ -131,31 +130,31 @@ def load_nets(resume_pkl, lG, lD, lGs, recompile):
 
 # Training Loop
 # ----------------------------------------------------------------------------
-# 1. Sets up the environment and data
-# 2. Builds the generator (g) and discriminator (d) networks
+# 1. Set up the environment and data
+# 2. Build the generator (g) and discriminator (d) networks
 # 3. Manage the training process
 # 4. Run periodic evaluations on specified metrics
-# 5. Produces sample images over the course of training
+# 5. Produce sample images over the course of training
 
 def training_loop(
     # Configurations
     cG = {}, cD = {},                   # Generator and Discriminator command-line arguments
     dataset_args            = {},       # dataset.load_dataset() options
     sched_args              = {},       # train.TrainingSchedule options
-    vis_args                = {},       # vis.eval options
+    vis_args                = {},       # visualize.vis options
     grid_args               = {},       # train.setup_snapshot_img_grid() options
     metric_arg_list         = [],       # MetricGroup Options
     tf_config               = {},       # tflib.init_tf() options
-    eval                    = False,    # Evaluation mode
     train                   = False,    # Training mode
+    eval                    = False,    # Evaluation mode
+    vis                     = False,    # Visualization mode
     # Data
     data_dir                = None,     # Directory to load datasets from
     total_kimg              = 25000,    # Total length of the training, measured in thousands of real images
     mirror_augment          = False,    # Enable mirror augmentation?
     drange_net              = [-1,1],   # Dynamic range used when feeding image data to the networks
-    ratio                   = 1.0,      # Image height/width ratio in the dataset
     # Optimization
-    minibatch_repeats       = 4,        # Number of minibatches to run before adjusting training parameters
+    batch_repeats           = 4,        # Number of batches to run before adjusting training parameters
     lazy_regularization     = True,     # Perform regularization as a separate training step?
     smoothing_kimg          = 10.0,     # Half-life of the running average of generator weights
     clip                    = None,     # Clip gradients threshold
@@ -173,9 +172,7 @@ def training_loop(
     network_snapshot_ticks  = 3,        # How often to save network snapshots? None = only save networks-final.pkl
     last_snapshots          = 10,       # Maximal number of prior snapshots to save
     eval_images_num         = 50000,    # Sample size for the metrics
-    printname               = "",       # Experiment name for logging
-    # Architecture
-    merge                   = False):   # Generate several images and then merge them
+    printname               = ""):       # Experiment name for logging
 
     # Initialize dnnlib and TensorFlow
     tflib.init_tf(tf_config)
@@ -213,18 +210,17 @@ def training_loop(
     if eval:
         # Save a snapshot of the current network to evaluate
         pkl = dnnlib.make_run_dir_path("network-eval-snapshot-%06d.pkl" % resume_kimg)
-        misc.save_pkl((G, D, Gs), pkl, remove = False)
+        misc.save_pkl((G, D, Gs), pkl)
 
-        # Quantitative evaluation
         misc.log("Run evaluation...")
         metric = metrics.run(pkl, num_imgs = eval_images_num, run_dir = dnnlib.make_run_dir_path(),
-            data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = ratio, 
+            data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = dataset.ratio, 
             tf_config = tf_config, eval_mod = True, mirror_augment = mirror_augment)  
 
-        # Qualitative evaluation
+    if vis:
         misc.log("Produce visualizations...")
-        visualize.eval(Gs, dataset, batch_size = sched.minibatch_gpu,
-            drange_net = drange_net, ratio = ratio, **vis_args)
+        visualize.vis(Gs, dataset, batch_size = sched.batch_gpu,
+            drange_net = drange_net, ratio = dataset.ratio, **vis_args)
 
     if not train:
         dataset.close()
@@ -236,15 +232,15 @@ def training_loop(
         lrate_in_g           = tf.placeholder(tf.float32, name = "lrate_in_g", shape = [])
         lrate_in_d           = tf.placeholder(tf.float32, name = "lrate_in_d", shape = [])
         step                 = tf.placeholder(tf.int32, name = "step", shape = [])
-        minibatch_size_in    = tf.placeholder(tf.int32, name = "minibatch_size_in", shape=[])
-        minibatch_gpu_in     = tf.placeholder(tf.int32, name = "minibatch_gpu_in", shape=[])
-        minibatch_multiplier = minibatch_size_in // (minibatch_gpu_in * num_gpus)
-        beta                 = 0.5 ** tf.div(tf.cast(minibatch_size_in, tf.float32), 
+        batch_size_in        = tf.placeholder(tf.int32, name = "batch_size_in", shape=[])
+        batch_gpu_in         = tf.placeholder(tf.int32, name = "batch_gpu_in", shape=[])
+        batch_multiplier     = batch_size_in // (batch_gpu_in * num_gpus)
+        beta                 = 0.5 ** tf.div(tf.cast(batch_size_in, tf.float32), 
                                 smoothing_kimg * 1000.0) if smoothing_kimg > 0.0 else 0.0
 
     # Set optimizers
     for cN, lr in [(cG, lrate_in_g), (cD, lrate_in_d)]:
-        set_optimizer(cN, lr, minibatch_multiplier, lazy_regularization, clip)
+        set_optimizer(cN, lr, batch_multiplier, lazy_regularization, clip)
 
     # Build training graph for each GPU
     data_fetch_ops = []
@@ -258,22 +254,22 @@ def training_loop(
 
             # Fetch training data via temporary variables
             with tf.name_scope("DataFetch"):
-                reals, labels = dataset.get_minibatch_tf()
+                reals, labels = dataset.get_batch_tf()
                 reals = process_reals(reals, dataset.dynamic_range, drange_net, mirror_augment)
                 reals, reals_fetch = read_data(reals, "reals",
-                    [sched.minibatch_gpu] + dataset.shape, minibatch_gpu_in)
+                    [sched.batch_gpu] + dataset.shape, batch_gpu_in)
                 labels, labels_fetch = read_data(labels, "labels",
-                    [sched.minibatch_gpu, dataset.label_size], minibatch_gpu_in)
+                    [sched.batch_gpu, dataset.label_size], batch_gpu_in)
                 data_fetch_ops += [reals_fetch, labels_fetch]
 
             # Evaluate loss functions
             with tf.name_scope("G_loss"):
                 cG.loss, cG.reg = dnnlib.util.call_func_by_name(G = cG.gpu, D = cD.gpu, dataset = dataset,
-                    reals = reals, minibatch_size = minibatch_gpu_in, **cG.loss_args)
+                    reals = reals, batch_size = batch_gpu_in, **cG.loss_args)
 
             with tf.name_scope("D_loss"):
                 cD.loss, cD.reg = dnnlib.util.call_func_by_name(G = cG.gpu, D = cD.gpu, dataset = dataset,
-                    reals = reals, labels = labels, minibatch_size = minibatch_gpu_in, **cD.loss_args)
+                    reals = reals, labels = labels, batch_size = batch_gpu_in, **cD.loss_args)
 
             for cN in [cG, cD]:
                 set_optimizer_ops(cN, lazy_regularization, no_op)
@@ -321,24 +317,24 @@ def training_loop(
 
         # Choose training parameters and configure training ops
         sched = training_schedule(sched_args, cur_nimg = cur_nimg, dataset = dataset)
-        assert sched.minibatch_size % (sched.minibatch_gpu * num_gpus) == 0
-        dataset.configure(sched.minibatch_gpu)
+        assert sched.batch_size % (sched.batch_gpu * num_gpus) == 0
+        dataset.configure(sched.batch_gpu)
 
         # Run training ops
         feed_dict = {
             lrate_in_g: sched.G_lrate,
             lrate_in_d: sched.D_lrate,
-            minibatch_size_in: sched.minibatch_size,
-            minibatch_gpu_in: sched.minibatch_gpu,
+            batch_size_in: sched.batch_size,
+            batch_gpu_in: sched.batch_gpu,
             step: sched.kimg
         }
 
         # Several iterations before updating training parameters
-        for _repeat in range(minibatch_repeats):
-            rounds = range(0, sched.minibatch_size, sched.minibatch_gpu * num_gpus)
+        for _repeat in range(batch_repeats):
+            rounds = range(0, sched.batch_size, sched.batch_gpu * num_gpus)
             for cN in [cG, cD]:
                 cN.run_reg = lazy_regularization and (running_mb_counter % cN.reg_interval == 0)
-            cur_nimg += sched.minibatch_size
+            cur_nimg += sched.batch_size
             running_mb_counter += 1
 
             for cN in [cG, cD]:
@@ -376,36 +372,36 @@ def training_loop(
             print(("tick %s kimg %s   loss/reg: G (%s %s) D (%s %s)   grad norms: G (%s %s) D (%s %s)   " + 
                    "time %s sec/kimg %s maxGPU %sGB %s") % (
                 misc.bold("%-5d" % autosummary("Progress/tick", cur_tick)),
-                misc.bcolored("{:>8.1f}".format(autosummary("Progress/kimg", cur_nimg / 1000.0)), "red"),
-                misc.bcolored("{:>6.3f}".format(cG.lossvals_agg["loss"] or 0), "blue"),
-                misc.bold( "{:>6.3f}".format(cG.lossvals_agg["reg"] or 0)),
-                misc.bcolored("{:>6.3f}".format(cD.lossvals_agg["loss"] or 0), "blue"),
-                misc.bold("{:>6.3f}".format(cD.lossvals_agg["reg"] or 0)),
+                misc.bcolored(f"{autosummary('Progress/kimg', cur_nimg / 1000.0):>8.1f}", "red"),
+                misc.bcolored(f"{(cG.lossvals_agg['loss'] or 0):>6.3f}", "blue"),
+                misc.bold(f"{(cG.lossvals_agg['reg'] or 0):>6.3f}"),
+                misc.bcolored(f"{(cD.lossvals_agg['loss'] or 0):>6.3f}", "blue"),
+                misc.bold(f"{(cD.lossvals_agg['reg'] or 0):>6.3f}"),
                 misc.cond_bcolored(cG.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cG.lossvals_agg["reg_norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["norm"], 20.0, "red"),
                 misc.cond_bcolored(cD.lossvals_agg["reg_norm"], 20.0, "red"),
                 misc.bold("%-10s" % dnnlib.util.format_time(autosummary("Timing/total_sec", total_time))),
-                "{:>7.2f}".format(autosummary("Timing/sec_per_kimg", tick_time / tick_kimg)),
-                "{:>4.1f}".format(autosummary("Resources/peak_gpu_mem_gb", peak_gpu_mem_op.eval() / 2**30)),
-                printname))
+                f"{autosummary('Timing/sec_per_kimg', tick_time / tick_kimg):>7.2f}",
+                f"{autosummary('Resources/peak_gpu_mem_gb', peak_gpu_mem_op.eval() / 2**30):>4.1f}",
+                misc.bold(printname)))
 
             autosummary("Timing/total_hours", total_time / (60.0 * 60.0))
             autosummary("Timing/total_days", total_time / (24.0 * 60.0 * 60.0))
 
             # Save snapshots
             if img_snapshot_ticks is not None and (cur_tick % img_snapshot_ticks == 0 or done):
-                visualize.eval(Gs, dataset, batch_size = sched.minibatch_gpu, training = True,
+                visualize.vis(Gs, dataset, batch_size = sched.batch_gpu, training = True,
                     step = cur_nimg // 1000, grid_size = grid_size, latents = grid_latents, 
-                    labels = grid_labels, drange_net = drange_net, ratio = ratio, **vis_args)
+                    labels = grid_labels, drange_net = drange_net, ratio = dataset.ratio, **vis_args)
 
             if network_snapshot_ticks is not None and (cur_tick % network_snapshot_ticks == 0 or done):
                 pkl = dnnlib.make_run_dir_path("network-snapshot-%06d.pkl" % (cur_nimg // 1000))
-                misc.save_pkl((G, D, Gs), pkl, remove = False)
+                misc.save_pkl((G, D, Gs), pkl)
 
                 if cur_tick % network_snapshot_ticks == 0 or done:
                     metric = metrics.run(pkl, num_imgs = eval_images_num, run_dir = dnnlib.make_run_dir_path(),
-                        data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = ratio, 
+                        data_dir = dnnlib.convert_path(data_dir), num_gpus = num_gpus, ratio = dataset.ratio, 
                         tf_config = tf_config, mirror_augment = mirror_augment)
 
                 if last_snapshots > 0:
@@ -420,7 +416,7 @@ def training_loop(
             maintenance_time = dnnlib.RunContext.get().get_last_update_interval() - tick_time
 
     # Save final snapshot
-    misc.save_pkl((G, D, Gs), dnnlib.make_run_dir_path("network-final.pkl"), remove = False)
+    misc.save_pkl((G, D, Gs), dnnlib.make_run_dir_path("network-final.pkl"))
 
     # All done
     if summarize:

@@ -14,9 +14,10 @@ python loader.py --source=checkpoint-tf.pkl --dest=checkpoint.pkl
 
 ### Command-line Options
 Compared to the TF version, we removed several options that didn't contribute empirically to performance:
-```
+```python
 --tanh: to add tanh on the generator output
 --d-reg: discriminator regularization type: non, gp, r1, r2, (In pytorch we use only r1 -- the default TF regularization)
+--fused-modconv: Fuse modulation and convolution operations (In pytorch we set this automatically to be disabled in training and enabled during evaluation, for best performance)
 ```
 
 ### Command-line Options

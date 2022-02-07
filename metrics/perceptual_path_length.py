@@ -7,7 +7,7 @@ from metrics import metric_base
 from training import misc
 
 class PPL(metric_base.MetricBase):
-    def __init__(self, num_samples, epsilon, space, sampling, crop, minibatch_per_gpu, Gs_overrides, **kwargs):
+    def __init__(self, num_samples, epsilon, space, sampling, crop, batch_per_gpu, Gs_overrides, **kwargs):
         assert space in ["z", "w"]
         assert sampling in ["full", "end"]
         super().__init__(**kwargs)
@@ -16,13 +16,13 @@ class PPL(metric_base.MetricBase):
         self.space = space
         self.sampling = sampling
         self.crop = crop
-        self.minibatch_per_gpu = minibatch_per_gpu
+        self.batch_per_gpu = batch_per_gpu
         self.Gs_overrides = Gs_overrides
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, **kwargs):
         Gs_kwargs = dict(Gs_kwargs)
         Gs_kwargs.update(self.Gs_overrides)
-        minibatch_size = num_gpus * self.minibatch_per_gpu
+        batch_size = num_gpus * self.batch_per_gpu
 
         # Construct TensorFlow graph
         distance_expr = []
@@ -32,9 +32,9 @@ class PPL(metric_base.MetricBase):
                 noise_vars = [var for name, var in Gs_clone.components.synthesis.vars.items() if name.startswith("noise")]
 
                 # Generate random latents and interpolation t-values
-                lat_t01 = tf.random_normal([self.minibatch_per_gpu * 2] + Gs_clone.input_shape[1:])
-                lerp_t = tf.random_uniform([self.minibatch_per_gpu], 0.0, 1.0 if self.sampling == "full" else 0.0)
-                labels = tf.reshape(tf.tile(self._get_random_labels_tf(self.minibatch_per_gpu), [1, 2]), [self.minibatch_per_gpu * 2, -1])
+                lat_t01 = tf.random_normal([self.batch_per_gpu * 2] + Gs_clone.input_shape[1:])
+                lerp_t = tf.random_uniform([self.batch_per_gpu], 0.0, 1.0 if self.sampling == "full" else 0.0)
+                labels = tf.reshape(tf.tile(self._get_random_labels_tf(self.batch_per_gpu), [1, 2]), [self.batch_per_gpu * 2, -1])
 
                 # Interpolate in W or Z
                 if self.space == "w":
@@ -52,8 +52,8 @@ class PPL(metric_base.MetricBase):
                     dlat_e01 = Gs_clone.get_output_for(latents, labels, **Gs_kwargs, return_dlatents = True)[-1]
 
                 # Synthesize images
-                with tf.control_dependencies([var.initializer for var in noise_vars]): # use same noise inputs for the entire minibatch
-                    imgs = Gs_clone.get_output_for(dlat_e01, labels, randomize_noise = False, **Gs_kwargs, take_dlatents = True)[0]
+                with tf.control_dependencies([var.initializer for var in noise_vars]): # use same noise inputs for the entire batch
+                    imgs = Gs_clone.get_output_for(dlat_e01, labels, noise_mode = "const", **Gs_kwargs, take_dlatents = True)[0]
                     imgs = tf.cast(imgs, tf.float32)
 
                 # Crop only the face region
@@ -77,7 +77,7 @@ class PPL(metric_base.MetricBase):
 
         # Sampling loop
         all_distances = []
-        for begin in range(0, self.num_samples, minibatch_size):
+        for begin in range(0, self.num_samples, batch_size):
             self._report_progress(begin, self.num_samples)
             all_distances += tflib.run(distance_expr)
         all_distances = np.concatenate(all_distances, axis = 0)

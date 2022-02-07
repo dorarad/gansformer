@@ -27,21 +27,20 @@ def cset(dicts, name, prop):
 
 # Conditional set: if dict[name] is not populated from the command line, then assign dict[name] := prop
 def nset(args, name, prop):
-    flag = "--{}".format(name.replace("_", "-"))
+    flag = f"--{name.replace('_', '-')}"
     if flag not in sys.argv:
         args[name] = prop
-
-# Conditional set: if dict[name] has its default value, then assign dict[name] := prop
-def dset(d, name, prop, default):
-    if d[name] == default:
-        d[name] = prop
 
 # Set network (generator or discriminator): model, loss and optimizer
 def set_net(net, reg_interval):
     ret = EasyDict()
-    ret.args  = EasyDict(func_name = "training.network.{}_GANformer".format(net[0])) # network options
-    ret.loss_args = EasyDict(func_name = "training.loss.{}_loss".format(net[0]))      # loss options
-    ret.opt_args  = EasyDict(beta1 = 0.0, beta2 = 0.99, epsilon = 1e-8)               # optimizer options
+    net2name = {
+        "D": "Discriminator", 
+        "G": "Generator"
+    }
+    ret.args  = EasyDict(func_name = f"training.networks.{net2name[net]}")       # network options
+    ret.loss_args = EasyDict(func_name = f"training.loss.{net}_loss")            # loss options
+    ret.opt_args  = EasyDict(beta1 = 0.0, beta2 = 0.99, epsilon = 1e-8)          # optimizer options
     ret.reg_interval = reg_interval
     return ret
 
@@ -53,13 +52,8 @@ def run(**args):
     grid      = EasyDict(size = "1080p", layout = "random")                      # setup_snapshot_img_grid() options
     sc        = dnnlib.SubmitConfig()                                            # dnnlib.submit_run() options
 
-    # If the flag is specified without arguments (--arg), set to True
-    for arg in ["summarize", "keep_samples", "style", "fused_modconv", "local_noise"]:
-        if args[arg] is None:
-            args[arg] = True
-
-    if not args.train and not args.eval:
-        misc.log("Warning: Neither --train nor --eval are provided. Therefore, we only print network shapes", "red")
+    # GANformer and baselines default settings
+    # ----------------------------------------------------------------------------
 
     if args.ganformer_default:
         task = args.dataset
@@ -104,6 +98,14 @@ def run(**args):
         nset(args, "merge_type", "softmax")
         nset(args, "components_num", 8)
 
+    # General setup
+    # ----------------------------------------------------------------------------
+
+    # If the flag is specified without arguments (--arg), set to True
+    for arg in ["summarize", "keep_samples", "style", "fused_modconv", "local_noise"]:
+        if args[arg] is None:
+            args[arg] = True
+
     # Environment configuration
     tf_config = {
         "rnd.np_random_seed": 1000,
@@ -116,11 +118,13 @@ def run(**args):
     assert num_gpus in [1, 2, 4, 8]
     sc.num_gpus = num_gpus
 
-    # Networks configuration
-    cG = set_net("G", reg_interval = 4)
-    cD = set_net("D", reg_interval = 16)
+    # Data setup
+    # ----------------------------------------------------------------------------
 
     # Dataset configuration
+    if not os.path.exists(f"{args.data_dir}/{args.dataset}"):
+        misc.error(f"The dataset {args.data_dir}/{args.dataset} directory does not exist")
+
     # For bedrooms, we choose the most common ratio in the 
     # dataset and crop the other images into that ratio.
     ratios = {
@@ -129,48 +133,72 @@ def run(**args):
         "cityscapes": 0.5,
         "ffhq": 1.0
     }
-    args.ratio = ratios.get(args.dataset, args.ratio)
-    dataset_args = EasyDict(tfrecord_dir = args.dataset, max_imgs = args.train_images_num, 
-        num_threads = args.num_threads, resolution = args.resolution)
-    for arg in ["data_dir", "mirror_augment", "total_kimg", "ratio"]:
+    args.ratio = args.ratio or ratios.get(args.dataset, 1.0)
+    args.crop_ratio = 0.5 if args.resolution > 256 and args.ratio <= 0.5 else None
+
+    dataset_args = EasyDict(
+        tfrecord_dir = args.dataset, 
+        max_imgs     = args.train_images_num, 
+        num_threads  = args.num_threads, 
+        resolution   = args.resolution,
+        crop_ratio   = args.crop_ratio, 
+        ratio        = args.ratio
+    )
+    for arg in ["data_dir", "mirror_augment", "total_kimg"]:
         cset(train, arg, args[arg])
+
+    # Optimization setup
+    # ----------------------------------------------------------------------------
+
+    # Networks configuration
+    cG = set_net("G", reg_interval = 4)
+    cD = set_net("D", reg_interval = 16)
+    cset([cG, cD], "crop_ratio", args.crop_ratio)
 
     # Training and Optimizations configuration
-    for arg in ["eval", "train", "recompile", "last_snapshots"]:
+    if not any([args.train, args.eval, args.vis]):
+        misc.log("Warning: None of --train, --eval or --vis are provided. Therefore, we only print network shapes", "red")
+
+    for arg in ["train", "eval", "vis", "recompile", "last_snapshots"]:
         cset(train, arg, args[arg])
 
-    # Round to the closest multiply of minibatch size for validity
-    args.batch_size -= args.batch_size % args.minibatch_size
-    args.minibatch_std_size -= args.minibatch_std_size % args.minibatch_size
-    args.latent_size -= args.latent_size % args.components_num
-    if args.latent_size == 0:
-        misc.error("--latent-size is too small. Must best a multiply of components-num")
+    if args.batch_size % (args.batch_gpu * num_gpus) != 0:
+        misc.error("--batch-size should be divided by --batch-gpu * 'num_gpus'")
+
+    if args.latent_size % args.components_num != 0:
+        misc.error(f"--latent-size ({args.latent_size}) should be divisible by --components-num (k={k})")
 
     sched_args = {
         "G_lrate": "g_lr",
         "D_lrate": "d_lr",
-        "minibatch_size": "batch_size",
-        "minibatch_gpu": "minibatch_size"
+        "batch_size": "batch_size",
+        "batch_gpu": "batch_gpu"
     }
     for arg, cmd_arg in sched_args.items():
         cset(sched, arg, args[cmd_arg])
     cset(train, "clip", args.clip)
 
+    # Evaluation and visualization
+    # ----------------------------------------------------------------------------
+
     # Logging and metrics configuration
+    for metric in args.metrics:
+        if metric not in metric_defaults:
+            misc.error(f"Unknown metric: {metric}")
     metrics = [metric_defaults[x] for x in args.metrics]
 
+    for arg in ["summarize", "eval_images_num"]:
+        cset(train, arg, args[arg])
     cset(cG.args, "truncation_psi", args.truncation_psi)
     for arg in ["keep_samples", "num_heads"]:
         cset(vis, arg, args[arg])
-    for arg in ["summarize", "eval_images_num"]:
-        cset(train, arg, args[arg])
 
     # Visualization
     args.vis_imgs = args.vis_images
     args.vis_ltnts = args.vis_latents
     vis_types = ["imgs", "ltnts", "maps", "layer_maps", "interpolations", "noise_var", "style_mix"]
     # Set of all the set visualization types option
-    vis.vis_types = {arg for arg in vis_types if args["vis_{}".format(arg)]}
+    vis.vis_types = {arg for arg in vis_types if args[f"vis_{arg}"]}
 
     vis_args = {
         "attention": "transformer",
@@ -185,6 +213,9 @@ def run(**args):
     for arg, cmd_arg in vis_args.items():
         cset(vis, arg, args[cmd_arg])
 
+    # Networks setup
+    # ----------------------------------------------------------------------------
+
     # Networks architecture
     cset(cG.args, "architecture", args.g_arch)
     cset(cD.args, "architecture", args.d_arch)
@@ -197,18 +228,18 @@ def run(**args):
                 "Either add --transformer for GANformer or --kgan for k-GAN.")
 
         args.latent_size = int(args.latent_size / args.components_num)
-    cD.args.latent_size = cG.args.latent_size = cG.args.dlatent_size = args.latent_size
+    cD.args.a_dim = cG.args.z_dim = cG.args.w_dim = args.latent_size
     cset([cG.args, cD.args, vis], "components_num", args.components_num)
 
     # Mapping network
     for arg in ["layersnum", "lrmul", "dim", "resnet", "shared_dim"]:
-        field = "mapping_{}".format(arg)
+        field = f"mapping_{arg}"
         cset(cG.args, field, args[field])
 
     # StyleGAN settings
     for arg in ["style", "latent_stem", "fused_modconv", "local_noise"]:
         cset(cG.args, arg, args[arg])
-    cD.args.mbstd_group_size = args.minibatch_std_size
+    cD.args.mbstd_group_size = min(args.batch_size, 4)
 
     # GANformer
     cset(cG.args, "transformer", args.transformer)
@@ -223,23 +254,23 @@ def run(**args):
         cset([cG.args, cD.args], arg, args[arg])
 
     # Positional encoding
-    for arg in ["dim", "init", "directions_num"]:
-        field = "pos_{}".format(arg)
+    for arg in ["dim", "type", "init", "directions_num"]:
+        field = f"pos_{arg}"
         cset([cG.args, cD.args], field, args[field])
 
     # k-GAN
     for arg in ["layer", "type", "same"]:
-        field = "merge_{}".format(arg)
+        field = f"merge_{arg}"
         cset(cG.args, field, args[field])
-    cset([cG.args, train], "merge", args.kgan)
+    cset(cG.args, "merge", args.kgan)
 
     if args.kgan and args.transformer:
         misc.error("Either have --transformer for GANformer or --kgan for k-GAN, not both")
 
     # Attention
     for arg in ["start_res", "end_res", "ltnt2ltnt", "img2img"]: # , "local_attention"
-        cset(cG.args, arg, args["g_{}".format(arg)])
-        cset(cD.args, arg, args["d_{}".format(arg)])
+        cset(cG.args, arg, args[f"g_{arg}"])
+        cset(cD.args, arg, args[f"d_{arg}"])
     cset(cG.args, "img2ltnt", args.g_img2ltnt)
     # cset(cD.args, "ltnt2img", args.d_ltnt2img)
 
@@ -251,7 +282,7 @@ def run(**args):
     gloss_args = {
         "loss_type": "g_loss",
         "reg_weight": "g_reg_weight",
-        # "pathreg": "pathreg",
+        # "pathreg": "pathreg"
     }
     dloss_args = {
         "loss_type": "d_loss",
@@ -263,6 +294,9 @@ def run(**args):
     for arg, cmd_arg in dloss_args.items():
         cset(cD.loss_args, arg, args[cmd_arg])
 
+    # Setup and launching
+    # ----------------------------------------------------------------------------
+
     ##### Experiments management:
     # Whenever we start a new experiment we store its result in a directory named 'args.expname:000'.
     # When we rerun a training or evaluation command it restores the model from that directory by default.
@@ -270,7 +304,7 @@ def run(**args):
     # directory: 'args.expname:001' after the first restart, then 'args.expname:002' after the second, etc.
 
     # Find the latest directory that matches the experiment
-    exp_dir = sorted(glob.glob("{}/{}-*".format(args.result_dir, args.expname)))
+    exp_dir = sorted(glob.glob(f"{args.result_dir}/{args.expname}-*"))
     run_id = 0
     if len(exp_dir) > 0:
         run_id = int(exp_dir[-1].split("-")[-1])
@@ -278,11 +312,11 @@ def run(**args):
     if args.restart:
         run_id += 1
 
-    run_name = "{}-{:03d}".format(args.expname, run_id)
-    train.printname = "{} ".format(misc.bold(args.expname))
+    run_name = f"{args.expname}-{run_id:03d}"
+    train.printname = f"{misc.bold(args.expname)} "
 
     snapshot, kimg, resume = None, 0, False
-    pkls = sorted(glob.glob("{}/{}/network*.pkl".format(args.result_dir, run_name)))
+    pkls = sorted(glob.glob(f"{args.result_dir}/{run_name}/network*.pkl"))
     # Load a particular snapshot is specified
     if args.pretrained_pkl is not None and args.pretrained_pkl != "None":
         # Soft links support
@@ -309,7 +343,7 @@ def run(**args):
         resume = True
 
     if snapshot:
-        misc.log("Resuming {}, from {}, kimg {}".format(run_name, snapshot, kimg), "white")
+        misc.log(f"Resuming {run_name}, from {snapshot}, kimg {kimg}", "white")
         train.resume_pkl = snapshot
         train.resume_kimg = kimg
     else:
@@ -356,12 +390,13 @@ def main():
     # Framework
     # ------------------------------------------------------------------------------------------------------
     parser.add_argument("--expname",            help = "Experiment name", default = "exp", type = str)
-    parser.add_argument("--eval",               help = "Evaluation mode (default: False)", default = None, action = "store_true")
     parser.add_argument("--train",              help = "Train mode (default: False)", default = None, action = "store_true")
+    parser.add_argument("--eval",               help = "Evaluation mode (default: False)", default = None, action = "store_true")
+    parser.add_argument("--vis",                help = "Visualization mode (default: False)", default = None, action = "store_true")
     parser.add_argument("--gpus",               help = "Comma-separated list of GPUs to be used (default: %(default)s)", default = "0", type = str)
 
     ## Default configurations
-    parser.add_argument("--ganformer-default", help = "Select a default GANformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
+    parser.add_argument("--ganformer-default",  help = "Select a default GANformer configuration, either pretrained (default) or from scratch (with --pretrained-pkl None)", default = None, action = "store_true")
     parser.add_argument("--baseline",           help = "Use a baseline model configuration", default = None, choices = ["GAN", "StyleGAN2", "kGAN", "SAGAN"], type = str)
 
     ## Resumption
@@ -376,7 +411,7 @@ def main():
     ## Dataset
     parser.add_argument("--data-dir",           help = "Datasets root directory (default: %(default)s)", default = "datasets", metavar = "DIR")
     parser.add_argument("--dataset",            help = "Training dataset name (subdirectory of data-dir)", required = True)
-    parser.add_argument("--ratio",              help = "Image height/width ratio in the dataset", default = 1.0, type = float)
+    parser.add_argument("--ratio",              help = "Image height/width ratio in the dataset", default = None, type = float)
     parser.add_argument("--resolution",         help = "Training resolution", default = 256, type = int)
     parser.add_argument("--num-threads",        help = "Number of input processing threads (default: %(default)s)", default = 4, type = int)
     parser.add_argument("--mirror-augment",     help = "Perform horizontal flip augmentation for the data (default: %(default)s)", default = None, action = "store_true")
@@ -384,7 +419,7 @@ def main():
 
     ## Training
     parser.add_argument("--batch-size",         help = "Global batch size (optimization step) (default: %(default)s)", default = 32, type = int)
-    parser.add_argument("--minibatch-size",     help = "Batch size per GPU, gradients will be accumulated to match batch-size (default: %(default)s)", default = 4, type = int)
+    parser.add_argument("--batch-gpu",          help = "Batch size per GPU, gradients will be accumulated to match batch-size (default: %(default)s)", default = 4, type = int)
     parser.add_argument("--total-kimg",         help = "Training length in thousands of images (default: %(default)s)", metavar = "KIMG", default = 25000, type = int)
     parser.add_argument("--gamma",              help = "R1 regularization weight (default: %(default)s)", default = 10, type = float)
     parser.add_argument("--clip",               help = "Gradient clipping threshold (optional)", default = None, type = float)
@@ -396,7 +431,7 @@ def main():
     parser.add_argument("--metrics",            help = "Comma-separated list of metrics or none (default: %(default)s)", default = "fid", type = _parse_comma_sep)
     parser.add_argument("--summarize",          help = "Create TensorBoard summaries (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--truncation-psi",     help = "Truncation Psi to be used in producing sample images " +
-                                                       "(used only for visualizations, _not used_ in training or for computing metrics) (default: %(default)s)", default = 0.65, type = float)
+                                                       "(used only for visualizations, _not used_ in training or for computing metrics) (default: %(default)s)", default = 0.75, type = float)
     parser.add_argument("--keep-samples",       help = "Keep all prior samples during training, or if False, just the most recent ones (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--eval-images-num",    help = "Number of images to evaluate metrics on (default: 50,000)", default = None, type = int)
 
@@ -409,12 +444,12 @@ def main():
     parser.add_argument("--vis-noise-var",      help = "Create noise variation visualization", default = None, action = "store_true")
     parser.add_argument("--vis-style-mix",      help = "Create style mixing visualization", default = None, action = "store_true")
 
-    parser.add_argument("--vis-grid",                    help = "Whether to save the samples in one large grid files (default: True in training)", default = None, action = "store_true")
-    parser.add_argument("--vis-num",                     help = "Number of images for which visualization will be created (default: grid-size/100 in train/eval)", default = None, type = int)
-    parser.add_argument("--vis-rich-num",                help = "Number of samples for which richer visualizations will be created (default: 5)", default = None, type = int)
-    parser.add_argument("--vis-section-size",            help = "Visualization section size to process at one (section-size <= vis-num) for memory footprint (default: 100)", default = None, type = int)
-    parser.add_argument("--blending-alpha",              help = "Proportion for generated images and attention maps blends (default: 0.3)", default = None, type = float)
-    parser.add_argument("--interpolation-density",       help = "Number of samples in between two end points of an interpolation (default: 8)", default = None, type = int)
+    parser.add_argument("--vis-grid",               help = "Whether to save the samples in one large grid files (default: True in training)", default = None, action = "store_true")
+    parser.add_argument("--vis-num",                help = "Number of images for which visualization will be created (default: grid-size/100 in train/eval)", default = None, type = int)
+    parser.add_argument("--vis-rich-num",           help = "Number of samples for which richer visualizations will be created (default: 5)", default = None, type = int)
+    parser.add_argument("--vis-section-size",       help = "Visualization section size to process at one (section-size <= vis-num) for memory footprint (default: 100)", default = None, type = int)
+    parser.add_argument("--blending-alpha",         help = "Proportion for generated images and attention maps blends (default: 0.3)", default = None, type = float)
+    parser.add_argument("--interpolation-density",  help = "Number of samples in between two end points of an interpolation (default: 8)", default = None, type = int)
     # parser.add_argument("--interpolation-per-component", help = "Whether to perform interpolation along particular latent components when true, or all of them at once otherwise (default: False)", default = None, action = "store_true")
 
     # Model
@@ -433,7 +468,7 @@ def main():
     parser.add_argument("--mapping-shared-dim", help = "Perform one shared mapping to all latent components concatenated together using the set dimension (default: disabled)", default = None, type = int)
 
     # Loss
-    # parser.add_argument("--pathreg",            help = "Use path regularization in generator training (default: False)", default = None, action = "store_true")
+    # parser.add_argument("--pathreg",          help = "Use path regularization in generator training (default: False)", default = None, action = "store_true")
     parser.add_argument("--g-loss",             help = "Generator loss type (default: %(default)s)", default = "logistic_ns", choices = ["logistic", "logistic_ns", "hinge", "wgan"], type = str)
     parser.add_argument("--g-reg-weight",       help = "Generator regularization weight (default: %(default)s)", default = 1.0, type = float)
 
@@ -453,7 +488,6 @@ def main():
     parser.add_argument("--latent-stem",        help = "Input latent through the generator stem grid (default: False)", default = None, action = "store_true")
     parser.add_argument("--fused-modconv",      help = "Fuse modulation and convolution operations (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
     parser.add_argument("--local-noise",        help = "Add stochastic local noise each layer (default: %(default)s)", default = True, metavar = "BOOL", type = _str_to_bool, nargs = "?")
-    parser.add_argument("--minibatch-std-size", help = "Add minibatch standard deviation layer in the discriminator, 0 to disable (default: %(default)s)", default = 4, type = int)
 
     ## GANformer
     parser.add_argument("--transformer",        help = "Add transformer layers to the generator: top-down latents-to-image (default: False)", default = None, action = "store_true")
@@ -515,16 +549,6 @@ def main():
     parser.add_argument("--merge-same",         help = "Merge images with same alpha weights across all spatial positions (default: %(default)s)", default = None, action = "store_true")
 
     args = parser.parse_args()
-
-    if not os.path.exists(args.data_dir):
-        misc.error("Dataset root directory does not exist")
-
-    if not os.path.exists("{}/{}".format(args.data_dir, args.dataset)):
-        misc.error("The dataset {}/{} directory does not exist".format(args.data_dir, args.dataset))
-
-    for metric in args.metrics:
-        if metric not in metric_defaults:
-            misc.error("Unknown metric: {}".format(metric))
 
     run(**vars(args))
 

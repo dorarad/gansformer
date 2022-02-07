@@ -68,7 +68,7 @@ class MetricBase:
         self._progress_sec = psec
 
     def run(self, network_pkl, num_imgs, run_dir = None, data_dir = None, dataset_args = None,
-            mirror_augment = None, num_gpus = 1, tf_config = None, log_results = True,
+            mirror_augment = None, ratio = 1.0, num_gpus = 1, tf_config = None, log_results = True,
             Gs_kwargs = dict(is_validation = True), eval_mod = False, **kwargs):
 
         self._reset(network_pkl = network_pkl, run_dir = run_dir, data_dir = data_dir,
@@ -82,7 +82,7 @@ class MetricBase:
             if self._network_pkl is not None:
                 _G, _D, Gs = misc.load_pkl(self._network_pkl)[:3]
             self._evaluate(Gs, Gs_kwargs = Gs_kwargs, num_gpus = num_gpus,
-                num_imgs = num_imgs, **kwargs)
+                num_imgs = num_imgs, ratio = ratio, **kwargs)
             self._report_progress(1, 1)
         self._eval_time = time.time() - time_begin
 
@@ -120,7 +120,7 @@ class MetricBase:
             name = self.name
             tflib.autosummary.autosummary("Metrics/" + name + res.suffix, res.value)
 
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None, **kwargs):
         raise NotImplementedError # to be overridden by subclasses
 
     def _report_result(self, value, suffix = "", fmt = "%-10.4f"):
@@ -137,68 +137,68 @@ class MetricBase:
         val = self._progress_lo + (pcur / pmax) * (self._progress_hi - self._progress_lo)
         dnnlib.RunContext.get().update(status_str, int(val), self._progress_max)
 
-    def _get_cache_file_for_reals(self, num_imgs, extension = "pkl", **kwargs):
+    def _get_cache_file_for_reals(self, num_imgs, ratio, extension = "pkl", **kwargs):
         all_args = dnnlib.EasyDict(metric_name = self.name, mirror_augment = self._mirror_augment)
         all_args.update(self._dataset_args)
         all_args.update(kwargs)
         md5 = hashlib.md5(repr(sorted(all_args.items())).encode("utf-8"))
         dataset_name = self._dataset_args.get("tfrecord_dir", None) or self._dataset_args.get("h5_file", None)
         dataset_name = os.path.splitext(os.path.basename(dataset_name))[0]
-        return os.path.join(".GANsformer-cache", "%s-%s-%s-%s.%s" % (md5.hexdigest(), 
-            self.name, dataset_name, num_imgs, extension))
+        return os.path.join(".GANformer-cache", "%s-%s-%s-%s-%s.%s" % (md5.hexdigest(), 
+            self.name, dataset_name, num_imgs, ratio * 100, extension))
 
     def _get_dataset_obj(self):
         if self._dataset_obj is None:
             self._dataset_obj = dataset.load_dataset(data_dir = self._data_dir, **self._dataset_args)
         return self._dataset_obj
 
-    def _iterate_files(self, paths, minibatch_size):
-        for idx in range(0, len(paths), minibatch_size):
+    def _iterate_files(self, paths, batch_size):
+        for idx in range(0, len(paths), batch_size):
             load_img = lambda img: np.asarray(PIL.Image.open(img).convert("RGB")).transpose(2, 0, 1)
-            imgs = [load_img(img) for img in paths[idx : idx + minibatch_size]]
+            imgs = [load_img(img) for img in paths[idx : idx + batch_size]]
             imgs = np.stack(imgs, axis = 0)
             yield imgs
 
-    def _iterate_reals(self, minibatch_size):
+    def _iterate_reals(self, batch_size):
         dataset_obj = self._get_dataset_obj()
         while True:
-            imgs, _labels = dataset_obj.get_minibatch_np(minibatch_size)
+            imgs, _labels = dataset_obj.get_batch_np(batch_size)
             if self._mirror_augment:
                 imgs = misc.apply_mirror_augment(imgs)
             yield imgs
 
-    def _iterate_fakes(self, Gs, minibatch_size, num_gpus):
+    def _iterate_fakes(self, Gs, batch_size, num_gpus):
         while True:
-            latents = np.random.randn(minibatch_size, *Gs.input_shape[1:])
+            latents = np.random.randn(batch_size, *Gs.input_shape[1:])
             fmt = dict(func = tflib.convert_imgs_to_uint8, nchw_to_nhwc = True)
             imgs = Gs.run(latents, None, output_transform = fmt, is_validation = True, 
                 num_gpus = num_gpus, assume_frozen = True)[0]
             yield imgs
 
-    def _get_random_labels_tf(self, minibatch_size):
-        return self._get_dataset_obj().get_random_labels_tf(minibatch_size)
+    def _get_random_labels_tf(self, batch_size):
+        return self._get_dataset_obj().get_random_labels_tf(batch_size)
 
     def _get_random_imgs_tf(self):
-        return self._get_dataset_obj().get_minibatch_tf()[0]
+        return self._get_dataset_obj().get_batch_tf()[0]
 
     # Iterate over images form the dataset and extract their features.
     # Args:
     #   img_iter: an iterator over image batches
     #   featurizer: a feature extractor featurizer (e.g. inception/vgg), that receives an image batch
     #          and returns their vector feature embeddings
-    #   minibatch_size: size of batches provides by the image iterator
+    #   batch_size: size of batches provides by the image iterator
     #   num_imgs: number of extracted images
     # Returns the features [num_imgs, featurizer.output_shape[1]]
-    def _get_feats(self, img_iter, featurizer, minibatch_size, num_gpus, num_imgs):
+    def _get_feats(self, img_iter, featurizer, batch_size, ratio, num_gpus, num_imgs):
         feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
         itr = enumerate(img_iter)
         if self.eval_mod:
-            itr = tqdm(itr, total = num_imgs / minibatch_size, unit_scale = minibatch_size)
+            itr = tqdm(itr, total = num_imgs / batch_size, unit_scale = batch_size)
         for idx, imgs in itr:
-            begin = idx * minibatch_size
-            end = min(begin + minibatch_size, num_imgs)
+            begin = idx * batch_size
+            end = min(begin + batch_size, num_imgs)
 
-            feats[begin:end] = featurizer.run(imgs[:end-begin], num_gpus = num_gpus, assume_frozen = True)
+            feats[begin:end] = featurizer.run(misc.crop_tensor(imgs[:end-begin], ratio), num_gpus = num_gpus, assume_frozen = True)
 
             if end == num_imgs:
                 break
@@ -210,33 +210,33 @@ class MetricBase:
     #   generator: a model for generating images
     #   featurizer: a feature extractor model (e.g. inception/vgg), that receives an image batch
     #          and returns their vector feature embeddings
-    #   minibatch_size: size of batches provides by the image iterator
-    #   num_imgs: number of extracted iamges
+    #   batch_size: size of batches provides by the image iterator
+    #   num_imgs: number of extracted images
     #   num_gpus: number of GPUs to use for generating the images
     #   g_kwargs: generator arguments
     # Returns the features [num_imgs, featurizer.output_shape[1]]
-    def _gen_feats(self, generator, featurizer, minibatch_size, num_imgs, num_gpus, g_kwargs):
+    def _gen_feats(self, generator, featurizer, batch_size, ratio, num_imgs, num_gpus, g_kwargs):
         # Construct TensorFlow graph
         result_expr = []
         for gpu_idx in range(num_gpus):
             with tf.device("/gpu:%d" % gpu_idx):
-                latents = tf.random_normal([self.minibatch_per_gpu] + generator.input_shape[1:])
-                labels = self._get_random_labels_tf(self.minibatch_per_gpu)
+                latents = tf.random_normal([self.batch_per_gpu] + generator.input_shape[1:])
+                labels = self._get_random_labels_tf(self.batch_per_gpu)
 
                 imgs = generator.clone().get_output_for(latents, labels, **g_kwargs)[0]
-                imgs = tflib.convert_imgs_to_uint8(imgs)
+                imgs = tflib.convert_imgs_to_uint8(misc.crop_tensor(imgs, ratio))
 
                 result_expr.append(featurizer.clone().get_output_for(imgs))
 
         # Compute features for newly generated 'num_imgs' images
-        itr = range(0, num_imgs, minibatch_size)
+        itr = range(0, num_imgs, batch_size)
         if self.eval_mod:
-            itr = tqdm(itr, total = num_imgs / minibatch_size, unit_scale = minibatch_size)
+            itr = tqdm(itr, total = num_imgs / batch_size, unit_scale = batch_size)
 
         feats = np.empty([num_imgs, featurizer.output_shape[1]], dtype = np.float32)
         for begin in itr:
             self._report_progress(begin, num_imgs)
-            end = min(begin + minibatch_size, num_imgs)
+            end = min(begin + batch_size, num_imgs)
             feats[begin:end] = np.concatenate(tflib.run(result_expr), axis = 0)[:end-begin]
         return feats
 
@@ -245,19 +245,19 @@ class MetricBase:
     #   paths: a list of image patch to extract features for.
     #   featurizer: a feature extractor featurizer (e.g. inception/vgg), that receives an image batch
     #          and returns their vector feature embeddings
-    #   minibatch_size: size of batches provides by the image iterator
+    #   batch_size: size of batches provides by the image iterator
     #   num_imgs: number of extracted images
     # Returns the features [num_imgs, featurizer.output_shape[1]]
-    def _paths_to_feats(self, paths, featurizer, minibatch_size, num_gpus, num_imgs = None):
+    def _paths_to_feats(self, paths, featurizer, batch_size, ratio, num_gpus, num_imgs = None):
         paths = glob.glob(paths)
         if num_imgs is not None:
             paths = paths[:num_imgs]
         num_imgs = len(paths)
 
-        print("Evaluting FID on {} imgs.".format(num_imgs))
+        print(f"Evaluting FID on {num_imgs} imgs.")
 
-        imgs = self._iterate_files(paths, minibatch_size)
-        feats = self._get_feats(imgs, featurizer, num_gpus, num_imgs, minibatch_size)
+        imgs = self._iterate_files(paths, batch_size)
+        feats = self._get_feats(imgs, featurizer, num_gpus, num_imgs, batch_size, ratio)
         return feats
 
 # Group of multiple metrics
@@ -280,5 +280,5 @@ class MetricGroup:
 
 # Dummy metric for debugging purposes
 class DummyMetric(MetricBase):
-    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None):
+    def _evaluate(self, Gs, Gs_kwargs, num_gpus, num_imgs, paths = None, **kwargs):
         self._report_result(0.0)

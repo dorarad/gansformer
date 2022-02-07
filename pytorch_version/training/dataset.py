@@ -122,7 +122,7 @@ class ImageFolderDataset(Dataset):
     def __init__(self, path, resolution, **kwargs):
         self.path = path
         if not os.path.exists(f"{path}/{resolution}"):
-            misc.error(f"Dataset folder {path}/{resolution} doesn't exists.")
+            misc.error(f"Dataset folder {path}/{resolution} doesn't exists. Follow data preparation instructions using the prepare_data.py script.")
 
         self.img_files = sorted(glob.glob(f"{path}/{resolution}/*.png"))
         # misc.log(f"Found {len(self.img_files)} images in the dataset.")

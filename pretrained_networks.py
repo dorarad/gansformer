@@ -20,10 +20,6 @@ def get_path_or_url(path_or_gdrive_path, eval = False):
     nets = eval_gdrive_urls if eval else gdrive_urls
     return nets.get(path_or_gdrive_path, path_or_gdrive_path)
 
-
-def get_path_or_url(path_or_gdrive_path):
-    return nets.get(path_or_gdrive_path, path_or_gdrive_path)
-
 _cached_networks = dict()
 
 def load_networks(path_or_gdrive_path):

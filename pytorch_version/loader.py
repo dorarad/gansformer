@@ -16,7 +16,7 @@ pretrained_networks = {
 
 eval_pretrained_networks = pretrained_networks.copy()
 eval_pretrained_networks.update({
-    "gdrive:cityscapes-snapshot-2048.pkl":   "https://drive.google.com/uc?id=1Zw1cFxxN6-iC_M4x6Zbf9lwH9wKryW3p",
+#    "gdrive:cityscapes-snapshot-2048.pkl":   "https://drive.google.com/uc?id=1Zw1cFxxN6-iC_M4x6Zbf9lwH9wKryW3p",
     "gdrive:ffhq-snapshot-1024.pkl":         "https://drive.google.com/uc?id=10V4yK_rQWb4F6Q4vwqkO5XNKX721k3zl"
 })
 

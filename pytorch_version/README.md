@@ -2,7 +2,7 @@
 
 ## Pytorch implementation
 Our repository now supports both **Tensorflow** (at [the main directory](../)) and **Pytorch** (at this directory). 
-The two implementations follow a close code and files structure, and share the same interface. 
+The two implementations follow close code and files structure, and share the same interface. 
 To switch from the TF to Pytorch, simply enter into `pytorch_version`, and install the [requirements](requirements.txt).
 
 ### Pretrained models

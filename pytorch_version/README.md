@@ -20,7 +20,7 @@ Compared to the TF version, we removed several options that didn't contribute em
 --fused-modconv: Fuse modulation and convolution operations (In pytorch we set this automatically to be disabled in training and enabled during evaluation, for best performance)
 ```
 
-### Command-line Options
+### Baseline models
 The Pytorch version supports the GANformer model, as well as Vanilla and StyleGAN2 baselines. 
 The TF version additionally supports k-GAN and SAGAN baselines.
 

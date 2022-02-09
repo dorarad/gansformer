@@ -21,7 +21,7 @@ Compared to the TF version, we removed several options that didn't contribute em
 ```
 
 ### Baseline models
-The Pytorch version supports the GANformer model, as well as Vanilla and StyleGAN2 baselines. 
+The Pytorch version supports the GANformer model, as well as Vanilla and StyleGAN2 baselines.  
 The TF version additionally supports k-GAN and SAGAN baselines.
 
 Please feel free to open an issue or [contact](dorarad@cs.stanford.edu) for any questions or suggestions about the new implementation!

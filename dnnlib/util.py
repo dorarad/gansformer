@@ -21,6 +21,7 @@ import html
 import hashlib
 import glob
 import uuid
+import gdown
 
 from distutils.util import strtobool
 from typing import Any, List, Tuple, Union
@@ -330,6 +331,10 @@ def open_url(url: str, cache_dir: str = None, num_attempts: int = 10, verbose: b
         if len(cache_files) == 1:
             return open(cache_files[0], "rb")
 
+    if "drive.google" in url:
+        filename = gdown.download(url, quiet = False)
+        return open(filename, "rb")
+    
     # Download
     url_name = None
     url_data = None

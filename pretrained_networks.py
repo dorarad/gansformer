@@ -22,8 +22,8 @@ def get_path_or_url(path_or_gdrive_path, eval = False):
 
 _cached_networks = dict()
 
-def load_networks(path_or_gdrive_path):
-    path_or_url = get_path_or_url(path_or_gdrive_path)
+def load_networks(path_or_gdrive_path, eval = False):
+    path_or_url = get_path_or_url(path_or_gdrive_path, eval)
     if path_or_url in _cached_networks:
         return _cached_networks[path_or_url]
 

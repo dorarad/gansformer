@@ -25,7 +25,7 @@ def get_path_or_url(path_or_gdrive_path, eval = False):
     return nets.get(path_or_gdrive_path, path_or_gdrive_path)
 
 def load_network(filename, eval = False):
-    filename = get_path_or_url(filename)
+    filename = get_path_or_url(filename, eval)
     with dnnlib.util.open_url(filename) as f:
         network = load_network_pkl(f)
     return network

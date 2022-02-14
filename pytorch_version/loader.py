@@ -11,7 +11,7 @@ pretrained_networks = {
     "gdrive:clevr-snapshot.pkl":        "https://drive.google.com/uc?id=1zBh-U2kyVgN3C_P_7GqsMEHvBdz2lobu",
     "gdrive:cityscapes-snapshot.pkl":   "https://drive.google.com/uc?id=1XPGYzUP_1ETFtz5bUhpUFPha1IBNTuZh",
     "gdrive:ffhq-snapshot.pkl":         "https://drive.google.com/uc?id=1tgs-hHaziWrh0piuX3sEd8PwE9gFwlNh",
-    "gdrive:bedrooms-snapshot.pkl":     "https://drive.google.com/uc?id=1BpICHESy7O0gjXK0KNES5OgZ130QzMup"
+    "gdrive:bedrooms-snapshot.pkl":     "https://drive.google.com/uc?id=19TykSlMgXIjyIiDLBakmNVEQmD5dTd0s"
 }
 
 eval_pretrained_networks = pretrained_networks.copy()

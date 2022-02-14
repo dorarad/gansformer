@@ -289,6 +289,14 @@ nvcc test_nvcc.cu -o test_nvcc -run
 | GPU says hello.
 ```
 
+In the pytorch version, if you get the following repeating message:
+"Failed to build CUDA kernels for upfirdn2d. Falling back to slow reference implementation"
+make sure your cuda and pytorch versions match. If you have multiple CUDA installed, consider
+using setting ``CUDA_HOME`` to the matching one. E.g. 
+```python
+export CUDA_HOME=/usr/local/cuda-10.1
+```
+
 ## Architecture Overview
 The GANformer consists of two networks:
 

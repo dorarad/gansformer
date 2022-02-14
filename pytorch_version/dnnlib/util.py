@@ -20,6 +20,7 @@ import tempfile
 import urllib
 import urllib.request
 import uuid
+import gdown
 
 from distutils.util import strtobool
 from typing import Any, List, Tuple, Union
@@ -394,6 +395,10 @@ def open_url(url: str, cache_dir: str = None, num_attempts: int = 10, verbose: b
             filename = cache_files[0]
             return filename if return_filename else open(filename, "rb")
 
+    if "drive.google" in url:
+        filename = gdown.download(url, quiet = False)
+        return open(filename, "rb")
+    
     # Download
     url_name = None
     url_data = None

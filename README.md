@@ -289,8 +289,8 @@ nvcc test_nvcc.cu -o test_nvcc -run
 | GPU says hello.
 ```
 
-In the pytorch version, if you get the following repeating message:
-"Failed to build CUDA kernels for upfirdn2d. Falling back to slow reference implementation"
+In the pytorch version, if you get the following repeating message:  
+"Failed to build CUDA kernels for upfirdn2d. Falling back to slow reference implementation"  
 make sure your cuda and pytorch versions match. If you have multiple CUDA installed, consider
 using setting ``CUDA_HOME`` to the matching one. E.g. 
 ```python

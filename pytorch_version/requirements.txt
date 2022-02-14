@@ -13,3 +13,4 @@ easydict
 tqdm
 termcolor
 seaborn
+gdown

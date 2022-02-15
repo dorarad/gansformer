@@ -177,6 +177,8 @@ def setup_snapshot_img_grid(dataset, size = "1080p"):
     elif size == "8k":
         gw = np.clip(7680 // dataset.shape[2], 7, 32)
         gh = np.clip(4320 // dataset.shape[1], 4, 32)
+    elif isinstance(size, tuple):
+        gw, gh = size
     else: # if size is int, return an image list with that number of images
         gw = size
 

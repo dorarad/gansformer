@@ -49,7 +49,7 @@ def run(**args):
     train     = EasyDict(run_func_name = "training.training_loop.training_loop") # training loop options
     sched     = EasyDict()                                                       # TrainingSchedule options
     vis       = EasyDict()                                                       # visualize.eval() options
-    grid      = EasyDict(size = "1080p", layout = "random")                      # setup_snapshot_img_grid() options
+    grid      = EasyDict(size = (3, 2), layout = "random")                       # setup_snapshot_img_grid() options
     sc        = dnnlib.SubmitConfig()                                            # dnnlib.submit_run() options
 
     # GANformer and baselines default settings

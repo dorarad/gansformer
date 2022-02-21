@@ -147,12 +147,12 @@ We provide pretrained models for `bedrooms`, `cityscapes`, `clevr` and `ffhq`.
 
 To train a GANformer in its default configuration form scratch:
 ```python
-python run_network.py --train --gpus 0 --ganformer-default --expname clevr-scratch --dataset clevr
+python run_network.py --train --gpus 0 --ganformer-default --expname clevr-scratch --dataset clevr --eval-images-num 5000
 ```
 
 By defualt, models training is resumed from the latest snapshot. Use `--restart` to strat a new experiment, or `--pretrained-pkl` to select a particular snapshot to load.
 
-For comparing to state-of-the-art, we compute metric scores using 50,000 sample imaegs. To expedite training though, we recommend settings `--eval-images-num` to a lower number. Note though that this can impact the precision of the metrics, so we recommend using a lower value during training, and increasing it back up in the final evaluation.
+For comparing to state-of-the-art, we compute metric scores using 50,000 sample imaegs. To expedite training though, we recommend setting `--eval-images-num` to a lower number. Note though that this can impact the precision of the metrics, so we recommend using a lower value during training, and increasing it back up in the final evaluation.
 
 We support a large variety of command-line options to adjust the model, training, and evaluation. Run `python run_network.py -h` for the full list of options!
 

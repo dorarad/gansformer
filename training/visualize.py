@@ -86,9 +86,9 @@ def vis(G,
     # rather than richer visualizations
     vis = vis_types
     if training:
-        vis = {"imgs", "maps"}
-        if num_heads == 1:
-            vis.add("layer_maps")
+        vis = {"imgs"} #, "maps"
+    #    if num_heads == 1:
+    #        vis.add("layer_maps")
         section_size = num = len(latents)
     else:
         if vis is None:

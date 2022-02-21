@@ -100,7 +100,7 @@ def load_nets(load_pkl, nets, device, log):
             for name, net in [("G", G), ("D", D), ("Gs", Gs)]:
                 torch_misc.copy_params_and_buffers(resume_data[name], net, require_all = False)
         else:
-            for net in resume_data:
+            for net in ["G", "D", "Gs"]:
                 resume_data[net] = copy.deepcopy(resume_data[net]).eval().requires_grad_(False).to(device)
             nets = (resume_data["G"], resume_data["D"], resume_data["Gs"])
 

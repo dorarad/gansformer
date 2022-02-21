@@ -106,9 +106,9 @@ def vis(G,
     vis = vis_types
     # For time efficiency, during training save only image and map samples rather than richer visualizations
     if training:
-        vis = {"imgs", "maps"}
-        if num_heads == 1:
-            vis.add("layer_maps")
+        vis = {"imgs"} # , "maps"
+        # if num_heads == 1:
+        #    vis.add("layer_maps")
     else:
         vis = vis or {"imgs", "maps", "ltnts", "interpolations", "noise_var"}
 

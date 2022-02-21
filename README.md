@@ -315,4 +315,4 @@ The GANformer model can also be seen as a generalization of StyleGAN: while Styl
 ## Acknowledgement
 *_I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
-If you have questions, comments or feedback, please feel free to contact me at dorarad@stanford.edu, Thank you! :)
+If you have questions, comments or feedback, please feel free to contact me at dorarad@cs.stanford.edu, Thank you! :)

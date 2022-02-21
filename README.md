@@ -21,10 +21,6 @@ This is an implementation of the [GANformer](https://arxiv.org/pdf/2103.01209.pd
 The model iteratively propagates information from a set of latent variables to the evolving visual features and vice versa, to support the refinement of each in light of the other and encourage the emergence of compositional representations of objects and scenes. 
 In contrast to the classic transformer architecture, it utilizes multiplicative integration that allows flexible region-based modulation, and can thus be seen as a generalization of the successful StyleGAN network.
 
-*_I wish to thank [Christopher D. Manning](https://nlp.stanford.edu/~manning/) for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
-
-
-
 <img align="right" src="https://cs.stanford.edu/people/dorarad/img3.png" width="270px">
 
 **1st Paper**: [https://arxiv.org/pdf/2103.01209](https://arxiv.org/pdf/2103.01209)  
@@ -315,5 +311,8 @@ The GANformer consists of two networks:
 This codebase builds on top of and extends the great [StyleGAN2](https://github.com/NVlabs/stylegan2) and [StyleGAN2-ADA](https://github.com/NVlabs/stylegan2-ada-pytorch/) repositories by Karras et al.  
 
 The GANformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
+
+## Acknowledgement
+*_I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
 If you have questions, comments or feedback, please feel free to contact me at dorarad@stanford.edu, Thank you! :)

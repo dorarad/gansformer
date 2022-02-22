@@ -76,7 +76,7 @@ def get_weight(shape, gain = 1, use_wscale = True, lrmul = 1, channels_last = Fa
         runtime_coef = lrmul
 
     # Create variable
-    w = torch.randn(shape) / init_std
+    w = torch.randn(shape) * init_std
     w = torch.nn.Parameter(format_memory(w, channels_last))
     return w, runtime_coef
 

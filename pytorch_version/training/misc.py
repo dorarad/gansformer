@@ -5,6 +5,7 @@ import seaborn as sns
 from termcolor import colored
 from tqdm import tqdm
 import math
+import os
 
 # Colorful prints
 # ----------------------------------------------------------------------------

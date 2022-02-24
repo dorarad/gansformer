@@ -6,7 +6,7 @@
 
 # GANformer: Generative Adversarial Transformers
 <p align="center">
-  <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a>* & <a href="http://larryzitnick.org/">C. Lawrence Zitnick</a></b>
+  <b><a href="https://cs.stanford.edu/~dorarad/">Drew A. Hudson</a> & <a href="http://larryzitnick.org/">C. Lawrence Zitnick</a></b>
 </p>
 
 ## Check out our new [PyTorch](pytorch_version) version and the [GANformer2 paper](https://arxiv.org/abs/2111.08960)!
@@ -315,6 +315,6 @@ This codebase builds on top of and extends the great [StyleGAN2](https://github.
 The GANformer model can also be seen as a generalization of StyleGAN: while StyleGAN has one global latent vector that control the style of all image features globally, the GANformer has *k* latent vectors, that cooperate through attention to control regions within the image, and thereby better modeling images of multi-object and compositional scenes.
 
 ## Acknowledgement
-*_I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
+_I wish to thank Christopher D. Manning for the fruitful discussions and constructive feedback in developing the Bipartite Transformer, especially when explored within the language representation area, as well as for providing the kind financial support that allowed this work to happen!_ :sunflower:
 
 If you have questions, comments or feedback, please feel free to contact me at dorarad@cs.stanford.edu, Thank you! :)

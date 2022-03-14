@@ -23,7 +23,8 @@ def _init():
         try:
             _plugin = custom_ops.get_plugin('upfirdn2d_plugin', sources=sources, extra_cuda_cflags=['--use_fast_math'])
         except:
-            warnings.warn('Failed to build CUDA kernels for upfirdn2d. Falling back to slow reference implementation. Details:\n\n' + traceback.format_exc())
+            print('Failed to build CUDA kernels for upfirdn2d. Make sure your PyTorch CUDA is configured. Details:\n\n' + traceback.format_exc())
+            exit()
     return _plugin is not None
 
 def _parse_scaling(scaling):

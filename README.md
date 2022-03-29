@@ -185,13 +185,14 @@ Add `--pretrained-pkl gdrive:<dataset>-snapshot.pkl` to evalute a pretrained mod
 Below we provide the FID-50k scores for the GANformer (_using the pretrained checkpoints above_) as well as baseline models.  
 Note that these scores are different than the scores reported in the StyleGAN2 paper since they run experiments for up to 7x more training steps (5k-15k kimg-steps in our experiments over all models, which takes about 3-4 days with 4 GPUs, vs 50-70k kimg-steps in their experiments, which take over 90 GPU-days).
 
+**Note regarding Generator/Discriminator**: Following ablation experiments, we observed that incorporating the simplex and duplex attention to the generator (rather than to both the generator and discriminator) improve the models' performance. Accordingly, we are releasing pretrained models that incorporate attention to the generator only. We will update the paper's manuscript to reflect these findings!
+
 | Model          | CLEVR        | LSUN-Bedroom | FFHQ       | Cityscapes |
 | :------------: | :----------: | :----------: | :--------: | :--------: |
 | **GAN**        | 25.02        | 12.16        | 13.18      | 11.57      |
 | **kGAN**       | 28.28        | 69.9         | 61.14      | 51.08      |
 | **SAGAN**      | 26.04        | 14.06        | 16.21      | 12.81      |
 | **StyleGAN2**  | 16.05        | 11.53        | 16.21      | 8.35       |
-| **VQGAN**      | 32.60        | 59.63        | 63.12      | 173.80     |
 | **GANformer** | ***9.24***   | ***6.15***   | ***7.42*** | ***5.23*** |
 
 <div>

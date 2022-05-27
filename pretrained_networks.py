@@ -4,16 +4,16 @@ import dnnlib
 import dnnlib.tflib as tflib
 
 gdrive_urls = {
-    "gdrive:clevr-snapshot.pkl":        "https://drive.google.com/uc?id=1zBh-U2kyVgN3C_P_7GqsMEHvBdz2lobu",
-    "gdrive:cityscapes-snapshot.pkl":   "https://drive.google.com/uc?id=1XPGYzUP_1ETFtz5bUhpUFPha1IBNTuZh",
-    "gdrive:ffhq-snapshot.pkl":         "https://drive.google.com/uc?id=1tgs-hHaziWrh0piuX3sEd8PwE9gFwlNh",
-    "gdrive:bedrooms-snapshot.pkl":     "https://drive.google.com/uc?id=19TykSlMgXIjyIiDLBakmNVEQmD5dTd0s"
+    "gdrive:clevr-snapshot.pkl":        "https://drive.google.com/uc?id=1sYtuNEi0HGBH1F8GW2JlF4mCRGGrtZa9",
+    "gdrive:cityscapes-snapshot.pkl":   "https://drive.google.com/uc?id=1iL8S26IYCNAQmUS-6GYCVheKFtCE4ktQ",
+    "gdrive:ffhq-snapshot.pkl":         "https://drive.google.com/uc?id=1-b0vwevUQs6LI_EybdO8XJ5uYSx63vEa",
+    "gdrive:bedrooms-snapshot.pkl":     "https://drive.google.com/uc?id=1lrB4t3hOOpn8YiwHEduIZYzndHrsKX8z"
 }
 
 eval_gdrive_urls = gdrive_urls.copy()
 eval_gdrive_urls.update({
-    "gdrive:cityscapes-snapshot-2048.pkl":   "https://drive.google.com/uc?id=1Zw1cFxxN6-iC_M4x6Zbf9lwH9wKryW3p",
-    "gdrive:ffhq-snapshot-1024.pkl":         "https://drive.google.com/uc?id=10V4yK_rQWb4F6Q4vwqkO5XNKX721k3zl"
+    "gdrive:cityscapes-snapshot-2048.pkl":   "https://drive.google.com/uc?id=1lJlbIuxF89-owG7vQSBYXc8y2RqqP_bP",
+    "gdrive:ffhq-snapshot-1024.pkl":         "https://drive.google.com/uc?id=1OcsibUthk2y8y0slf2lQnrYBAtmdJYCQ"
 })
 
 def get_path_or_url(path_or_gdrive_path, eval = False):

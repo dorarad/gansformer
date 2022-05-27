@@ -7,7 +7,6 @@ import torch
 import dnnlib
 from torch_utils import misc
 
-
 pretrained_networks = {
     "gdrive:clevr-snapshot.pkl":        "https://drive.google.com/uc?id=1sYtuNEi0HGBH1F8GW2JlF4mCRGGrtZa9",
     "gdrive:cityscapes-snapshot.pkl":   "https://drive.google.com/uc?id=1iL8S26IYCNAQmUS-6GYCVheKFtCE4ktQ",

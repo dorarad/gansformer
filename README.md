@@ -40,7 +40,7 @@ In contrast to the classic transformer architecture, it utilizes multiplicative 
 :white_check_mark: Providing models trained for longer  
 :white_check_mark: Releasing the PyTorch version  
 :white_check_mark: Releasing pre-trained models for high-resolutions (up to 1024 x 1024)  
-⬜️ Releasing the GANformer2 model (supporting layout generation and conditional layout2image generation) (coming soon!)
+⬜️ Releasing the GANformer2 model (supporting layout generation and conditional layout2image generation)
 
 If you experience any issues or have suggestions for improvements or extensions, feel free to contact me either thourgh the issues page or at dorarad@stanford.edu. 
 

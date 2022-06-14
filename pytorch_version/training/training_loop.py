@@ -55,7 +55,7 @@ def fetch_data(dataset, dataset_iter, input_shape, drange_net, device, batches_n
         real_c = real_c.to(device).split(batch_gpu)
 
         gen_zs = torch.randn([batches_num * batch_size, *input_shape[1:]], device = device)
-        gen_zs = [gen_zs.split(batch_gpu) for gen_z in gen_zs.split(batch_size)]
+        gen_zs = [gen_z.split(batch_gpu) for gen_z in gen_zs.split(batch_size)]
 
         gen_cs = [dataset.get_label(np.random.randint(len(dataset))) for _ in range(batches_num * batch_size)]
         gen_cs = torch.from_numpy(np.stack(gen_cs)).pin_memory().to(device)
